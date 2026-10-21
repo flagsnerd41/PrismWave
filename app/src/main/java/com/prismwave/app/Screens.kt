@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,6 +40,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +54,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 @Composable
 fun Header(s: AppState) {
@@ -74,51 +79,53 @@ fun Header(s: AppState) {
 
 @Composable
 fun ChipsRow(s: AppState) {
-    val chips = listOf("Relax", "Energize", "Workout", "Focus", "Commute")
-    var sel by remember { mutableStateOf(-1) }
+    val chips = listOf("Relax", "Energize", "Workout", "Focus", "Commute", "Party", "Sleep")
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(chips) { i, c ->
+        itemsIndexed(chips) { _, c ->
             Box(
                 Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(if (sel == i) s.accent.copy(alpha = 0.25f) else Surface2.copy(alpha = 0.7f))
-                    .clickable { sel = if (sel == i) -1 else i }
+                    .background(Surface2.copy(alpha = 0.7f))
+                    .clickable {
+                        s.searchQuery = c + " music"
+                        s.screen = Screen.Search
+                    }
                     .padding(horizontal = 16.dp, vertical = 9.dp)
             ) {
-                Text(c, color = if (sel == i) s.accent else Color.White, fontSize = 14.sp)
+                Text(c, color = Color.White, fontSize = 14.sp)
             }
         }
     }
 }
 
 @Composable
-fun QuickCard(song: Song, s: AppState) {
+fun QuickCard(song: Song, s: AppState, from: List<Song>) {
     Box(
         Modifier
             .width(280.dp)
             .height(190.dp)
             .clip(RoundedCornerShape(26.dp))
-            .clickable { s.play(song) }
+            .clickable { s.play(song, from) }
     ) {
         Cover(song, Modifier.fillMaxSize(), 0.dp, 72.sp)
         Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)))
+                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))
             )
         )
         Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
-            Text(song.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 14.sp)
+            Text(song.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 14.sp, maxLines = 1)
         }
     }
 }
 
 @Composable
-fun SmallCard(song: Song, s: AppState) {
-    Column(Modifier.width(140.dp).clickable { s.play(song) }) {
+fun SmallCard(song: Song, s: AppState, from: List<Song>) {
+    Column(Modifier.width(140.dp).clickable { s.play(song, from) }) {
         Cover(song, Modifier.size(140.dp), 18.dp, 44.sp)
         Spacer(Modifier.height(8.dp))
         Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -127,34 +134,89 @@ fun SmallCard(song: Song, s: AppState) {
 }
 
 @Composable
+fun LoadingRow(s: AppState) {
+    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = s.accent, modifier = Modifier.size(28.dp))
+    }
+}
+
+@Composable
 fun HomeScreen(s: AppState) {
+    LaunchedEffect(Unit) {
+        s.loadFeed("quick", "new music hits")
+        s.loadFeed("chill", "chill songs")
+        s.loadFeed("workout", "workout songs")
+    }
+    val quick = s.feeds["quick"]
+    val chill = s.feeds["chill"]
+    val workout = s.feeds["workout"]
     LazyColumn(contentPadding = PaddingValues(bottom = 180.dp)) {
         item { Header(s) }
         item { ChipsRow(s) }
         item { SectionTitle("Quick picks") }
         item {
-            LazyRow(
+            if (quick == null) LoadingRow(s) else LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) { items(SampleSongs.take(6)) { QuickCard(it, s) } }
+            ) { items(quick.take(8)) { QuickCard(it, s, quick) } }
         }
-        item { SectionTitle("Keep listening") }
-        item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) { items(SampleSongs.reversed()) { SmallCard(it, s) } }
+        if (s.history.isNotEmpty()) {
+            item { SectionTitle("Keep listening") }
+            item {
+                val h = s.history.toList()
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) { items(h.take(12)) { SmallCard(it, s, h) } }
+            }
         }
-        item { SectionTitle("Forgotten favorites") }
-        items(SampleSongs.take(4)) { SongRow(it, s) }
+        if (chill != null && chill.isNotEmpty()) {
+            item { SectionTitle("Chill") }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) { items(chill.take(10)) { SmallCard(it, s, chill) } }
+            }
+        }
+        if (workout != null && workout.isNotEmpty()) {
+            item { SectionTitle("Workout") }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) { items(workout.take(10)) { SmallCard(it, s, workout) } }
+            }
+        }
+        if (s.liked.isNotEmpty()) {
+            item { SectionTitle("Your favorites") }
+            val l = s.liked.toList()
+            items(l.take(4)) { SongRow(it, s, l) }
+        }
     }
 }
 
 @Composable
 fun SearchScreen(s: AppState) {
-    var q by remember { mutableStateOf("") }
-    val results = if (q.isBlank()) SampleSongs else SampleSongs.filter {
-        it.title.contains(q, true) || it.artist.contains(q, true) || it.album.contains(q, true)
+    var results by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf("") }
+    LaunchedEffect(s.searchQuery) {
+        err = ""
+        val q = s.searchQuery.trim()
+        if (q.length < 2) {
+            results = emptyList()
+            busy = false
+            return@LaunchedEffect
+        }
+        delay(500)
+        busy = true
+        try {
+            results = Engine.search(q)
+        } catch (e: Exception) {
+            err = "Search failed: " + (e.message ?: "unknown").take(80)
+        }
+        busy = false
     }
     LazyColumn(contentPadding = PaddingValues(bottom = 180.dp)) {
         item {
@@ -168,8 +230,8 @@ fun SearchScreen(s: AppState) {
         }
         item {
             OutlinedTextField(
-                value = q,
-                onValueChange = { q = it },
+                value = s.searchQuery,
+                onValueChange = { s.searchQuery = it },
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
                 placeholder = { Text("Songs, artists, albums", color = TextDim) },
@@ -184,11 +246,23 @@ fun SearchScreen(s: AppState) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
             )
         }
-        item { SectionTitle(if (q.isBlank()) "Suggested" else "Results") }
-        if (results.isEmpty()) {
-            item { Text("Nothing found", color = TextDim, modifier = Modifier.padding(horizontal = 20.dp)) }
+        if (busy) item { LoadingRow(s) }
+        if (err.isNotEmpty()) {
+            item { Text(err, color = TextDim, modifier = Modifier.padding(20.dp)) }
         }
-        items(results) { SongRow(it, s) }
+        if (s.searchQuery.trim().length < 2) {
+            if (s.history.isNotEmpty()) {
+                item { SectionTitle("Recently played") }
+                val h = s.history.toList()
+                items(h.take(10)) { SongRow(it, s, h) }
+            }
+        } else if (!busy) {
+            item { SectionTitle("Results") }
+            if (results.isEmpty() && err.isEmpty()) {
+                item { Text("Nothing found", color = TextDim, modifier = Modifier.padding(horizontal = 20.dp)) }
+            }
+            items(results) { SongRow(it, s, results) }
+        }
     }
 }
 
@@ -197,18 +271,21 @@ private data class TileInfo(val name: String, val icon: ImageVector, val count: 
 @Composable
 fun LibraryScreen(s: AppState) {
     var open by remember { mutableStateOf<String?>(null) }
+    val top = s.topPlayed()
     val tiles = listOf(
         TileInfo("Liked", Icons.Rounded.Favorite, s.liked.size.toString() + " songs"),
-        TileInfo("Offline", Icons.Rounded.Download, "0 songs"),
-        TileInfo("Cached", Icons.Rounded.Storage, "0 songs"),
-        TileInfo("Local Files", Icons.Rounded.Folder, "0 songs"),
-        TileInfo("Top 50", Icons.Rounded.Star, "50 songs")
+        TileInfo("History", Icons.Rounded.Home, s.history.size.toString() + " songs"),
+        TileInfo("Top 50", Icons.Rounded.Star, top.size.toString() + " songs"),
+        TileInfo("Offline", Icons.Rounded.Download, "Soon"),
+        TileInfo("Cached", Icons.Rounded.Storage, "Soon"),
+        TileInfo("Local Files", Icons.Rounded.Folder, "Soon")
     )
     val o = open
     if (o != null) {
         val songs = when (o) {
-            "Liked" -> SampleSongs.filter { it.id in s.liked }
-            "Top 50" -> SampleSongs
+            "Liked" -> s.liked.toList()
+            "History" -> s.history.toList()
+            "Top 50" -> top
             else -> emptyList()
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 180.dp)) {
@@ -225,13 +302,13 @@ fun LibraryScreen(s: AppState) {
             if (songs.isEmpty()) {
                 item {
                     Text(
-                        if (o == "Liked") "No liked songs yet" else "Arrives with the audio engine",
+                        if (o == "Liked") "No liked songs yet, tap the heart on a song" else "Coming in a later wave",
                         color = TextDim,
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }
             }
-            items(songs) { SongRow(it, s) }
+            items(songs) { SongRow(it, s, songs) }
         }
         return
     }
@@ -246,7 +323,7 @@ fun LibraryScreen(s: AppState) {
             )
         }
         item {
-            val top = SampleSongs[0]
+            val first = top.firstOrNull()
             Box(
                 Modifier
                     .padding(horizontal = 20.dp)
@@ -254,13 +331,19 @@ fun LibraryScreen(s: AppState) {
                     .height(150.dp)
                     .clip(RoundedCornerShape(26.dp))
                     .background(Brush.horizontalGradient(listOf(s.accent.copy(alpha = 0.9f), Surface2)))
-                    .clickable { s.play(top) }
+                    .clickable { if (first != null) s.play(first, top) }
                     .padding(22.dp)
             ) {
                 Column(Modifier.align(Alignment.CenterStart)) {
                     Text("Most played", color = Color.Black.copy(alpha = 0.7f), fontSize = 14.sp)
-                    Text(top.title, color = Color.Black, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    Text(top.artist, color = Color.Black.copy(alpha = 0.7f), fontSize = 15.sp)
+                    Text(
+                        first?.title ?: "Play something first",
+                        color = Color.Black,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                    Text(first?.artist ?: "", color = Color.Black.copy(alpha = 0.7f), fontSize = 15.sp, maxLines = 1)
                 }
             }
         }
@@ -293,7 +376,7 @@ fun LibraryScreen(s: AppState) {
 }
 
 @Composable
-private fun Section(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
             .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -307,7 +390,6 @@ private fun Section(title: String, content: @Composable androidx.compose.foundat
         content()
     }
 }
-
 
 @Composable
 fun SettingsScreen(s: AppState) {
@@ -343,7 +425,7 @@ fun SettingsScreen(s: AppState) {
             }
         }
         Section("Playback") {
-            Text("Crossfade " + s.crossfade.toInt() + " s (active with the audio engine)", color = TextDim)
+            Text("Crossfade " + s.crossfade.toInt() + " s (coming soon)", color = TextDim)
             Slider(value = s.crossfade, onValueChange = { s.crossfade = it }, valueRange = 0f..12f)
             val sl = s.sleepLeft
             Text(

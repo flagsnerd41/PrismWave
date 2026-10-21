@@ -1,37 +1,61 @@
 package com.prismwave.app
 
+import android.content.ComponentName
+import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.core.content.ContextCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 enum class Screen { Home, Search, Library, Settings }
 
 data class Song(
-    val id: Int,
+    val id: String,
     val title: String,
     val artist: String,
-    val album: String,
     val seconds: Int,
+    val url: String,
+    val thumb: String?
+) {
     val color: Color
+        get() = Color.hsv((kotlin.math.abs(id.hashCode()) % 360).toFloat(), 0.5f, 0.55f)
+}
+
+private fun Song.toJson(): JSONObject = JSONObject()
+    .put("id", id).put("title", title).put("artist", artist)
+    .put("seconds", seconds).put("url", url).put("thumb", thumb ?: "")
+
+private fun JSONObject.toSong(): Song = Song(
+    getString("id"), getString("title"), getString("artist"),
+    getInt("seconds"), getString("url"), optString("thumb").ifEmpty { null }
 )
 
-// Sample data. Replaced by the real YouTube Music engine in the next wave.
-val SampleSongs = listOf(
-    Song(1, "Midnight Drive", "Nova Lane", "Neon Roads", 214, Color(0xFFB5651D)),
-    Song(2, "Golden Hour", "Sela Moon", "Warm Light", 188, Color(0xFFC9A227)),
-    Song(3, "Paper Planes", "The Quiet Fields", "Small Wonders", 241, Color(0xFF3E7C6B)),
-    Song(4, "Static Bloom", "Orbit Club", "Signal", 203, Color(0xFF6B4C9A)),
-    Song(5, "Slow Tide", "Marlo Reyes", "Salt & Sand", 265, Color(0xFF2F6690)),
-    Song(6, "Lantern", "Ivy Hart", "After Dark", 197, Color(0xFFA23E48)),
-    Song(7, "Highway Rain", "Nova Lane", "Neon Roads", 232, Color(0xFF4A5759)),
-    Song(8, "Honey & Smoke", "Sela Moon", "Warm Light", 176, Color(0xFF9C6644)),
-    Song(9, "Daydream Club", "Orbit Club", "Signal", 219, Color(0xFF357266)),
-    Song(10, "Northern Lights", "Marlo Reyes", "Salt & Sand", 281, Color(0xFF3A5A8C))
-)
+class AppState(private val ctx: Context) {
+    private val prefs = ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var controller: MediaController? = null
+    private val counts = HashMap<String, Int>()
+    private val known = HashMap<String, Song>()
+    private val loadingFeeds = HashSet<String>()
+    private var ticks = 0
 
-class AppState {
     var screen by mutableStateOf(Screen.Home)
     var current by mutableStateOf<Song?>(null)
     var playing by mutableStateOf(false)
@@ -44,56 +68,201 @@ class AppState {
     var repeat by mutableStateOf(false)
     var crossfade by mutableStateOf(0f)
     var sleepLeft by mutableStateOf(0)
-    var playCount by mutableStateOf(0)
-    var listenSeconds by mutableStateOf(0)
-    val liked = mutableStateListOf<Int>()
+    var status by mutableStateOf("")
+    var searchQuery by mutableStateOf("")
+    var playCount by mutableStateOf(prefs.getInt("playCount", 0))
+    var listenSeconds by mutableStateOf(prefs.getInt("listenSeconds", 0))
+    val liked = mutableStateListOf<Song>()
+    val history = mutableStateListOf<Song>()
+    val feeds = mutableStateMapOf<String, List<Song>>()
+    var queue: List<Song> = emptyList()
 
+    init {
+        liked.addAll(loadSongs("liked"))
+        history.addAll(loadSongs("history"))
+        loadSongs("known").forEach { known[it.id] = it }
+        try {
+            val obj = JSONObject(prefs.getString("counts", "{}") ?: "{}")
+            obj.keys().forEach { counts[it] = obj.getInt(it) }
+        } catch (e: Exception) {
+        }
+        connect()
+    }
+
+    private fun connect() {
+        val token = SessionToken(ctx, ComponentName(ctx, PlaybackService::class.java))
+        val f = MediaController.Builder(ctx, token).buildAsync()
+        f.addListener({
+            try {
+                val c = f.get()
+                controller = c
+                c.addListener(object : Player.Listener {
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        playing = playWhenReady
+                    }
+
+                    override fun onPlaybackStateChanged(state: Int) {
+                        if (state == Player.STATE_ENDED) onEnded()
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        status = "Playback error, tap next"
+                        playing = false
+                    }
+                })
+            } catch (e: Exception) {
+                status = "Player unavailable"
+            }
+        }, ContextCompat.getMainExecutor(ctx))
+    }
+
+    // ---------- storage ----------
+    private fun loadSongs(key: String): List<Song> {
+        val raw = prefs.getString(key, null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { arr.getJSONObject(it).toSong() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveSongs(key: String, list: List<Song>) {
+        prefs.edit().putString(key, JSONArray(list.map { it.toJson() }).toString()).apply()
+    }
+
+    private fun saveAll() {
+        saveSongs("liked", liked)
+        saveSongs("history", history)
+        saveSongs("known", known.values.take(300))
+        prefs.edit()
+            .putString("counts", JSONObject(counts as Map<*, *>).toString())
+            .putInt("playCount", playCount)
+            .putInt("listenSeconds", listenSeconds)
+            .apply()
+    }
+
+    // ---------- library ----------
     fun glassAlpha(): Float = if (batterySaver) 1f else glass
 
-    fun play(song: Song) {
+    fun isLiked(song: Song): Boolean = liked.any { it.id == song.id }
+
+    fun toggleLike(song: Song) {
+        if (isLiked(song)) liked.removeAll { it.id == song.id } else liked.add(0, song)
+        known[song.id] = song
+        saveAll()
+    }
+
+    fun topPlayed(): List<Song> =
+        counts.entries.sortedByDescending { it.value }.take(50).mapNotNull { known[it.key] }
+
+    fun loadFeed(key: String, query: String) {
+        if (feeds.containsKey(key) || !loadingFeeds.add(key)) return
+        scope.launch {
+            try {
+                feeds[key] = Engine.search(query)
+            } catch (e: Exception) {
+                status = "No connection to YouTube Music"
+            }
+            loadingFeeds.remove(key)
+        }
+    }
+
+    // ---------- playback ----------
+    fun play(song: Song, from: List<Song> = listOf(song)) {
         current = song
+        queue = from
         position = 0f
         playing = true
+        status = "Loading..."
         playCount++
+        known[song.id] = song
+        counts[song.id] = (counts[song.id] ?: 0) + 1
+        history.removeAll { it.id == song.id }
+        history.add(0, song)
+        while (history.size > 30) history.removeAt(history.size - 1)
+        saveAll()
+        scope.launch {
+            try {
+                val url = Engine.streamUrl(song.url)
+                var c = controller
+                var tries = 0
+                while (c == null && tries < 50) {
+                    delay(100)
+                    c = controller
+                    tries++
+                }
+                if (c == null) {
+                    status = "Player unavailable"
+                    return@launch
+                }
+                if (current?.id != song.id) return@launch
+                val meta = MediaMetadata.Builder()
+                    .setTitle(song.title)
+                    .setArtist(song.artist)
+                    .setArtworkUri(song.thumb?.let { Uri.parse(it) })
+                    .build()
+                c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setMediaMetadata(meta).build())
+                c.prepare()
+                c.play()
+                status = ""
+            } catch (e: Exception) {
+                status = "Can't play this one: " + (e.message ?: "error").take(50)
+                playing = false
+            }
+        }
     }
 
     fun toggle() {
-        if (current != null) playing = !playing
+        val c = controller ?: return
+        if (current == null) return
+        if (c.playWhenReady) c.pause() else c.play()
+    }
+
+    fun seekTo(sec: Float) {
+        position = sec
+        controller?.seekTo((sec * 1000).toLong())
     }
 
     fun next() {
         val cur = current ?: return
-        val i = SampleSongs.indexOfFirst { it.id == cur.id }
-        val n = if (shuffle) SampleSongs.random() else SampleSongs[(i + 1) % SampleSongs.size]
-        play(n)
+        if (queue.isEmpty()) return
+        val i = queue.indexOfFirst { it.id == cur.id }
+        val n = if (shuffle) queue.random() else queue[(i + 1) % queue.size]
+        play(n, queue)
     }
 
     fun prev() {
         val cur = current ?: return
         if (position > 3f) {
-            position = 0f
+            seekTo(0f)
             return
         }
-        val i = SampleSongs.indexOfFirst { it.id == cur.id }
-        play(SampleSongs[(i - 1 + SampleSongs.size) % SampleSongs.size])
+        if (queue.isEmpty()) return
+        val i = queue.indexOfFirst { it.id == cur.id }
+        play(queue[(i - 1 + queue.size) % queue.size], queue)
     }
 
-    fun toggleLike(song: Song) {
-        if (song.id in liked) liked.remove(song.id) else liked.add(song.id)
+    private fun onEnded() {
+        if (repeat) {
+            controller?.seekTo(0)
+            controller?.play()
+        } else {
+            next()
+        }
     }
 
     fun tick() {
-        if (playing) {
-            position += 1f
+        val c = controller
+        if (c != null && playing && c.playbackState == Player.STATE_READY) {
+            position = c.currentPosition / 1000f
             listenSeconds++
-            val cur = current
-            if (cur != null && position >= cur.seconds) {
-                if (repeat) position = 0f else next()
-            }
+            ticks++
+            if (ticks % 30 == 0) saveAll()
         }
         if (sleepLeft > 0) {
             sleepLeft--
-            if (sleepLeft == 0) playing = false
+            if (sleepLeft == 0) c?.pause()
         }
     }
 }

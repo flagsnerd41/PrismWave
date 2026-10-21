@@ -112,7 +112,12 @@ fun MiniPlayer(s: AppState) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(song.artist, color = TextDim, fontSize = 13.sp, maxLines = 1)
+                    Text(
+                        if (s.status.isNotEmpty()) s.status else song.artist,
+                        color = TextDim,
+                        fontSize = 13.sp,
+                        maxLines = 1
+                    )
                 }
                 RoundBtn(
                     if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -123,7 +128,7 @@ fun MiniPlayer(s: AppState) {
                 RoundBtn(Icons.Rounded.SkipNext, 0f, { s.next() }, 42.dp)
             }
             LinearProgressIndicator(
-                progress = { (s.position / song.seconds).coerceIn(0f, 1f) },
+                progress = { (s.position / song.seconds.coerceAtLeast(1)).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(2.dp),
                 color = s.accent,
                 trackColor = Color.Transparent
@@ -168,9 +173,14 @@ fun FullPlayer(s: AppState) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(song.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text(song.artist, color = TextDim, fontSize = 16.sp, maxLines = 1)
+                Text(
+                    if (s.status.isNotEmpty()) s.status else song.artist,
+                    color = TextDim,
+                    fontSize = 16.sp,
+                    maxLines = 1
+                )
             }
-            val liked = song.id in s.liked
+            val liked = s.isLiked(song)
             Icon(
                 imageVector = if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 contentDescription = null,
@@ -179,10 +189,11 @@ fun FullPlayer(s: AppState) {
             )
         }
         Spacer(Modifier.height(12.dp))
+        val total = song.seconds.coerceAtLeast(1).toFloat()
         Slider(
-            value = s.position.coerceIn(0f, song.seconds.toFloat()),
-            onValueChange = { s.position = it },
-            valueRange = 0f..song.seconds.toFloat()
+            value = s.position.coerceIn(0f, total),
+            onValueChange = { s.seekTo(it) },
+            valueRange = 0f..total
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(fmt(s.position.toInt()), color = TextDim, fontSize = 13.sp)

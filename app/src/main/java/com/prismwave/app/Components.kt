@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +28,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -60,6 +63,14 @@ fun Cover(song: Song, modifier: Modifier = Modifier, radius: Dp = 14.dp, letterS
             fontSize = letterSize,
             fontWeight = FontWeight.Bold
         )
+        if (song.thumb != null) {
+            AsyncImage(
+                model = song.thumb,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -74,6 +85,7 @@ fun Glass(
         Modifier
             .clip(shape)
             .then(modifier)
+            .background(Night)
             .background(Surface2.copy(alpha = alpha))
             .border(1.dp, Color.White.copy(alpha = 0.08f), shape),
         content = content
@@ -112,12 +124,12 @@ fun SectionTitle(text: String) {
 }
 
 @Composable
-fun SongRow(song: Song, s: AppState) {
+fun SongRow(song: Song, s: AppState, from: List<Song> = listOf(song)) {
     val isCurrent = s.current?.id == song.id
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { s.play(song) }
+            .clickable { s.play(song, from) }
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -139,7 +151,7 @@ fun SongRow(song: Song, s: AppState) {
                 overflow = TextOverflow.Ellipsis
             )
         }
-        val liked = song.id in s.liked
+        val liked = s.isLiked(song)
         Icon(
             imageVector = if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             contentDescription = null,
