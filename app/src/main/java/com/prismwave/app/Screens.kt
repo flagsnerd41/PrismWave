@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Folder
@@ -763,17 +764,21 @@ fun PlaylistScreen(s: AppState, id: String) {
     val total = pl.songs.sumOf { it.seconds }
     LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
         item {
-            Box(Modifier.fillMaxWidth().height(400.dp)) {
+            Box(Modifier.fillMaxWidth().height(560.dp)) {
                 val first = pl.songs.firstOrNull()
                 if (first != null) {
-                    Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1000)
+                    Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1200)
                 } else {
                     Box(Modifier.fillMaxSize().background(CardBg2))
                 }
                 Box(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
-                            listOf(Color.Black.copy(alpha = 0.35f), Color.Transparent, Night)
+                            0f to Color.Black.copy(alpha = 0.42f),
+                            0.18f to Color.Transparent,
+                            0.42f to Color.Transparent,
+                            0.72f to Night.copy(alpha = 0.78f),
+                            1f to Night
                         )
                     )
                 )
@@ -786,49 +791,73 @@ fun PlaylistScreen(s: AppState, id: String) {
                     RoundBtn(Icons.Rounded.MoreVert, 0.6f, { menu = true })
                 }
                 Column(
-                    Modifier.align(Alignment.BottomCenter).padding(20.dp),
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         pl.name,
                         color = Color.White,
-                        fontSize = 34.sp,
+                        fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        maxLines = 2
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        pl.songs.size.toString() + " songs  •  " + fmtLong(total),
-                        color = TextDim,
-                        fontSize = 16.sp
+                        pl.songs.size.toString() + "  songs  •  " + fmtLong(total),
+                        color = Color.White.copy(alpha = 0.62f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier.padding(top = 14.dp)
                     )
-                }
-            }
-        }
-        item {
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RoundBtn(Icons.Rounded.Shuffle, 0.9f, {
-                    if (pl.songs.isNotEmpty()) {
-                        s.shuffle = true
-                        s.play(pl.songs.random(), pl.songs)
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier
+                                .bounceClick {
+                                    if (pl.songs.isNotEmpty()) {
+                                        s.shuffle = true
+                                        s.play(pl.songs.random(), pl.songs)
+                                    }
+                                }
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Row(
+                            Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(Color.White)
+                                .bounceClick { if (pl.songs.isNotEmpty()) s.play(pl.songs[0], pl.songs) }
+                                .padding(horizontal = 34.dp, vertical = 15.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Play", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Box(
+                            Modifier
+                                .bounceClick { renaming = true }
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Rounded.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
                     }
-                }, 52.dp)
-                Spacer(Modifier.width(14.dp))
-                Row(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White)
-                        .clickable { if (pl.songs.isNotEmpty()) s.play(pl.songs[0], pl.songs) }
-                        .padding(horizontal = 36.dp, vertical = 15.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Play", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

@@ -43,6 +43,13 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -415,6 +422,7 @@ fun FullPlayer(s: AppState) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TitleRow(
     s: AppState,
@@ -432,14 +440,16 @@ private fun TitleRow(
                 fontSize = titleSize,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.basicMarquee()
             )
             Text(
                 if (s.status.isNotEmpty()) s.status else song.artist,
                 color = Color.White.copy(alpha = 0.65f),
                 fontSize = artistSize,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.basicMarquee()
             )
         }
         val liked = s.isLiked(song)
@@ -467,13 +477,13 @@ private fun TitleRow(
 }
 
 @Composable
-private fun TransportRow(s: AppState, side: Dp, big: Dp) {
+private fun TransportRow(s: AppState, side: Dp, big: Dp, skipIcons: Boolean = false) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PlayerIcon(Icons.Rounded.FastRewind, Color.White, side, side + 28.dp) { s.prev() }
+        PlayerIcon(if (skipIcons) Icons.Rounded.SkipPrevious else Icons.Rounded.FastRewind, Color.White, side, side + 28.dp) { s.prev() }
         Box(Modifier.bounceClick { s.toggle() }.size(big + 18.dp), contentAlignment = Alignment.Center) {
             AnimatedContent(
                 targetState = s.playing,
@@ -491,7 +501,7 @@ private fun TransportRow(s: AppState, side: Dp, big: Dp) {
                 )
             }
         }
-        PlayerIcon(Icons.Rounded.FastForward, Color.White, side, side + 28.dp) { s.next() }
+        PlayerIcon(if (skipIcons) Icons.Rounded.SkipNext else Icons.Rounded.FastForward, Color.White, side, side + 28.dp) { s.next() }
     }
 }
 
@@ -578,41 +588,73 @@ private fun ImmersiveBody(
     val art = rememberArtColor(song)
     val bottom by animateColorAsState(lerp(art, Color.Black, 0.55f), tween(700), label = "ibot")
     val total = song.seconds.coerceAtLeast(1).toFloat()
-    Box(Modifier.fillMaxSize().background(Night)) {
-        Cover(song, Modifier.fillMaxSize(), 0.dp, 160.sp, quality = 1200)
+    val stageFade = remember {
+        Brush.verticalGradient(
+            0f to Color.Black,
+            0.44f to Color.Black,
+            0.58f to Color.Black.copy(alpha = 0.96f),
+            0.70f to Color.Black.copy(alpha = 0.70f),
+            0.82f to Color.Black.copy(alpha = 0.28f),
+            1f to Color.Transparent
+        )
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().background(Night)) {
+        val stageHeight = maxHeight * 0.64f
+        // blurred backdrop that fills the whole screen
+        Cover(song, Modifier.fillMaxSize().blur(50.dp), 0.dp, 160.sp, quality = 600)
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.55f),
-                    0.22f to Color.Transparent,
-                    0.50f to Color.Transparent,
-                    0.78f to bottom.copy(alpha = 0.88f),
-                    1f to bottom
+                    0f to Color.Black.copy(alpha = 0.20f),
+                    0.50f to Color.Black.copy(alpha = 0.30f),
+                    1f to bottom.copy(alpha = 0.90f)
                 )
             )
         )
+        // sharp cover stage on top, fading into the backdrop
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(stageHeight)
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(brush = stageFade, blendMode = BlendMode.DstIn)
+                }
+        ) {
+            Cover(song, Modifier.fillMaxSize(), 0.dp, 160.sp, quality = 1200)
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.45f),
+                        0.22f to Color.Transparent
+                    )
+                )
+            )
+        }
         Column(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 "Playing from PrismWave",
                 color = Color.White,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(top = 18.dp).clickable { s.showPlayer = false }
             )
             Spacer(Modifier.weight(1f))
-            TitleRow(s, song, 28.sp, 21.sp, false, onMenu)
-            Spacer(Modifier.height(16.dp))
+            TitleRow(s, song, 27.sp, 19.sp, false, onMenu)
+            Spacer(Modifier.height(18.dp))
             SeekBar({ s.position }, total, { s.seekTo(it) }, Modifier.fillMaxWidth())
             TimeLabels(s, total)
-            Spacer(Modifier.height(8.dp))
-            TransportRow(s, 50.dp, 84.dp)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
+            TransportRow(s, 50.dp, 72.dp, true)
+            Spacer(Modifier.height(6.dp))
             VolumeRow()
             Spacer(Modifier.height(18.dp))
             Row(
