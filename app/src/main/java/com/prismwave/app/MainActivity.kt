@@ -20,7 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -82,25 +89,48 @@ fun Splash() {
 
 @Composable
 fun Main(s: AppState) {
-    Box(Modifier.fillMaxSize().background(Night)) {
-        Box(Modifier.fillMaxSize().statusBarsPadding()) {
-            when (s.screen) {
-                Screen.Home -> HomeScreen(s)
-                Screen.Search -> SearchScreen(s)
-                Screen.Library -> LibraryScreen(s)
-                Screen.Settings -> SettingsScreen(s)
+    val layer = rememberGraphicsLayer()
+    val backdrop = remember { Backdrop(layer) }
+    SideEffect { backdrop.radius = s.blurRadius }
+    CompositionLocalProvider(LocalBackdrop provides backdrop) {
+        Box(Modifier.fillMaxSize().background(Night)) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { backdrop.size = it }
+                    .drawWithContent {
+                        layer.record { this@drawWithContent.drawContent() }
+                        drawLayer(layer)
+                    }
+                    .background(Night)
+            ) {
+                Box(Modifier.fillMaxSize().statusBarsPadding()) {
+                    when (s.screen) {
+                        Screen.Home -> HomeScreen(s)
+                        Screen.Search -> SearchScreen(s)
+                        Screen.Library -> LibraryScreen(s)
+                        Screen.Settings -> SettingsScreen(s)
+                    }
+                }
             }
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                MiniPlayer(s)
+                NavBar(s)
+            }
+            BackHandler(enabled = s.screen != Screen.Home || s.libraryOpen != null || s.openPlaylist != null) {
+                when {
+                    s.openPlaylist != null -> s.openPlaylist = null
+                    s.libraryOpen != null -> s.libraryOpen = null
+                    else -> s.screen = Screen.Home
+                }
+            }
+            if (s.showPlayer) FullPlayer(s)
         }
-        Column(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            MiniPlayer(s)
-            NavBar(s)
-        }
-        if (s.showPlayer) FullPlayer(s)
     }
 }

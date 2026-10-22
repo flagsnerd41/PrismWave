@@ -47,6 +47,19 @@ private fun JSONObject.toSong(): Song = Song(
     getInt("seconds"), getString("url"), optString("thumb").ifEmpty { null }
 )
 
+data class Playlist(val id: String, val name: String, val songs: List<Song>)
+
+private fun Playlist.toJson(): JSONObject = JSONObject()
+    .put("id", id).put("name", name).put("songs", JSONArray(songs.map { it.toJson() }))
+
+private fun JSONObject.toPlaylist(): Playlist {
+    val arr = getJSONArray("songs")
+    return Playlist(
+        getString("id"), getString("name"),
+        (0 until arr.length()).map { arr.getJSONObject(it).toSong() }
+    )
+}
+
 class AppState(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -76,11 +89,21 @@ class AppState(private val ctx: Context) {
     val history = mutableStateListOf<Song>()
     val feeds = mutableStateMapOf<String, List<Song>>()
     var queue: List<Song> = emptyList()
+    val playlists = mutableStateListOf<Playlist>()
+    var libraryOpen by mutableStateOf<String?>(null)
+    var openPlaylist by mutableStateOf<String?>(null)
+    var libTab by mutableStateOf(0)
+    var blurRadius by mutableStateOf(48f)
 
     init {
         liked.addAll(loadSongs("liked"))
         history.addAll(loadSongs("history"))
         loadSongs("known").forEach { known[it.id] = it }
+        try {
+            val arr = JSONArray(prefs.getString("playlists", "[]") ?: "[]")
+            for (i in 0 until arr.length()) playlists.add(arr.getJSONObject(i).toPlaylist())
+        } catch (e: Exception) {
+        }
         try {
             val obj = JSONObject(prefs.getString("counts", "{}") ?: "{}")
             obj.keys().forEach { counts[it] = obj.getInt(it) }
@@ -140,6 +163,53 @@ class AppState(private val ctx: Context) {
             .putInt("playCount", playCount)
             .putInt("listenSeconds", listenSeconds)
             .apply()
+    }
+
+    // ---------- playlists ----------
+    private fun savePlaylists() {
+        prefs.edit().putString("playlists", JSONArray(playlists.map { it.toJson() }).toString()).apply()
+    }
+
+    fun createPlaylist(name: String): String {
+        val id = System.currentTimeMillis().toString()
+        playlists.add(Playlist(id, name.trim().ifEmpty { "New playlist" }, emptyList()))
+        savePlaylists()
+        return id
+    }
+
+    private fun updatePlaylist(id: String, change: (Playlist) -> Playlist) {
+        val i = playlists.indexOfFirst { it.id == id }
+        if (i < 0) return
+        playlists[i] = change(playlists[i])
+        savePlaylists()
+    }
+
+    fun renamePlaylist(id: String, name: String) =
+        updatePlaylist(id) { it.copy(name = name.trim().ifEmpty { it.name }) }
+
+    fun deletePlaylist(id: String) {
+        playlists.removeAll { it.id == id }
+        savePlaylists()
+    }
+
+    fun addToPlaylist(id: String, song: Song) {
+        known[song.id] = song
+        updatePlaylist(id) { p -> if (p.songs.any { it.id == song.id }) p else p.copy(songs = p.songs + song) }
+    }
+
+    fun removeFromPlaylist(id: String, songId: String) =
+        updatePlaylist(id) { p -> p.copy(songs = p.songs.filter { it.id != songId }) }
+
+    fun moveInPlaylist(id: String, index: Int, delta: Int) = updatePlaylist(id) { p ->
+        val to = index + delta
+        if (index !in p.songs.indices || to !in p.songs.indices) {
+            p
+        } else {
+            val list = p.songs.toMutableList()
+            val item = list.removeAt(index)
+            list.add(to, item)
+            p.copy(songs = list)
+        }
     }
 
     // ---------- library ----------

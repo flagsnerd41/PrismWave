@@ -5,11 +5,11 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-val Gold = Color(0xFFE8B04B)
-val Night = Color(0xFF121110)
-val Surface1 = Color(0xFF1C1A18)
-val Surface2 = Color(0xFF26231F)
-val TextDim = Color(0xFFB5ADA3)
+val Gold = Color(0xFFE3C96B)
+val Night = Color(0xFF16120C)
+val Surface1 = Color(0xFF241F15)
+val Surface2 = Color(0xFF2F2819)
+val TextDim = Color(0xFFB8AE98)
 
 @Composable
 fun PrismTheme(accent: Color = Gold, content: @Composable () -> Unit) {

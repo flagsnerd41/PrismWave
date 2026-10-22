@@ -1,6 +1,7 @@
 package com.prismwave.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -21,7 +22,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
@@ -51,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,32 +66,39 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun NavBar(s: AppState) {
     val items = listOf(
-        Screen.Home to Icons.Rounded.Home,
-        Screen.Search to Icons.Rounded.Search,
-        Screen.Library to Icons.Rounded.LibraryMusic,
-        Screen.Settings to Icons.Rounded.Settings
+        Triple(Screen.Home, Icons.Rounded.Explore, "Home"),
+        Triple(Screen.Search, Icons.Rounded.Search, "Search"),
+        Triple(Screen.Library, Icons.Rounded.GridView, "Library")
     )
-    Glass(s.glassAlpha(), Modifier.fillMaxWidth().height(64.dp), RoundedCornerShape(32.dp)) {
+    Glass(s.glassAlpha(), Modifier.fillMaxWidth().height(78.dp), RoundedCornerShape(30.dp)) {
         Row(
             Modifier.fillMaxSize().padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items.forEach { (screen, icon) ->
+            items.forEach { (screen, icon, label) ->
                 val sel = s.screen == screen
-                Row(
+                Column(
                     Modifier
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(if (sel) s.accent.copy(alpha = 0.2f) else Color.Transparent)
-                        .clickable { s.screen = screen }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .clickable {
+                            s.screen = screen
+                            s.libraryOpen = null
+                            s.openPlaylist = null
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(icon, contentDescription = null, tint = if (sel) s.accent else TextDim)
-                    if (sel) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(screen.name, color = s.accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        Modifier
+                            .width(66.dp)
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(17.dp))
+                            .background(if (sel) s.accent.copy(alpha = 0.28f) else Color.Transparent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icon, contentDescription = null, tint = if (sel) s.accent else TextDim)
                     }
+                    Text(label, color = if (sel) s.accent else TextDim, fontSize = 12.sp)
                 }
             }
         }
@@ -98,41 +111,55 @@ fun MiniPlayer(s: AppState) {
     Glass(
         s.glassAlpha(),
         Modifier.fillMaxWidth().clickable { s.showPlayer = true },
-        RoundedCornerShape(26.dp)
+        RoundedCornerShape(32.dp)
     ) {
-        Column {
-            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Cover(song, Modifier.size(46.dp), 14.dp)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        song.title,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        if (s.status.isNotEmpty()) s.status else song.artist,
-                        color = TextDim,
-                        fontSize = 13.sp,
-                        maxLines = 1
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+                val progress = (s.position / song.seconds.coerceAtLeast(1)).coerceIn(0f, 1f)
+                val ring = s.accent
+                Canvas(Modifier.fillMaxSize()) {
+                    drawArc(
+                        color = ring,
+                        startAngle = -90f,
+                        sweepAngle = 360f * progress,
+                        useCenter = false,
+                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                     )
                 }
-                RoundBtn(
-                    if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    0f,
-                    { s.toggle() },
-                    42.dp
-                )
-                RoundBtn(Icons.Rounded.SkipNext, 0f, { s.next() }, 42.dp)
+                Cover(song, Modifier.size(46.dp).clip(CircleShape), 23.dp)
             }
-            LinearProgressIndicator(
-                progress = { (s.position / song.seconds.coerceAtLeast(1)).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(2.dp),
-                color = s.accent,
-                trackColor = Color.Transparent
-            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    if (s.status.isNotEmpty()) s.status else song.artist,
+                    color = TextDim,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            RoundBtn(Icons.Rounded.SkipPrevious, 0.9f, { s.prev() }, 42.dp)
+            Spacer(Modifier.width(6.dp))
+            Box(
+                Modifier.size(52.dp).clip(CircleShape).background(s.accent).clickable { s.toggle() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+            Spacer(Modifier.width(6.dp))
+            RoundBtn(Icons.Rounded.SkipNext, 0.9f, { s.next() }, 42.dp)
         }
     }
 }
@@ -141,6 +168,7 @@ fun MiniPlayer(s: AppState) {
 fun FullPlayer(s: AppState) {
     val song = s.current ?: return
     var sleepDialog by remember { mutableStateOf(false) }
+    var addDialog by remember { mutableStateOf(false) }
     BackHandler { s.showPlayer = false }
     Column(
         Modifier
@@ -160,6 +188,8 @@ fun FullPlayer(s: AppState) {
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center
             )
+            RoundBtn(Icons.Rounded.Add, 0.4f, { addDialog = true })
+            Spacer(Modifier.width(8.dp))
             RoundBtn(
                 Icons.Rounded.Bedtime,
                 0.4f,
@@ -242,6 +272,7 @@ fun FullPlayer(s: AppState) {
             )
         }
     }
+    if (addDialog) AddToPlaylistDialog(song, s) { addDialog = false }
     if (sleepDialog) {
         AlertDialog(
             onDismissRequest = { sleepDialog = false },
