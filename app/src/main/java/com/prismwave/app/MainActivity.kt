@@ -5,7 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -105,11 +114,20 @@ fun Main(s: AppState) {
                     .background(Night)
             ) {
                 Box(Modifier.fillMaxSize().statusBarsPadding()) {
-                    when (s.screen) {
-                        Screen.Home -> HomeScreen(s)
-                        Screen.Search -> SearchScreen(s)
-                        Screen.Library -> LibraryScreen(s)
-                        Screen.Settings -> SettingsScreen(s)
+                    AnimatedContent(
+                        targetState = s.screen,
+                        transitionSpec = {
+                            (fadeIn(tween(260)) + scaleIn(initialScale = 0.96f, animationSpec = tween(260))) togetherWith
+                                fadeOut(tween(140))
+                        },
+                        label = "screens"
+                    ) { scr ->
+                        when (scr) {
+                            Screen.Home -> HomeScreen(s)
+                            Screen.Search -> SearchScreen(s)
+                            Screen.Library -> LibraryScreen(s)
+                            Screen.Settings -> SettingsScreen(s)
+                        }
                     }
                 }
             }
@@ -130,7 +148,12 @@ fun Main(s: AppState) {
                     else -> s.screen = Screen.Home
                 }
             }
-            if (s.showPlayer) FullPlayer(s)
+            AnimatedVisibility(
+                visible = s.showPlayer,
+                enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = 300f)) { it } + fadeIn(tween(200)),
+                exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))
+            ) { FullPlayer(s) }
+            if (s.showLogin) LoginScreen(s)
         }
     }
 }

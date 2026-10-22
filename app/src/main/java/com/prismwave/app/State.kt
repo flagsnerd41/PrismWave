@@ -3,6 +3,8 @@ package com.prismwave.app
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.webkit.CookieManager
+import java.io.IOException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -94,6 +96,12 @@ class AppState(private val ctx: Context) {
     var openPlaylist by mutableStateOf<String?>(null)
     var libTab by mutableStateOf(0)
     var blurRadius by mutableStateOf(48f)
+    var showLogin by mutableStateOf(false)
+    var accountMsg by mutableStateOf("")
+    var backupMsg by mutableStateOf("")
+    var importing by mutableStateOf(false)
+    var cookie by mutableStateOf(prefs.getString("ytCookie", "") ?: "")
+    val signedIn: Boolean get() = cookie.contains("SAPISID")
 
     init {
         liked.addAll(loadSongs("liked"))
@@ -163,6 +171,116 @@ class AppState(private val ctx: Context) {
             .putInt("playCount", playCount)
             .putInt("listenSeconds", listenSeconds)
             .apply()
+    }
+
+    // ---------- account ----------
+    fun onLogin(c: String) {
+        cookie = c
+        prefs.edit().putString("ytCookie", c).apply()
+        showLogin = false
+        accountMsg = "Signed in. Tap Import to get your playlists."
+    }
+
+    fun signOut() {
+        cookie = ""
+        prefs.edit().remove("ytCookie").apply()
+        CookieManager.getInstance().removeAllCookies(null)
+        CookieManager.getInstance().flush()
+        accountMsg = "Signed out"
+    }
+
+    private fun upsertPlaylist(p: Playlist) {
+        val i = playlists.indexOfFirst { it.id == p.id }
+        if (i >= 0) playlists[i] = p else playlists.add(p)
+        savePlaylists()
+    }
+
+    fun importAccount() {
+        if (importing || !signedIn) return
+        importing = true
+        accountMsg = "Importing liked songs..."
+        scope.launch {
+            try {
+                val remoteLiked = YtAccount.songs(cookie, "VLLM")
+                var addedLiked = 0
+                for (sg in remoteLiked) {
+                    known[sg.id] = sg
+                    if (!isLiked(sg)) {
+                        liked.add(sg)
+                        addedLiked++
+                    }
+                }
+                val pls = YtAccount.playlists(cookie).take(40)
+                var done = 0
+                for (p in pls) {
+                    accountMsg = "Importing playlist " + (done + 1) + " of " + pls.size + "..."
+                    val songs = YtAccount.songs(cookie, p.browseId)
+                    songs.forEach { known[it.id] = it }
+                    upsertPlaylist(Playlist("yt_" + p.browseId, p.name, songs))
+                    done++
+                }
+                saveAll()
+                accountMsg = "Done: " + done + " playlists, " + addedLiked + " new liked songs"
+            } catch (e: YtAccount.AuthException) {
+                accountMsg = "Session expired, sign in again"
+            } catch (e: Exception) {
+                accountMsg = "Import failed: " + (e.message ?: "error").take(60)
+            }
+            importing = false
+        }
+    }
+
+    // ---------- backup ----------
+    private fun buildBackup(): String {
+        val o = JSONObject()
+        o.put("version", 1)
+        o.put("liked", JSONArray(liked.map { it.toJson() }))
+        o.put("history", JSONArray(history.map { it.toJson() }))
+        o.put("playlists", JSONArray(playlists.map { it.toJson() }))
+        o.put("known", JSONArray(known.values.map { it.toJson() }))
+        o.put("counts", JSONObject(counts as Map<*, *>))
+        o.put("playCount", playCount)
+        o.put("listenSeconds", listenSeconds)
+        return o.toString()
+    }
+
+    fun exportTo(uri: Uri) {
+        try {
+            ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(buildBackup().toByteArray()) }
+            backupMsg = "Backup saved (" + liked.size + " liked, " + playlists.size + " playlists)"
+        } catch (e: Exception) {
+            backupMsg = "Backup failed: " + (e.message ?: "error").take(60)
+        }
+    }
+
+    fun importFrom(uri: Uri) {
+        try {
+            val text = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                ?: throw IOException("empty file")
+            val o = JSONObject(text)
+            fun songs(key: String): List<Song> {
+                val a = o.optJSONArray(key) ?: return emptyList()
+                return (0 until a.length()).map { a.getJSONObject(it).toSong() }
+            }
+            liked.clear()
+            liked.addAll(songs("liked"))
+            history.clear()
+            history.addAll(songs("history"))
+            known.clear()
+            songs("known").forEach { known[it.id] = it }
+            playlists.clear()
+            val pa = o.optJSONArray("playlists")
+            if (pa != null) for (i in 0 until pa.length()) playlists.add(pa.getJSONObject(i).toPlaylist())
+            counts.clear()
+            o.optJSONObject("counts")?.let { c -> c.keys().forEach { counts[it] = c.getInt(it) } }
+            playCount = o.optInt("playCount", playCount)
+            listenSeconds = o.optInt("listenSeconds", listenSeconds)
+            saveAll()
+            savePlaylists()
+            backupMsg = "Restored " + liked.size + " liked, " + playlists.size + " playlists"
+        } catch (e: Exception) {
+            backupMsg = "Restore failed: " + (e.message ?: "bad file").take(60)
+        }
     }
 
     // ---------- playlists ----------
@@ -270,7 +388,7 @@ class AppState(private val ctx: Context) {
                 val meta = MediaMetadata.Builder()
                     .setTitle(song.title)
                     .setArtist(song.artist)
-                    .setArtworkUri(song.thumb?.let { Uri.parse(it) })
+                    .setArtworkUri(song.thumb?.let { Uri.parse(artUrl(it, 800)) })
                     .build()
                 c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setMediaMetadata(meta).build())
                 c.prepare()

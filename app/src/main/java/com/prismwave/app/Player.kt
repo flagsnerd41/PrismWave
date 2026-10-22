@@ -1,7 +1,27 @@
 package com.prismwave.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -88,17 +108,28 @@ fun NavBar(s: AppState) {
                         },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    val pillW by animateDpAsState(
+                        if (sel) 68.dp else 34.dp,
+                        spring(dampingRatio = 0.55f, stiffness = 380f),
+                        label = "pillw"
+                    )
+                    val pillC by animateColorAsState(
+                        if (sel) s.accent.copy(alpha = 0.28f) else Color.Transparent,
+                        tween(250),
+                        label = "pillc"
+                    )
+                    val iconC by animateColorAsState(if (sel) s.accent else TextDim, tween(250), label = "iconc")
                     Box(
                         Modifier
-                            .width(66.dp)
+                            .width(pillW)
                             .height(34.dp)
                             .clip(RoundedCornerShape(17.dp))
-                            .background(if (sel) s.accent.copy(alpha = 0.28f) else Color.Transparent),
+                            .background(pillC),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(icon, contentDescription = null, tint = if (sel) s.accent else TextDim)
+                        Icon(icon, contentDescription = null, tint = iconC)
                     }
-                    Text(label, color = if (sel) s.accent else TextDim, fontSize = 12.sp)
+                    Text(label, color = iconC, fontSize = 12.sp)
                 }
             }
         }
@@ -147,17 +178,7 @@ fun MiniPlayer(s: AppState) {
             }
             RoundBtn(Icons.Rounded.SkipPrevious, 0.9f, { s.prev() }, 42.dp)
             Spacer(Modifier.width(6.dp))
-            Box(
-                Modifier.size(52.dp).clip(CircleShape).background(s.accent).clickable { s.toggle() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
+            PlayButton(s, 52.dp, 30.dp)
             Spacer(Modifier.width(6.dp))
             RoundBtn(Icons.Rounded.SkipNext, 0.9f, { s.next() }, 42.dp)
         }
@@ -170,10 +191,24 @@ fun FullPlayer(s: AppState) {
     var sleepDialog by remember { mutableStateOf(false) }
     var addDialog by remember { mutableStateOf(false) }
     BackHandler { s.showPlayer = false }
+    val bg by animateColorAsState(song.color.copy(alpha = 0.55f), tween(700), label = "bg")
+    val dragY = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
     Column(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(song.color.copy(alpha = 0.55f), Night, Night)))
+            .offset { IntOffset(0, dragY.value.roundToInt()) }
+            .draggable(
+                state = rememberDraggableState { d ->
+                    scope.launch { dragY.snapTo((dragY.value + d).coerceAtLeast(0f)) }
+                },
+                orientation = Orientation.Vertical,
+                onDragStopped = {
+                    if (dragY.value > 300f) s.showPlayer = false
+                    else dragY.animateTo(0f, spring(dampingRatio = 0.7f))
+                }
+            )
+            .background(Brush.verticalGradient(listOf(bg, Night, Night)))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
             .statusBarsPadding()
             .navigationBarsPadding()
@@ -198,7 +233,7 @@ fun FullPlayer(s: AppState) {
             )
         }
         Spacer(Modifier.height(12.dp))
-        Cover(song, Modifier.fillMaxWidth().aspectRatio(1f), 28.dp, 96.sp)
+        Cover(song, Modifier.fillMaxWidth().aspectRatio(1f), 28.dp, 96.sp, quality = 1000)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -247,17 +282,7 @@ fun FullPlayer(s: AppState) {
                 tint = Color.White,
                 modifier = Modifier.size(40.dp).clickable { s.prev() }
             )
-            Box(
-                Modifier.size(72.dp).clip(CircleShape).background(s.accent).clickable { s.toggle() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
+            PlayButton(s, 76.dp, 42.dp)
             Icon(
                 Icons.Rounded.SkipNext,
                 contentDescription = null,
@@ -295,5 +320,38 @@ fun FullPlayer(s: AppState) {
                 }
             }
         )
+    }
+}
+
+@Composable
+fun PlayButton(s: AppState, size: Dp, iconSize: Dp) {
+    val corner by animateDpAsState(
+        if (s.playing) size / 3 else size / 2,
+        spring(dampingRatio = 0.5f, stiffness = 300f),
+        label = "morph"
+    )
+    Box(
+        Modifier
+            .bounceClick { s.toggle() }
+            .size(size)
+            .clip(RoundedCornerShape(corner))
+            .background(s.accent),
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedContent(
+            targetState = s.playing,
+            transitionSpec = {
+                (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
+                    (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
+            },
+            label = "playicon"
+        ) { playing ->
+            Icon(
+                if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                contentDescription = null,
+                tint = Color.Black,
+                modifier = Modifier.size(iconSize)
+            )
+        }
     }
 }

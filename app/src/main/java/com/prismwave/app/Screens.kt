@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -128,17 +130,17 @@ fun LoadingRow(s: AppState) {
 }
 
 @Composable
-fun QuickCard(song: Song, s: AppState, from: List<Song>) {
+fun QuickCard(song: Song, s: AppState, from: List<Song>, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(30.dp)
     Box(
-        Modifier
+        modifier
             .width(300.dp)
             .height(340.dp)
             .clip(shape)
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
             .clickable { s.play(song, from) }
     ) {
-        Cover(song, Modifier.fillMaxSize(), 0.dp, 90.sp)
+        Cover(song, Modifier.fillMaxSize(), 0.dp, 90.sp, quality = 800)
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
@@ -161,8 +163,8 @@ fun QuickCard(song: Song, s: AppState, from: List<Song>) {
 }
 
 @Composable
-fun RecentCard(song: Song, s: AppState, from: List<Song>) {
-    Column(Modifier.width(140.dp).clickable { s.play(song, from) }) {
+fun RecentCard(song: Song, s: AppState, from: List<Song>, modifier: Modifier = Modifier) {
+    Column(modifier.width(140.dp).clickable { s.play(song, from) }) {
         Box {
             Cover(song, Modifier.size(140.dp), 24.dp, 44.sp)
             PlayBadge(s.accent, Modifier.align(Alignment.BottomEnd).padding(8.dp))
@@ -180,7 +182,7 @@ fun SongRowList(title: String, songs: List<Song>, s: AppState) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) { items(songs.take(12)) { RecentCard(it, s, songs) } }
+    ) { itemsIndexed(songs.take(12)) { i, sg -> RecentCard(sg, s, songs, Modifier.appear(i)) } }
 }
 
 // ------------------------------------------------------------ home
@@ -216,7 +218,7 @@ fun HomeScreen(s: AppState) {
             if (quick == null) LoadingRow(s) else LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) { items(quick.take(8)) { QuickCard(it, s, quick) } }
+            ) { itemsIndexed(quick.take(8)) { i, q -> QuickCard(q, s, quick, Modifier.appear(i)) } }
         }
         item { SongRowList("Recently played", s.history.toList(), s) }
         item { SongRowList("Chill", chill, s) }
@@ -355,12 +357,12 @@ fun SearchScreen(s: AppState) {
             }
             if (tab == 0) {
                 item { SectionTitle("Mood & Genres") }
-                items(Moods.chunked(2)) { pair ->
+                itemsIndexed(Moods.chunked(2)) { ri, pair ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        pair.forEach { MoodTile(it, s, Modifier.weight(1f)) }
+                        pair.forEach { MoodTile(it, s, Modifier.weight(1f).appear(ri)) }
                         if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
@@ -717,7 +719,7 @@ fun PlaylistScreen(s: AppState, id: String) {
             Box(Modifier.fillMaxWidth().height(400.dp)) {
                 val first = pl.songs.firstOrNull()
                 if (first != null) {
-                    Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp)
+                    Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1000)
                 } else {
                     Box(Modifier.fillMaxSize().background(Surface2))
                 }
@@ -812,11 +814,12 @@ fun PlaylistScreen(s: AppState, id: String) {
                 )
             }
         }
-        itemsIndexed(pl.songs) { i, song ->
+        itemsIndexed(pl.songs, key = { _, sg -> sg.id }) { i, song ->
             val cur = s.current?.id == song.id
             var rowMenu by remember { mutableStateOf(false) }
             Row(
                 Modifier
+                    .animateItem()
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 2.dp)
                     .clip(RoundedCornerShape(20.dp))
@@ -923,7 +926,26 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
 }
 
 @Composable
+private fun ActionButton(text: String, accent: Color, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .bounceClick { if (enabled) onClick() }
+            .clip(RoundedCornerShape(50))
+            .background(if (enabled) accent else Surface2)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+        Text(text, color = if (enabled) Color.Black else TextDim, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
 fun SettingsScreen(s: AppState) {
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) s.exportTo(uri) }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) s.importFrom(uri) }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 220.dp)) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { s.screen = Screen.Home })
@@ -963,6 +985,44 @@ fun SettingsScreen(s: AppState) {
                 if (sl > 0) "Sleep timer: " + fmt(sl) + " left" else "Sleep timer: off (set it in the player)",
                 color = TextDim
             )
+        }
+        Section("YouTube Music account") {
+            if (s.signedIn) {
+                Text("Signed in", color = Color.White)
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ActionButton(if (s.importing) "Importing..." else "Import playlists", s.accent, !s.importing) {
+                        s.importAccount()
+                    }
+                    ActionButton("Sign out", s.accent) { s.signOut() }
+                }
+            } else {
+                Text("Sign in to bring over your playlists and liked songs.", color = TextDim)
+                Spacer(Modifier.height(10.dp))
+                ActionButton("Sign in", s.accent) { s.showLogin = true }
+            }
+            if (s.accountMsg.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(s.accountMsg, color = TextDim, fontSize = 13.sp)
+            }
+        }
+        Section("Backup") {
+            Text(
+                "Saves liked songs, playlists, history and stats to a file you choose. Your login is never included.",
+                color = TextDim,
+                fontSize = 13.sp
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ActionButton("Back up", s.accent) { exportLauncher.launch("PrismWave-backup.json") }
+                ActionButton("Restore", s.accent) {
+                    importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                }
+            }
+            if (s.backupMsg.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(s.backupMsg, color = TextDim, fontSize = 13.sp)
+            }
         }
         Section("Stats") {
             Text("Songs played: " + s.playCount, color = Color.White)

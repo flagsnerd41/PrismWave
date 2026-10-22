@@ -58,7 +58,21 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import kotlinx.coroutines.delay
 
 fun fmt(sec: Int): String = "%d:%02d".format(sec / 60, sec % 60)
 
@@ -66,6 +80,64 @@ fun fmtLong(sec: Int): String {
     val h = sec / 3600
     val m = (sec % 3600) / 60
     return if (h > 0) h.toString() + "h " + m + "m" else m.toString() + "m"
+}
+
+private val sizeWh = Regex("=w\\d+-h\\d+")
+private val sizeS = Regex("=s\\d+")
+private val ytThumb = Regex("/(default|mqdefault|hqdefault|sddefault)\\.jpg")
+
+/** Asks YouTube/Google for a sharper version of the same artwork. */
+fun artUrl(url: String, px: Int): String = when {
+    "googleusercontent.com" in url || "ggpht.com" in url -> when {
+        sizeWh.containsMatchIn(url) -> sizeWh.replace(url, "=w" + px + "-h" + px)
+        sizeS.containsMatchIn(url) -> sizeS.replace(url, "=s" + px)
+        else -> url
+    }
+    "i.ytimg.com" in url && px >= 700 -> ytThumb.replace(url, "/hq720.jpg")
+    else -> url
+}
+
+/** Spring squish + tick on tap (Material expressive feel). */
+fun Modifier.bounceClick(onClick: () -> Unit): Modifier = composed {
+    var pressed by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+    val cb by rememberUpdatedState(onClick)
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = 500f),
+        label = "bounce"
+    )
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    pressed = true
+                    tryAwaitRelease()
+                    pressed = false
+                },
+                onTap = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    cb()
+                }
+            )
+        }
+}
+
+/** Fade + rise-in with a small stagger. */
+fun Modifier.appear(index: Int): Modifier = composed {
+    val a = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay((index * 60L).coerceAtMost(420L))
+        a.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 200f))
+    }
+    this.graphicsLayer {
+        alpha = a.value
+        translationY = (1f - a.value) * 60f
+    }
 }
 
 /** Holds a recorded copy of the screen content so bars can draw a blurred version of it. */
@@ -87,7 +159,14 @@ fun PLogo(size: Dp, color: Color = Gold) {
 }
 
 @Composable
-fun Cover(song: Song, modifier: Modifier = Modifier, radius: Dp = 14.dp, letterSize: TextUnit = 22.sp) {
+fun Cover(
+    song: Song,
+    modifier: Modifier = Modifier,
+    radius: Dp = 14.dp,
+    letterSize: TextUnit = 22.sp,
+    quality: Int = 400
+) {
+    val ctx = LocalContext.current
     Box(
         modifier
             .clip(RoundedCornerShape(radius))
@@ -100,9 +179,13 @@ fun Cover(song: Song, modifier: Modifier = Modifier, radius: Dp = 14.dp, letterS
             fontSize = letterSize,
             fontWeight = FontWeight.Bold
         )
-        if (song.thumb != null) {
+        val thumb = song.thumb
+        if (thumb != null) {
+            val req = remember(thumb, quality) {
+                ImageRequest.Builder(ctx).data(artUrl(thumb, quality)).crossfade(350).build()
+            }
             AsyncImage(
-                model = song.thumb,
+                model = req,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -154,10 +237,10 @@ fun RoundBtn(
 ) {
     Box(
         Modifier
+            .bounceClick(onClick)
             .size(size)
             .clip(CircleShape)
-            .background(Surface2.copy(alpha = alpha))
-            .clickable(onClick = onClick),
+            .background(Surface2.copy(alpha = alpha)),
         contentAlignment = Alignment.Center
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = tint)
@@ -168,9 +251,9 @@ fun RoundBtn(
 fun Chip(text: String, selected: Boolean, accent: Color, icon: ImageVector? = null, onClick: () -> Unit) {
     Row(
         Modifier
+            .bounceClick(onClick)
             .clip(RoundedCornerShape(50))
             .background(if (selected) accent else Surface2.copy(alpha = 0.8f))
-            .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
