@@ -1,5 +1,6 @@
 package com.prismwave.app
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -12,10 +13,13 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -64,52 +75,101 @@ class MainActivity : ComponentActivity() {
             val appCtx = LocalContext.current.applicationContext
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
-                var splash by remember { mutableStateOf(true) }
-                LaunchedEffect(Unit) {
-                    delay(1300)
-                    splash = false
-                }
+                var splashDone by remember { mutableStateOf(false) }
+                val blur = remember { Animatable(BLUR0) }
+                val shown = remember { Animatable(0f) }
+                val logoIn = remember { Animatable(0f) }
+                val titleIn = remember { Animatable(0f) }
                 LaunchedEffect(Unit) {
                     while (true) {
                         delay(1000)
                         s.tick()
                     }
                 }
-                Crossfade(targetState = splash, label = "splash") { showSplash ->
-                    if (showSplash) Splash() else Main(s)
+                LaunchedEffect(Unit) {
+                    launch { shown.animateTo(1f, tween(350)) }
+                    launch { logoIn.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 180f)) }
+                    delay(350)
+                    launch { titleIn.animateTo(1f, tween(600)) }
+                    delay(1250)
+                    launch { shown.animateTo(0f, tween(450)) }
+                    blur.animateTo(0f, tween(1400, easing = FastOutSlowInEasing))
+                    splashDone = true
+                }
+                Box(Modifier.fillMaxSize().background(Night)) {
+                    Box(
+                        Modifier.fillMaxSize().graphicsLayer {
+                            renderEffect = if (Build.VERSION.SDK_INT >= 31 && blur.value > 0.5f) {
+                                BlurEffect(blur.value, blur.value, TileMode.Clamp)
+                            } else {
+                                null
+                            }
+                        }
+                    ) { Main(s) }
+                    if (!splashDone) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) { detectTapGestures { } }
+                                .background(Color.Black.copy(alpha = 0.45f * (blur.value / BLUR0).coerceIn(0f, 1f))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                Modifier.graphicsLayer { alpha = shown.value },
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    Modifier.graphicsLayer {
+                                        translationY = (1f - logoIn.value) * 260f
+                                    }
+                                ) { AppLogo(112.dp) }
+                                Spacer(Modifier.height(18.dp))
+                                Text(
+                                    "PrismWave",
+                                    color = Color.White,
+                                    fontFamily = PrismFont,
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.6.sp,
+                                    modifier = Modifier.graphicsLayer {
+                                        alpha = titleIn.value
+                                        translationY = (1f - titleIn.value) * 140f
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-@Composable
-fun Splash() {
-    val a = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { a.animateTo(1f, tween(700)) }
-    Box(Modifier.fillMaxSize().background(Night), contentAlignment = Alignment.Center) {
-        Column(Modifier.alpha(a.value), horizontalAlignment = Alignment.CenterHorizontally) {
-            PLogo(84.dp, Gold)
-            Spacer(Modifier.height(16.dp))
-            Text("PrismWave", color = Gold, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
+private const val BLUR0 = 70f
 
 @Composable
 fun Main(s: AppState) {
     val layer = rememberGraphicsLayer()
     val backdrop = remember { Backdrop(layer) }
-    SideEffect { backdrop.radius = s.blurRadius }
-    CompositionLocalProvider(LocalBackdrop provides backdrop) {
+    val blurR = s.blurRadius
+    val blurActive = s.blurOn && !s.batterySaver && Build.VERSION.SDK_INT >= 31
+    SideEffect {
+        backdrop.radius = blurR
+        backdrop.enabled = blurActive
+    }
+    CompositionLocalProvider(LocalBackdrop provides backdrop, LocalReduceMotion provides s.reduceMotion) {
         Box(Modifier.fillMaxSize().background(Night)) {
             Box(
                 Modifier
                     .fillMaxSize()
                     .onSizeChanged { backdrop.size = it }
                     .drawWithContent {
-                        layer.record { this@drawWithContent.drawContent() }
-                        drawLayer(layer)
+                        if (blurActive) {
+                            layer.record { this@drawWithContent.drawContent() }
+                            drawLayer(layer)
+                        } else {
+                            drawContent()
+                        }
                     }
                     .background(Night)
             ) {
@@ -117,8 +177,15 @@ fun Main(s: AppState) {
                     AnimatedContent(
                         targetState = s.screen,
                         transitionSpec = {
-                            (fadeIn(tween(260)) + scaleIn(initialScale = 0.96f, animationSpec = tween(260))) togetherWith
-                                fadeOut(tween(140))
+                            if (s.reduceMotion) {
+                                fadeIn(tween(120)) togetherWith fadeOut(tween(80))
+                            } else {
+                                val dir = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                                (slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { w -> w * dir / 3 } +
+                                    fadeIn(tween(260))) togetherWith
+                                    (slideOutHorizontally(tween(340, easing = FastOutSlowInEasing)) { w -> -w * dir / 3 } +
+                                        fadeOut(tween(180)))
+                            }
                         },
                         label = "screens"
                     ) { scr ->

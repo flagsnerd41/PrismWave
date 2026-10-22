@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,13 +87,15 @@ fun Header(s: AppState) {
         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PLogo(36.dp, s.accent)
-        Spacer(Modifier.width(10.dp))
+        AppLogo(42.dp)
+        Spacer(Modifier.width(12.dp))
         Text(
             "PrismWave",
             color = Color.White,
-            fontSize = 24.sp,
+            fontFamily = PrismFont,
+            fontSize = 27.sp,
             fontWeight = FontWeight.Bold,
+            letterSpacing = 0.4.sp,
             modifier = Modifier.weight(1f)
         )
         RoundBtn(Icons.Rounded.History, 0.9f, {
@@ -954,9 +957,19 @@ fun SettingsScreen(s: AppState) {
         }
         Section("Look") {
             Text("Bar tint " + (s.glass * 100).toInt() + "%", color = TextDim)
-            Slider(value = s.glass, onValueChange = { s.glass = it }, valueRange = 0.3f..1f)
+            Slider(
+                value = s.glass,
+                onValueChange = { s.glass = it },
+                valueRange = 0.3f..1f,
+                onValueChangeFinished = { s.saveSettings() }
+            )
             Text("Blur strength " + s.blurRadius.toInt() + " (Android 12+)", color = TextDim)
-            Slider(value = s.blurRadius, onValueChange = { s.blurRadius = it }, valueRange = 10f..90f)
+            Slider(
+                value = s.blurRadius,
+                onValueChange = { s.blurRadius = it },
+                valueRange = 10f..200f,
+                onValueChangeFinished = { s.saveSettings() }
+            )
             Text("Accent", color = TextDim)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -966,15 +979,65 @@ fun SettingsScreen(s: AppState) {
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(c)
-                            .clickable { s.accent = c }
+                            .clickable {
+                                s.accent = c
+                                s.saveSettings()
+                            }
                     )
                 }
             }
         }
+        Section("Performance") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Blur on bars", color = Color.White, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = s.blurOn,
+                    onCheckedChange = {
+                        s.blurOn = it
+                        s.saveSettings()
+                    }
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Reduce motion", color = Color.White, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = s.reduceMotion,
+                    onCheckedChange = {
+                        s.reduceMotion = it
+                        s.saveSettings()
+                    }
+                )
+            }
+            Text("If the app ever feels slow, turn both of these on.", color = TextDim, fontSize = 13.sp)
+        }
+        Section("Player style") {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Chip("Album", true, s.accent) { }
+                listOf("Vinyl", "Minimal", "Immersive").forEach { name ->
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(Surface2.copy(alpha = 0.5f))
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text(name, color = TextDim, fontSize = 15.sp) }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("More player styles are coming soon.", color = TextDim, fontSize = 13.sp)
+        }
         Section("Battery") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Battery saver (no blur)", color = Color.White, modifier = Modifier.weight(1f))
-                Switch(checked = s.batterySaver, onCheckedChange = { s.batterySaver = it })
+                Switch(
+                    checked = s.batterySaver,
+                    onCheckedChange = {
+                        s.batterySaver = it
+                        s.saveSettings()
+                    }
+                )
             }
         }
         Section("Playback") {

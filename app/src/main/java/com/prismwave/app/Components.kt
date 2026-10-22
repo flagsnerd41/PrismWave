@@ -2,6 +2,8 @@ package com.prismwave.app
 
 import android.os.Build
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -127,12 +129,17 @@ fun Modifier.bounceClick(onClick: () -> Unit): Modifier = composed {
         }
 }
 
-/** Fade + rise-in with a small stagger. */
+val LocalReduceMotion = compositionLocalOf { false }
+
+/** Fade + rise-in with a small stagger (skipped when Reduce motion is on). */
 fun Modifier.appear(index: Int): Modifier = composed {
-    val a = remember { Animatable(0f) }
+    val reduce = LocalReduceMotion.current
+    val a = remember { Animatable(if (reduce) 1f else 0f) }
     LaunchedEffect(Unit) {
-        delay((index * 60L).coerceAtMost(420L))
-        a.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 200f))
+        if (!reduce) {
+            delay((index * 60L).coerceAtMost(420L))
+            a.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 200f))
+        }
     }
     this.graphicsLayer {
         alpha = a.value
@@ -143,10 +150,20 @@ fun Modifier.appear(index: Int): Modifier = composed {
 /** Holds a recorded copy of the screen content so bars can draw a blurred version of it. */
 class Backdrop(val layer: GraphicsLayer) {
     var size by mutableStateOf(IntSize.Zero)
-    var radius by mutableStateOf(48f)
+    var radius by mutableStateOf(80f)
+    var enabled by mutableStateOf(true)
 }
 
 val LocalBackdrop = compositionLocalOf<Backdrop?> { null }
+
+@Composable
+fun AppLogo(size: Dp) {
+    Image(
+        painter = painterResource(R.drawable.app_logo),
+        contentDescription = null,
+        modifier = Modifier.size(size).clip(RoundedCornerShape(size * 0.24f))
+    )
+}
 
 @Composable
 fun PLogo(size: Dp, color: Color = Gold) {
@@ -202,7 +219,7 @@ fun Glass(
     content: @Composable BoxScope.() -> Unit
 ) {
     val backdrop = LocalBackdrop.current
-    val useBlur = backdrop != null && Build.VERSION.SDK_INT >= 31 && alpha < 0.999f
+    val useBlur = backdrop != null && backdrop.enabled && Build.VERSION.SDK_INT >= 31 && alpha < 0.999f
     val blurLayer = rememberGraphicsLayer()
     var pos by remember { mutableStateOf(Offset.Zero) }
     Box(
@@ -212,11 +229,13 @@ fun Glass(
             .onGloballyPositioned { pos = it.positionInRoot() }
             .drawBehind {
                 if (useBlur && backdrop != null && backdrop.size.width > 0) {
+                    // Only the bar's own area is blurred (much cheaper than the whole screen).
                     blurLayer.renderEffect = BlurEffect(backdrop.radius, backdrop.radius, TileMode.Clamp)
-                    blurLayer.record(this, layoutDirection, backdrop.size) {
-                        drawLayer(backdrop.layer)
+                    blurLayer.clip = true
+                    blurLayer.record(this, layoutDirection, IntSize(size.width.toInt(), size.height.toInt())) {
+                        translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
                     }
-                    translate(-pos.x, -pos.y) { drawLayer(blurLayer) }
+                    drawLayer(blurLayer)
                 } else {
                     drawRect(Night)
                 }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -19,6 +20,8 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -70,15 +73,17 @@ class AppState(private val ctx: Context) {
     private val known = HashMap<String, Song>()
     private val loadingFeeds = HashSet<String>()
     private var ticks = 0
+    private var saveJob: Job? = null
+    private var plJob: Job? = null
 
     var screen by mutableStateOf(Screen.Home)
     var current by mutableStateOf<Song?>(null)
     var playing by mutableStateOf(false)
     var position by mutableStateOf(0f)
     var showPlayer by mutableStateOf(false)
-    var glass by mutableStateOf(0.75f)
-    var batterySaver by mutableStateOf(false)
-    var accent by mutableStateOf(Gold)
+    var glass by mutableStateOf(prefs.getFloat("glass", 0.75f))
+    var batterySaver by mutableStateOf(prefs.getBoolean("batterySaver", false))
+    var accent by mutableStateOf(Color(prefs.getInt("accent", Gold.toArgb())))
     var shuffle by mutableStateOf(false)
     var repeat by mutableStateOf(false)
     var crossfade by mutableStateOf(0f)
@@ -95,7 +100,9 @@ class AppState(private val ctx: Context) {
     var libraryOpen by mutableStateOf<String?>(null)
     var openPlaylist by mutableStateOf<String?>(null)
     var libTab by mutableStateOf(0)
-    var blurRadius by mutableStateOf(48f)
+    var blurRadius by mutableStateOf(prefs.getFloat("blur", 80f))
+    var blurOn by mutableStateOf(prefs.getBoolean("blurOn", true))
+    var reduceMotion by mutableStateOf(prefs.getBoolean("reduceMotion", false))
     var showLogin by mutableStateOf(false)
     var accountMsg by mutableStateOf("")
     var backupMsg by mutableStateOf("")
@@ -162,14 +169,38 @@ class AppState(private val ctx: Context) {
         prefs.edit().putString(key, JSONArray(list.map { it.toJson() }).toString()).apply()
     }
 
+    // Saves are debounced and the JSON is built off the main thread (this used to cause stutter).
     private fun saveAll() {
-        saveSongs("liked", liked)
-        saveSongs("history", history)
-        saveSongs("known", known.values.take(300))
+        saveJob?.cancel()
+        saveJob = scope.launch {
+            delay(1200)
+            val likedSnap = liked.toList()
+            val histSnap = history.toList()
+            val knownSnap = known.values.take(300)
+            val countsSnap = HashMap(counts)
+            val pc = playCount
+            val ls = listenSeconds
+            withContext(Dispatchers.Default) {
+                prefs.edit()
+                    .putString("liked", JSONArray(likedSnap.map { it.toJson() }).toString())
+                    .putString("history", JSONArray(histSnap.map { it.toJson() }).toString())
+                    .putString("known", JSONArray(knownSnap.map { it.toJson() }).toString())
+                    .putString("counts", JSONObject(countsSnap as Map<*, *>).toString())
+                    .putInt("playCount", pc)
+                    .putInt("listenSeconds", ls)
+                    .apply()
+            }
+        }
+    }
+
+    fun saveSettings() {
         prefs.edit()
-            .putString("counts", JSONObject(counts as Map<*, *>).toString())
-            .putInt("playCount", playCount)
-            .putInt("listenSeconds", listenSeconds)
+            .putFloat("glass", glass)
+            .putFloat("blur", blurRadius)
+            .putBoolean("batterySaver", batterySaver)
+            .putBoolean("blurOn", blurOn)
+            .putBoolean("reduceMotion", reduceMotion)
+            .putInt("accent", accent.toArgb())
             .apply()
     }
 
@@ -285,7 +316,14 @@ class AppState(private val ctx: Context) {
 
     // ---------- playlists ----------
     private fun savePlaylists() {
-        prefs.edit().putString("playlists", JSONArray(playlists.map { it.toJson() }).toString()).apply()
+        plJob?.cancel()
+        plJob = scope.launch {
+            delay(800)
+            val snap = playlists.toList()
+            withContext(Dispatchers.Default) {
+                prefs.edit().putString("playlists", JSONArray(snap.map { it.toJson() }).toString()).apply()
+            }
+        }
     }
 
     fun createPlaylist(name: String): String {

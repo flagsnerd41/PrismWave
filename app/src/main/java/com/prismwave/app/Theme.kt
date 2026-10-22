@@ -4,6 +4,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+
+val PrismFont = FontFamily(Font(R.font.outfit_bold, FontWeight.Bold))
 
 val Gold = Color(0xFFE3C96B)
 val Night = Color(0xFF16120C)

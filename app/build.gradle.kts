@@ -11,8 +11,26 @@ android {
         applicationId = "com.prismwave.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 8
+        versionName = "0.6.0"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("prismwave.jks")
+            storePassword = "prismwave"
+            keyAlias = "prismwave"
+            keyPassword = "prismwave"
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     buildFeatures { compose = true }

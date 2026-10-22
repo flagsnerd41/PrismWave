@@ -2,22 +2,33 @@ package com.prismwave.app
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -221,11 +232,32 @@ object YtAccount {
 @Composable
 fun LoginScreen(s: AppState) {
     BackHandler { s.showLogin = false }
-    Column(Modifier.fillMaxSize().background(Night).statusBarsPadding().navigationBarsPadding()) {
+    var info by remember { mutableStateOf("Loading...") }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Night)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding()
+    ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             RoundBtn(Icons.Rounded.Close, 0.9f, { s.showLogin = false })
             Spacer(Modifier.width(12.dp))
-            Text("Sign in to YouTube Music", color = Color.White, fontWeight = FontWeight.Bold)
+            Column(Modifier.weight(1f)) {
+                Text("Sign in to YouTube Music", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(info, color = TextDim, fontSize = 12.sp, maxLines = 1)
+            }
+            Box(
+                Modifier
+                    .bounceClick {
+                        val c = CookieManager.getInstance().getCookie("https://music.youtube.com") ?: ""
+                        if (c.contains("SAPISID")) s.onLogin(c) else info = "Not signed in yet, finish the sign-in first"
+                    }
+                    .clip(RoundedCornerShape(50))
+                    .background(s.accent)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            ) { Text("Done", color = Color.Black, fontWeight = FontWeight.SemiBold) }
         }
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -233,12 +265,13 @@ fun LoginScreen(s: AppState) {
                 WebView(ctx).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
-                    settings.userAgentString = YtAccount.UA
+                    settings.javaScriptCanOpenWindowsAutomatically = true
                     CookieManager.getInstance().setAcceptCookie(true)
                     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
+                            info = (url ?: "").removePrefix("https://").take(60)
                             if (url != null && url.startsWith("https://music.youtube.com")) {
                                 val c = CookieManager.getInstance().getCookie("https://music.youtube.com") ?: ""
                                 if (c.contains("SAPISID")) {
@@ -247,8 +280,23 @@ fun LoginScreen(s: AppState) {
                                 }
                             }
                         }
+
+                        override fun onReceivedError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            error: WebResourceError?
+                        ) {
+                            super.onReceivedError(view, request, error)
+                            if (request?.isForMainFrame == true) {
+                                info = "Page error: " + (error?.description ?: "unknown")
+                            }
+                        }
                     }
-                    loadUrl("https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F")
+                    loadUrl(
+                        "https://accounts.google.com/ServiceLogin?ltmpl=music&service=youtube&passive=true" +
+                            "&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue" +
+                            "%26next%3Dhttps%253A%252F%252Fmusic.youtube.com%252F"
+                    )
                 }
             }
         )

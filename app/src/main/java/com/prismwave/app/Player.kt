@@ -2,6 +2,31 @@ package com.prismwave.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import android.content.Context
+import android.media.AudioManager
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.VolumeDown
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.drawable.toBitmap
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
@@ -146,9 +171,10 @@ fun MiniPlayer(s: AppState) {
     ) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
-                val progress = (s.position / song.seconds.coerceAtLeast(1)).coerceIn(0f, 1f)
                 val ring = s.accent
+                val total = song.seconds.coerceAtLeast(1)
                 Canvas(Modifier.fillMaxSize()) {
+                    val progress = (s.position / total).coerceIn(0f, 1f)
                     drawArc(
                         color = ring,
                         startAngle = -90f,
@@ -186,14 +212,126 @@ fun MiniPlayer(s: AppState) {
 }
 
 @Composable
+fun rememberArtColor(song: Song): Color {
+    val ctx = LocalContext.current
+    var color by remember(song.id) { mutableStateOf(song.color) }
+    LaunchedEffect(song.id) {
+        val t = song.thumb ?: return@LaunchedEffect
+        try {
+            val req = ImageRequest.Builder(ctx).data(artUrl(t, 200)).allowHardware(false).size(48).build()
+            val res = ctx.imageLoader.execute(req)
+            val bmp = (res as? SuccessResult)?.drawable?.toBitmap(1, 1)
+            if (bmp != null) color = Color(bmp.getPixel(0, 0))
+        } catch (e: Exception) {
+        }
+    }
+    return color
+}
+
+@Composable
+fun SeekBar(
+    positionProvider: () -> Float,
+    max: Float,
+    onSeek: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var dragging by remember { mutableStateOf(false) }
+    val h by animateDpAsState(if (dragging) 12.dp else 6.dp, spring(dampingRatio = 0.6f, stiffness = 400f), label = "seekh")
+    Box(
+        modifier
+            .height(30.dp)
+            .pointerInput(max) {
+                detectTapGestures { off -> onSeek((off.x / size.width).coerceIn(0f, 1f) * max) }
+            }
+            .pointerInput(max) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragging = true },
+                    onDragEnd = { dragging = false },
+                    onDragCancel = { dragging = false }
+                ) { change, _ ->
+                    change.consume()
+                    onSeek((change.position.x / size.width).coerceIn(0f, 1f) * max)
+                }
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(h)
+                .clip(RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = 0.28f))
+        )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(h)
+                .clip(RoundedCornerShape(50))
+                .drawBehind {
+                    val frac = (positionProvider() / max).coerceIn(0f, 1f)
+                    drawRect(Color.White.copy(alpha = 0.92f), size = Size(size.width * frac, size.height))
+                }
+        )
+    }
+}
+
+@Composable
+private fun TimeLabels(s: AppState, total: Float) {
+    val pos = s.position.coerceIn(0f, total)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(fmt(pos.toInt()), color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        Text("-" + fmt((total - pos).toInt()), color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun PlayerIcon(icon: ImageVector, tint: Color, size: Dp = 26.dp, box: Dp = 48.dp, onClick: () -> Unit) {
+    Box(Modifier.bounceClick(onClick).size(box), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
+    }
+}
+
+@Composable
+private fun VolumeRow() {
+    val ctx = LocalContext.current
+    val am = remember { ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    val maxVol = remember { am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
+    var vol by remember { mutableStateOf(am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Rounded.VolumeDown, contentDescription = null, tint = Color.White.copy(alpha = 0.7f))
+        SeekBar(
+            positionProvider = { vol },
+            max = maxVol.toFloat(),
+            onSeek = {
+                vol = it
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, it.toInt(), 0)
+            },
+            modifier = Modifier.weight(1f).padding(horizontal = 10.dp)
+        )
+        Icon(Icons.Rounded.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.7f))
+    }
+}
+
+@Composable
 fun FullPlayer(s: AppState) {
     val song = s.current ?: return
     var sleepDialog by remember { mutableStateOf(false) }
     var addDialog by remember { mutableStateOf(false) }
+    var menuDialog by remember { mutableStateOf(false) }
     BackHandler { s.showPlayer = false }
-    val bg by animateColorAsState(song.color.copy(alpha = 0.55f), tween(700), label = "bg")
+    val art = rememberArtColor(song)
+    val c1 by animateColorAsState(lerp(art, Night, 0.15f), tween(700), label = "g1")
+    val c2 by animateColorAsState(lerp(art, Night, 0.45f), tween(700), label = "g2")
+    val c3 by animateColorAsState(lerp(art, Night, 0.80f), tween(700), label = "g3")
     val dragY = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val coverScale by animateFloatAsState(
+        if (s.playing) 1f else 0.88f,
+        spring(dampingRatio = 0.6f, stiffness = 260f),
+        label = "cover"
+    )
+    val total = song.seconds.coerceAtLeast(1).toFloat()
+    val coverShape = RoundedCornerShape(20.dp)
     Column(
         Modifier
             .fillMaxSize()
@@ -208,95 +346,130 @@ fun FullPlayer(s: AppState) {
                     else dragY.animateTo(0f, spring(dampingRatio = 0.7f))
                 }
             )
-            .background(Brush.verticalGradient(listOf(bg, Night, Night)))
+            .background(Brush.verticalGradient(listOf(c1, c2, c3)))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 26.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            RoundBtn(Icons.Rounded.KeyboardArrowDown, 0.4f, { s.showPlayer = false })
-            Text(
-                "Now playing",
-                color = TextDim,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            RoundBtn(Icons.Rounded.Add, 0.4f, { addDialog = true })
-            Spacer(Modifier.width(8.dp))
-            RoundBtn(
-                Icons.Rounded.Bedtime,
-                0.4f,
-                { sleepDialog = true },
-                tint = if (s.sleepLeft > 0) s.accent else Color.White
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Cover(song, Modifier.fillMaxWidth().aspectRatio(1f), 28.dp, 96.sp, quality = 1000)
-        Spacer(Modifier.height(24.dp))
+        Box(
+            Modifier
+                .padding(top = 10.dp, bottom = 20.dp)
+                .width(44.dp)
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.45f))
+                .clickable { s.showPlayer = false }
+        )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .graphicsLayer {
+                    scaleX = coverScale
+                    scaleY = coverScale
+                }
+                .shadow(22.dp, coverShape)
+        ) { Cover(song, Modifier.fillMaxSize(), 20.dp, 96.sp, quality = 1000) }
+        Spacer(Modifier.height(26.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(song.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(
+                    song.title,
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     if (s.status.isNotEmpty()) s.status else song.artist,
-                    color = TextDim,
-                    fontSize = 16.sp,
-                    maxLines = 1
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 19.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             val liked = s.isLiked(song)
-            Icon(
-                imageVector = if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                contentDescription = null,
-                tint = if (liked) s.accent else Color.White,
-                modifier = Modifier.size(30.dp).clickable { s.toggleLike(song) }
-            )
+            Box(
+                Modifier
+                    .bounceClick { s.toggleLike(song) }
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (liked) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Box(
+                Modifier
+                    .bounceClick { menuDialog = true }
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.MoreHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
         }
-        Spacer(Modifier.height(12.dp))
-        val total = song.seconds.coerceAtLeast(1).toFloat()
-        Slider(
-            value = s.position.coerceIn(0f, total),
-            onValueChange = { s.seekTo(it) },
-            valueRange = 0f..total
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(fmt(s.position.toInt()), color = TextDim, fontSize = 13.sp)
-            Text(fmt(song.seconds), color = TextDim, fontSize = 13.sp)
-        }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.weight(1f))
+        SeekBar({ s.position }, total, { s.seekTo(it) }, Modifier.fillMaxWidth())
+        TimeLabels(s, total)
+        Spacer(Modifier.weight(1f))
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Rounded.Shuffle,
-                contentDescription = null,
-                tint = if (s.shuffle) s.accent else TextDim,
-                modifier = Modifier.size(28.dp).clickable { s.shuffle = !s.shuffle }
-            )
-            Icon(
-                Icons.Rounded.SkipPrevious,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(40.dp).clickable { s.prev() }
-            )
-            PlayButton(s, 76.dp, 42.dp)
-            Icon(
-                Icons.Rounded.SkipNext,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(40.dp).clickable { s.next() }
-            )
-            Icon(
-                Icons.Rounded.Repeat,
-                contentDescription = null,
-                tint = if (s.repeat) s.accent else TextDim,
-                modifier = Modifier.size(28.dp).clickable { s.repeat = !s.repeat }
-            )
+            PlayerIcon(Icons.Rounded.FastRewind, Color.White, 44.dp, 72.dp) { s.prev() }
+            Box(Modifier.bounceClick { s.toggle() }.size(96.dp), contentAlignment = Alignment.Center) {
+                AnimatedContent(
+                    targetState = s.playing,
+                    transitionSpec = {
+                        (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
+                            (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
+                    },
+                    label = "bigplay"
+                ) { p ->
+                    Icon(
+                        if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(78.dp)
+                    )
+                }
+            }
+            PlayerIcon(Icons.Rounded.FastForward, Color.White, 44.dp, 72.dp) { s.next() }
         }
+        Spacer(Modifier.weight(1f))
+        VolumeRow()
+        Spacer(Modifier.weight(1f))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.7f)) {
+                s.shuffle = !s.shuffle
+            }
+            PlayerIcon(Icons.Rounded.Add, Color.White.copy(alpha = 0.7f)) { addDialog = true }
+            PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White.copy(alpha = 0.7f)) {
+                sleepDialog = true
+            }
+            PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.7f)) {
+                s.repeat = !s.repeat
+            }
+        }
+        Spacer(Modifier.height(10.dp))
     }
+    if (menuDialog) SongMenu(song, s, null) { menuDialog = false }
     if (addDialog) AddToPlaylistDialog(song, s) { addDialog = false }
     if (sleepDialog) {
         AlertDialog(
