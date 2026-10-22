@@ -2,6 +2,14 @@ package com.prismwave.app
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -137,11 +145,11 @@ fun QuickCard(song: Song, s: AppState, from: List<Song>, modifier: Modifier = Mo
     val shape = RoundedCornerShape(30.dp)
     Box(
         modifier
+            .softClick { s.play(song, from) }
             .width(300.dp)
             .height(340.dp)
             .clip(shape)
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
-            .clickable { s.play(song, from) }
     ) {
         Cover(song, Modifier.fillMaxSize(), 0.dp, 90.sp, quality = 800)
         Box(
@@ -167,7 +175,7 @@ fun QuickCard(song: Song, s: AppState, from: List<Song>, modifier: Modifier = Mo
 
 @Composable
 fun RecentCard(song: Song, s: AppState, from: List<Song>, modifier: Modifier = Modifier) {
-    Column(modifier.width(140.dp).clickable { s.play(song, from) }) {
+    Column(modifier.softClick { s.play(song, from) }.width(140.dp)) {
         Box {
             Cover(song, Modifier.size(140.dp), 24.dp, 44.sp)
             PlayBadge(s.accent, Modifier.align(Alignment.BottomEnd).padding(8.dp))
@@ -263,10 +271,10 @@ private val Moods = listOf(
 private fun MoodTile(m: Mood, s: AppState, modifier: Modifier) {
     Box(
         modifier
+            .softClick { s.searchQuery = m.query }
             .height(96.dp)
             .clip(RoundedCornerShape(26.dp))
             .background(Brush.horizontalGradient(listOf(m.b, m.a)))
-            .clickable { s.searchQuery = m.query }
             .padding(18.dp)
     ) {
         Box(
@@ -326,8 +334,8 @@ fun SearchScreen(s: AppState) {
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
-                    focusedContainerColor = Surface2,
-                    unfocusedContainerColor = Surface2,
+                    focusedContainerColor = CardBg2,
+                    unfocusedContainerColor = CardBg2,
                     focusedBorderColor = s.accent,
                     unfocusedBorderColor = Color.Transparent,
                     cursorColor = s.accent
@@ -409,9 +417,9 @@ private fun LibTile(
 ) {
     Column(
         modifier
+            .softClick(onClick)
             .clip(RoundedCornerShape(26.dp))
-            .background(Surface1)
-            .clickable(onClick = onClick)
+            .background(CardBg)
             .padding(18.dp)
     ) {
         Box(Modifier.size(44.dp).clip(CircleShape).background(iconBg), contentAlignment = Alignment.Center) {
@@ -427,10 +435,10 @@ private fun LibTile(
 private fun PlaylistCard(p: Playlist, s: AppState) {
     Column(
         Modifier
+            .softClick { s.openPlaylist = p.id }
             .width(168.dp)
             .clip(RoundedCornerShape(26.dp))
-            .background(Surface1)
-            .clickable { s.openPlaylist = p.id }
+            .background(CardBg)
             .padding(12.dp)
     ) {
         val first = p.songs.firstOrNull()
@@ -438,7 +446,7 @@ private fun PlaylistCard(p: Playlist, s: AppState) {
             if (first != null) {
                 Cover(first, Modifier.size(144.dp), 20.dp, 44.sp)
             } else {
-                Box(Modifier.size(144.dp).clip(RoundedCornerShape(20.dp)).background(Surface2))
+                Box(Modifier.size(144.dp).clip(RoundedCornerShape(20.dp)).background(CardBg2))
             }
             if (first != null) {
                 PlayBadge(s.accent, Modifier.align(Alignment.BottomEnd).padding(8.dp))
@@ -450,18 +458,44 @@ private fun PlaylistCard(p: Playlist, s: AppState) {
     }
 }
 
+private fun depthOf(page: String): Int = when {
+    page.startsWith("pl:") -> 2
+    page.startsWith("lib:") -> 1
+    else -> 0
+}
+
 @Composable
 fun LibraryScreen(s: AppState) {
-    val plId = s.openPlaylist
-    if (plId != null) {
-        PlaylistScreen(s, plId)
-        return
+    val page = when {
+        s.openPlaylist != null -> "pl:" + s.openPlaylist
+        s.libraryOpen != null -> "lib:" + s.libraryOpen
+        else -> "main"
     }
-    val open = s.libraryOpen
-    if (open != null) {
-        SongListScreen(s, open)
-        return
+    AnimatedContent(
+        targetState = page,
+        transitionSpec = {
+            if (s.reduceMotion) {
+                fadeIn(tween(120)) togetherWith fadeOut(tween(80))
+            } else {
+                val dir = if (depthOf(targetState) >= depthOf(initialState)) 1 else -1
+                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> w * dir / 3 } +
+                    fadeIn(tween(240))) togetherWith
+                    (slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> -w * dir / 3 } +
+                        fadeOut(tween(160)))
+            }
+        },
+        label = "library"
+    ) { p ->
+        when {
+            p.startsWith("pl:") -> PlaylistScreen(s, p.removePrefix("pl:"))
+            p.startsWith("lib:") -> SongListScreen(s, p.removePrefix("lib:"))
+            else -> LibraryMain(s)
+        }
     }
+}
+
+@Composable
+private fun LibraryMain(s: AppState) {
     var creating by remember { mutableStateOf(false) }
     val top = s.topPlayed()
     LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
@@ -473,6 +507,16 @@ fun LibraryScreen(s: AppState) {
             ) {
                 item { Chip("Library", s.libTab == 0, s.accent) { s.libTab = 0 } }
                 item { Chip("Playlists", s.libTab == 1, s.accent) { s.libTab = 1 } }
+            }
+        }
+        if (s.signedIn && s.accountMsg.isNotEmpty()) {
+            item {
+                Text(
+                    s.accountMsg,
+                    color = TextDim,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                )
             }
         }
         if (s.libTab == 1) {
@@ -506,7 +550,7 @@ fun LibraryScreen(s: AppState) {
                     if (first != null) {
                         Cover(first, Modifier.size(60.dp), 14.dp)
                     } else {
-                        Box(Modifier.size(60.dp).clip(RoundedCornerShape(14.dp)).background(Surface2))
+                        Box(Modifier.size(60.dp).clip(RoundedCornerShape(14.dp)).background(CardBg2))
                     }
                     Spacer(Modifier.width(14.dp))
                     Column {
@@ -523,7 +567,7 @@ fun LibraryScreen(s: AppState) {
                         .padding(horizontal = 20.dp, vertical = 16.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(30.dp))
-                        .background(Surface2)
+                        .background(CardBg2)
                         .padding(20.dp)
                 ) {
                     Row {
@@ -578,9 +622,9 @@ fun LibraryScreen(s: AppState) {
                 listOf("Local Files", "On device", Icons.Rounded.Folder, olive, s.accent),
                 listOf("My top 50", "All time", Icons.Rounded.TrendingUp, olive, s.accent)
             )
-            items(tiles.chunked(2)) { pair ->
+            itemsIndexed(tiles.chunked(2)) { ri, pair ->
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                    Modifier.appear(ri).fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     pair.forEach { t ->
@@ -606,7 +650,7 @@ fun LibraryScreen(s: AppState) {
                                 .width(168.dp)
                                 .height(214.dp)
                                 .clip(RoundedCornerShape(26.dp))
-                                .background(Surface1)
+                                .background(CardBg)
                                 .clickable { creating = true },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
@@ -724,7 +768,7 @@ fun PlaylistScreen(s: AppState, id: String) {
                 if (first != null) {
                     Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1000)
                 } else {
-                    Box(Modifier.fillMaxSize().background(Surface2))
+                    Box(Modifier.fillMaxSize().background(CardBg2))
                 }
                 Box(
                     Modifier.fillMaxSize().background(
@@ -919,7 +963,7 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
             .padding(horizontal = 20.dp, vertical = 8.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Surface1)
+            .background(CardBg)
             .padding(18.dp)
     ) {
         Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -934,7 +978,7 @@ private fun ActionButton(text: String, accent: Color, enabled: Boolean = true, o
         Modifier
             .bounceClick { if (enabled) onClick() }
             .clip(RoundedCornerShape(50))
-            .background(if (enabled) accent else Surface2)
+            .background(if (enabled) accent else CardBg2)
             .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Text(text, color = if (enabled) Color.Black else TextDim, fontWeight = FontWeight.SemiBold)
@@ -1015,12 +1059,19 @@ fun SettingsScreen(s: AppState) {
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Chip("Album", true, s.accent) { }
-                listOf("Vinyl", "Minimal", "Immersive").forEach { name ->
+                Chip("Album", s.playerStyle == 0, s.accent) {
+                    s.playerStyle = 0
+                    s.saveSettings()
+                }
+                Chip("Immersive", s.playerStyle == 1, s.accent) {
+                    s.playerStyle = 1
+                    s.saveSettings()
+                }
+                listOf("Vinyl", "Minimal").forEach { name ->
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(Surface2.copy(alpha = 0.5f))
+                            .background(CardBg2)
                             .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) { Text(name, color = TextDim, fontSize = 15.sp) }
                 }

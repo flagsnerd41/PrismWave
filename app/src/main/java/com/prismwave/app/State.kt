@@ -103,6 +103,7 @@ class AppState(private val ctx: Context) {
     var blurRadius by mutableStateOf(prefs.getFloat("blur", 80f))
     var blurOn by mutableStateOf(prefs.getBoolean("blurOn", true))
     var reduceMotion by mutableStateOf(prefs.getBoolean("reduceMotion", false))
+    var playerStyle by mutableStateOf(prefs.getInt("playerStyle", 0))
     var showLogin by mutableStateOf(false)
     var accountMsg by mutableStateOf("")
     var backupMsg by mutableStateOf("")
@@ -125,6 +126,9 @@ class AppState(private val ctx: Context) {
         } catch (e: Exception) {
         }
         connect()
+        if (signedIn && System.currentTimeMillis() - prefs.getLong("lastImport", 0L) > 6L * 3600 * 1000) {
+            importAccount()
+        }
     }
 
     private fun connect() {
@@ -200,16 +204,24 @@ class AppState(private val ctx: Context) {
             .putBoolean("batterySaver", batterySaver)
             .putBoolean("blurOn", blurOn)
             .putBoolean("reduceMotion", reduceMotion)
+            .putInt("playerStyle", playerStyle)
             .putInt("accent", accent.toArgb())
             .apply()
     }
 
     // ---------- account ----------
     fun onLogin(c: String) {
+        val already = signedIn && cookie == c
         cookie = c
         prefs.edit().putString("ytCookie", c).apply()
         showLogin = false
-        accountMsg = "Signed in. Tap Import to get your playlists."
+        if (already) return
+        // like other apps: playlists appear automatically right after signing in
+        screen = Screen.Library
+        libTab = 1
+        libraryOpen = null
+        openPlaylist = null
+        importAccount()
     }
 
     fun signOut() {
@@ -229,7 +241,7 @@ class AppState(private val ctx: Context) {
     fun importAccount() {
         if (importing || !signedIn) return
         importing = true
-        accountMsg = "Importing liked songs..."
+        accountMsg = "Importing from YouTube Music..."
         scope.launch {
             try {
                 val remoteLiked = YtAccount.songs(cookie, "VLLM")
@@ -251,7 +263,12 @@ class AppState(private val ctx: Context) {
                     done++
                 }
                 saveAll()
-                accountMsg = "Done: " + done + " playlists, " + addedLiked + " new liked songs"
+                prefs.edit().putLong("lastImport", System.currentTimeMillis()).apply()
+                accountMsg = if (done == 0 && remoteLiked.isEmpty()) {
+                    "Signed in, but nothing was found. YouTube may have changed its format."
+                } else {
+                    "Done: " + done + " playlists, " + addedLiked + " new liked songs"
+                }
             } catch (e: YtAccount.AuthException) {
                 accountMsg = "Session expired, sign in again"
             } catch (e: Exception) {

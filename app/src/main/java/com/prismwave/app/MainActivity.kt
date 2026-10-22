@@ -7,6 +7,10 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.spring
@@ -157,6 +161,11 @@ fun Main(s: AppState) {
         backdrop.radius = blurR
         backdrop.enabled = blurActive
     }
+    val cur = s.current
+    val artC = if (cur != null) rememberArtColor(cur) else s.accent
+    val strength = if (cur != null) 1f else 0.5f
+    val tintTop by animateColorAsState(lerp(Night, artC, 0.42f * strength), tween(900), label = "tintTop")
+    val tintBot by animateColorAsState(lerp(Night, artC, 0.16f * strength), tween(900), label = "tintBot")
     CompositionLocalProvider(LocalBackdrop provides backdrop, LocalReduceMotion provides s.reduceMotion) {
         Box(Modifier.fillMaxSize().background(Night)) {
             Box(
@@ -171,7 +180,7 @@ fun Main(s: AppState) {
                             drawContent()
                         }
                     }
-                    .background(Night)
+                    .drawBehind { drawRect(Brush.verticalGradient(listOf(tintTop, tintBot))) }
             ) {
                 Box(Modifier.fillMaxSize().statusBarsPadding()) {
                     AnimatedContent(

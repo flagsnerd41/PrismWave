@@ -10,6 +10,9 @@ import androidx.compose.ui.text.font.FontWeight
 
 val PrismFont = FontFamily(Font(R.font.outfit_bold, FontWeight.Bold))
 
+val CardBg = Color.White.copy(alpha = 0.07f)
+val CardBg2 = Color.White.copy(alpha = 0.11f)
+
 val Gold = Color(0xFFE3C96B)
 val Night = Color(0xFF16120C)
 val Surface1 = Color(0xFF241F15)

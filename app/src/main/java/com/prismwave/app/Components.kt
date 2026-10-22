@@ -100,12 +100,17 @@ fun artUrl(url: String, px: Int): String = when {
 }
 
 /** Spring squish + tick on tap (Material expressive feel). */
-fun Modifier.bounceClick(onClick: () -> Unit): Modifier = composed {
+fun Modifier.bounceClick(onClick: () -> Unit): Modifier = pressable(0.88f, onClick)
+
+/** Gentler press effect for rows and big cards. */
+fun Modifier.softClick(onClick: () -> Unit): Modifier = pressable(0.96f, onClick)
+
+private fun Modifier.pressable(scaleTo: Float, onClick: () -> Unit): Modifier = composed {
     var pressed by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val cb by rememberUpdatedState(onClick)
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.88f else 1f,
+        targetValue = if (pressed) scaleTo else 1f,
         animationSpec = spring(dampingRatio = 0.4f, stiffness = 500f),
         label = "bounce"
     )
@@ -259,7 +264,7 @@ fun RoundBtn(
             .bounceClick(onClick)
             .size(size)
             .clip(CircleShape)
-            .background(Surface2.copy(alpha = alpha)),
+            .background(Color.White.copy(alpha = 0.04f + alpha * 0.1f)),
         contentAlignment = Alignment.Center
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = tint)
@@ -272,7 +277,7 @@ fun Chip(text: String, selected: Boolean, accent: Color, icon: ImageVector? = nu
         Modifier
             .bounceClick(onClick)
             .clip(RoundedCornerShape(50))
-            .background(if (selected) accent else Surface2.copy(alpha = 0.8f))
+            .background(if (selected) accent else Color.White.copy(alpha = 0.10f))
             .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -418,7 +423,7 @@ fun SongRow(song: Song, s: AppState, from: List<Song> = listOf(song), playlistId
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { s.play(song, from) }
+            .softClick { s.play(song, from) }
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

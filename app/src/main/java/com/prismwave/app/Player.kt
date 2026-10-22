@@ -2,6 +2,11 @@ package com.prismwave.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.FormatListBulleted
+import androidx.compose.ui.unit.TextUnit
 import android.content.Context
 import android.media.AudioManager
 import androidx.compose.animation.core.animateFloatAsState
@@ -126,7 +131,7 @@ fun NavBar(s: AppState) {
                 Column(
                     Modifier
                         .weight(1f)
-                        .clickable {
+                        .softClick {
                             s.screen = screen
                             s.libraryOpen = null
                             s.openPlaylist = null
@@ -166,7 +171,7 @@ fun MiniPlayer(s: AppState) {
     val song = s.current ?: return
     Glass(
         s.glassAlpha(),
-        Modifier.fillMaxWidth().clickable { s.showPlayer = true },
+        Modifier.fillMaxWidth().softClick { s.showPlayer = true },
         RoundedCornerShape(32.dp)
     ) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -318,21 +323,11 @@ fun FullPlayer(s: AppState) {
     var sleepDialog by remember { mutableStateOf(false) }
     var addDialog by remember { mutableStateOf(false) }
     var menuDialog by remember { mutableStateOf(false) }
+    var queueDialog by remember { mutableStateOf(false) }
     BackHandler { s.showPlayer = false }
-    val art = rememberArtColor(song)
-    val c1 by animateColorAsState(lerp(art, Night, 0.15f), tween(700), label = "g1")
-    val c2 by animateColorAsState(lerp(art, Night, 0.45f), tween(700), label = "g2")
-    val c3 by animateColorAsState(lerp(art, Night, 0.80f), tween(700), label = "g3")
     val dragY = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    val coverScale by animateFloatAsState(
-        if (s.playing) 1f else 0.88f,
-        spring(dampingRatio = 0.6f, stiffness = 260f),
-        label = "cover"
-    )
-    val total = song.seconds.coerceAtLeast(1).toFloat()
-    val coverShape = RoundedCornerShape(20.dp)
-    Column(
+    Box(
         Modifier
             .fillMaxSize()
             .offset { IntOffset(0, dragY.value.roundToInt()) }
@@ -346,8 +341,177 @@ fun FullPlayer(s: AppState) {
                     else dragY.animateTo(0f, spring(dampingRatio = 0.7f))
                 }
             )
-            .background(Brush.verticalGradient(listOf(c1, c2, c3)))
+            .background(Night)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
+    ) {
+        AnimatedContent(
+            targetState = s.playerStyle,
+            transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
+            label = "pstyle"
+        ) { style ->
+            if (style == 1) {
+                ImmersiveBody(
+                    s, song,
+                    { menuDialog = true }, { addDialog = true }, { sleepDialog = true }, { queueDialog = true }
+                )
+            } else {
+                AlbumBody(s, song, { menuDialog = true }, { addDialog = true }, { sleepDialog = true })
+            }
+        }
+    }
+    if (menuDialog) SongMenu(song, s, null) { menuDialog = false }
+    if (addDialog) AddToPlaylistDialog(song, s) { addDialog = false }
+    if (queueDialog) {
+        AlertDialog(
+            onDismissRequest = { queueDialog = false },
+            confirmButton = { TextButton(onClick = { queueDialog = false }) { Text("Close") } },
+            title = { Text("Queue") },
+            text = {
+                LazyColumn(Modifier.heightIn(max = 380.dp)) {
+                    items(s.queue.take(100)) { q ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { s.play(q, s.queue) }.padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Cover(q, Modifier.size(42.dp), 10.dp, 16.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    q.title,
+                                    color = if (q.id == song.id) s.accent else Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(q.artist, color = TextDim, fontSize = 12.sp, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+    if (sleepDialog) {
+        AlertDialog(
+            onDismissRequest = { sleepDialog = false },
+            confirmButton = { TextButton(onClick = { sleepDialog = false }) { Text("Close") } },
+            title = { Text("Sleep timer") },
+            text = {
+                Column {
+                    listOf(0 to "Off", 15 to "15 minutes", 30 to "30 minutes", 60 to "60 minutes").forEach { (m, label) ->
+                        Text(
+                            label,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    s.sleepLeft = m * 60
+                                    sleepDialog = false
+                                }
+                                .padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun TitleRow(
+    s: AppState,
+    song: Song,
+    titleSize: TextUnit,
+    artistSize: TextUnit,
+    circles: Boolean,
+    onMenu: () -> Unit
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                song.title,
+                color = Color.White,
+                fontSize = titleSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                if (s.status.isNotEmpty()) s.status else song.artist,
+                color = Color.White.copy(alpha = 0.65f),
+                fontSize = artistSize,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        val liked = s.isLiked(song)
+        val bgMod = if (circles) Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.18f)) else Modifier
+        Box(
+            Modifier.bounceClick { s.toggleLike(song) }.size(40.dp).then(bgMod),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                if (circles) (if (liked) Icons.Rounded.Star else Icons.Rounded.StarBorder)
+                else (if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder),
+                contentDescription = null,
+                tint = if (liked && !circles) s.accent else Color.White,
+                modifier = Modifier.size(if (circles) 22.dp else 30.dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Box(
+            Modifier.bounceClick(onMenu).size(40.dp).then(bgMod),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Rounded.MoreHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun TransportRow(s: AppState, side: Dp, big: Dp) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PlayerIcon(Icons.Rounded.FastRewind, Color.White, side, side + 28.dp) { s.prev() }
+        Box(Modifier.bounceClick { s.toggle() }.size(big + 18.dp), contentAlignment = Alignment.Center) {
+            AnimatedContent(
+                targetState = s.playing,
+                transitionSpec = {
+                    (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
+                        (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
+                },
+                label = "bigplay"
+            ) { p ->
+                Icon(
+                    if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(big)
+                )
+            }
+        }
+        PlayerIcon(Icons.Rounded.FastForward, Color.White, side, side + 28.dp) { s.next() }
+    }
+}
+
+@Composable
+private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> Unit, onSleep: () -> Unit) {
+    val art = rememberArtColor(song)
+    val c1 by animateColorAsState(lerp(art, Night, 0.15f), tween(700), label = "g1")
+    val c2 by animateColorAsState(lerp(art, Night, 0.45f), tween(700), label = "g2")
+    val c3 by animateColorAsState(lerp(art, Night, 0.80f), tween(700), label = "g3")
+    val coverScale by animateFloatAsState(
+        if (s.playing) 1f else 0.88f,
+        spring(dampingRatio = 0.6f, stiffness = 260f),
+        label = "cover"
+    )
+    val total = song.seconds.coerceAtLeast(1).toFloat()
+    val coverShape = RoundedCornerShape(20.dp)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(c1, c2, c3)))
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(horizontal = 26.dp),
@@ -373,81 +537,12 @@ fun FullPlayer(s: AppState) {
                 .shadow(22.dp, coverShape)
         ) { Cover(song, Modifier.fillMaxSize(), 20.dp, 96.sp, quality = 1000) }
         Spacer(Modifier.height(26.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    song.title,
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    if (s.status.isNotEmpty()) s.status else song.artist,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 19.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            val liked = s.isLiked(song)
-            Box(
-                Modifier
-                    .bounceClick { s.toggleLike(song) }
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    if (liked) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Box(
-                Modifier
-                    .bounceClick { menuDialog = true }
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Rounded.MoreHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-            }
-        }
+        TitleRow(s, song, 22.sp, 19.sp, true, onMenu)
         Spacer(Modifier.weight(1f))
         SeekBar({ s.position }, total, { s.seekTo(it) }, Modifier.fillMaxWidth())
         TimeLabels(s, total)
         Spacer(Modifier.weight(1f))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PlayerIcon(Icons.Rounded.FastRewind, Color.White, 44.dp, 72.dp) { s.prev() }
-            Box(Modifier.bounceClick { s.toggle() }.size(96.dp), contentAlignment = Alignment.Center) {
-                AnimatedContent(
-                    targetState = s.playing,
-                    transitionSpec = {
-                        (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
-                            (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
-                    },
-                    label = "bigplay"
-                ) { p ->
-                    Icon(
-                        if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(78.dp)
-                    )
-                }
-            }
-            PlayerIcon(Icons.Rounded.FastForward, Color.White, 44.dp, 72.dp) { s.next() }
-        }
+        TransportRow(s, 44.dp, 78.dp)
         Spacer(Modifier.weight(1f))
         VolumeRow()
         Spacer(Modifier.weight(1f))
@@ -459,9 +554,9 @@ fun FullPlayer(s: AppState) {
             PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.7f)) {
                 s.shuffle = !s.shuffle
             }
-            PlayerIcon(Icons.Rounded.Add, Color.White.copy(alpha = 0.7f)) { addDialog = true }
+            PlayerIcon(Icons.Rounded.Add, Color.White.copy(alpha = 0.7f)) { onAdd() }
             PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White.copy(alpha = 0.7f)) {
-                sleepDialog = true
+                onSleep()
             }
             PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.7f)) {
                 s.repeat = !s.repeat
@@ -469,30 +564,84 @@ fun FullPlayer(s: AppState) {
         }
         Spacer(Modifier.height(10.dp))
     }
-    if (menuDialog) SongMenu(song, s, null) { menuDialog = false }
-    if (addDialog) AddToPlaylistDialog(song, s) { addDialog = false }
-    if (sleepDialog) {
-        AlertDialog(
-            onDismissRequest = { sleepDialog = false },
-            confirmButton = { TextButton(onClick = { sleepDialog = false }) { Text("Close") } },
-            title = { Text("Sleep timer") },
-            text = {
-                Column {
-                    listOf(0 to "Off", 15 to "15 minutes", 30 to "30 minutes", 60 to "60 minutes").forEach { (m, label) ->
-                        Text(
-                            label,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    s.sleepLeft = m * 60
-                                    sleepDialog = false
-                                }
-                                .padding(vertical = 12.dp)
-                        )
+}
+
+@Composable
+private fun ImmersiveBody(
+    s: AppState,
+    song: Song,
+    onMenu: () -> Unit,
+    onAdd: () -> Unit,
+    onSleep: () -> Unit,
+    onQueue: () -> Unit
+) {
+    val art = rememberArtColor(song)
+    val bottom by animateColorAsState(lerp(art, Color.Black, 0.55f), tween(700), label = "ibot")
+    val total = song.seconds.coerceAtLeast(1).toFloat()
+    Box(Modifier.fillMaxSize().background(Night)) {
+        Cover(song, Modifier.fillMaxSize(), 0.dp, 160.sp, quality = 1200)
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.55f),
+                    0.22f to Color.Transparent,
+                    0.50f to Color.Transparent,
+                    0.78f to bottom.copy(alpha = 0.88f),
+                    1f to bottom
+                )
+            )
+        )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                "Playing from PrismWave",
+                color = Color.White,
+                fontSize = 15.sp,
+                modifier = Modifier.padding(top = 18.dp).clickable { s.showPlayer = false }
+            )
+            Spacer(Modifier.weight(1f))
+            TitleRow(s, song, 28.sp, 21.sp, false, onMenu)
+            Spacer(Modifier.height(16.dp))
+            SeekBar({ s.position }, total, { s.seekTo(it) }, Modifier.fillMaxWidth())
+            TimeLabels(s, total)
+            Spacer(Modifier.height(8.dp))
+            TransportRow(s, 50.dp, 84.dp)
+            Spacer(Modifier.height(8.dp))
+            VolumeRow()
+            Spacer(Modifier.height(18.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White) {
+                    s.shuffle = !s.shuffle
+                }
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White.copy(alpha = 0.16f))
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White) { onSleep() }
+                    Box(Modifier.width(1.dp).height(26.dp).background(Color.White.copy(alpha = 0.25f)))
+                    PlayerIcon(Icons.Rounded.Add, Color.White) { onAdd() }
+                    Box(Modifier.width(1.dp).height(26.dp).background(Color.White.copy(alpha = 0.25f)))
+                    PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White) {
+                        s.repeat = !s.repeat
                     }
                 }
+                PlayerIcon(Icons.Rounded.FormatListBulleted, Color.White) { onQueue() }
             }
-        )
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
 
