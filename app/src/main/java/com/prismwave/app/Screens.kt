@@ -1182,6 +1182,11 @@ private fun SettingsGroup(items: List<SettingsItem>, accent: Color, base: Int, o
 }
 
 @Composable
+private fun ChangeList(lines: List<String>) {
+    lines.forEach { Text("•  " + it, color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(vertical = 2.dp)) }
+}
+
+@Composable
 private fun ToggleRow(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -1211,7 +1216,8 @@ fun SettingsScreen(s: AppState) {
         "backup" to "Backup & restore",
         "behavior" to "Behavior",
         "content" to "Content",
-        "about" to "About"
+        "about" to "About",
+        "changelog" to "What's new"
     )
     Column(Modifier.verticalScroll(rememberScrollState()).padding(top = statusTop(), bottom = 220.dp)) {
       AnimatedContent(
@@ -1258,6 +1264,7 @@ fun SettingsScreen(s: AppState) {
                     SettingsItem("behavior", "Behavior", "Haptics, taps, and look extras", Icons.Rounded.TouchApp),
                     SettingsItem("content", "Content", "Choose what shows on Home", Icons.Rounded.Home),
                     SettingsItem("backup", "Backup & restore", "Save or bring back your library", Icons.Rounded.Folder),
+                    SettingsItem("changelog", "What's new", "Changes in each version", Icons.Rounded.History),
                     SettingsItem("about", "About", "Version and build info", Icons.Rounded.Info)
                 ),
                 s.accent,
@@ -1430,9 +1437,43 @@ fun SettingsScreen(s: AppState) {
                         ToggleRow("Chill and Workout", "Mix shelves at the bottom", Opts.showMixes) { Opts.showMixes = it; Opts.save() }
                     }
                 }
+                "changelog" -> {
+                    Section("v15") { ChangeList(listOf("What's new page in Settings")) }
+                    Section("v14") {
+                        ChangeList(listOf(
+                            "Swipe a song row: right to like, left to queue",
+                            "Swipe the mini player to skip songs",
+                            "Glowing cover shadow in the Album player",
+                            "Shimmer placeholders instead of spinners"
+                        ))
+                    }
+                    Section("v13") {
+                        ChangeList(listOf(
+                            "Big Keep listening card on Home",
+                            "Tempo and Pitch is a middle dialog again",
+                            "Three-dots menu is a bottom sheet again"
+                        ))
+                    }
+                    Section("v12") {
+                        ChangeList(listOf(
+                            "Slide-in pages for queue, sleep, add to playlist, details, stats",
+                            "Blurred status bar on every screen",
+                            "Behavior, Content and About settings",
+                            "Pitch - and + buttons"
+                        ))
+                    }
+                    Section("v11 and earlier") {
+                        ChangeList(listOf(
+                            "Tempo and Pitch, downloads, Apple Music style playlist page",
+                            "ArchiveTune style Home and Immersive player",
+                            "Duration bug fixed",
+                            "YouTube Music search, streaming, backup and sign-in"
+                        ))
+                    }
+                }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v12", color = Color.White)
+                        Text("Version v15", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }
