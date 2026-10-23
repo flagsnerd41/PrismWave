@@ -1,5 +1,11 @@
 package com.prismwave.app
 
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.foundation.horizontalScroll
+import android.media.audiofx.AudioEffect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -807,14 +813,17 @@ private fun MenuTile(a: MenuAction, accent: Color, modifier: Modifier) {
 }
 
 @Composable
-private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun MenuRow(icon: ImageVector, label: String, sub: String? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
         Spacer(Modifier.width(18.dp))
-        Text(label, color = Color.White, fontSize = 18.sp)
+        Column {
+            Text(label, color = Color.White, fontSize = 18.sp)
+            if (sub != null) Text(sub, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        }
     }
 }
 
@@ -865,6 +874,7 @@ private fun PlayerMenuSheet(
     }
     var visible by remember { mutableStateOf(false) }
     var details by remember { mutableStateOf(false) }
+    var tempoOpen by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
     val close: () -> Unit = {
         scope.launch {
@@ -1003,10 +1013,30 @@ private fun PlayerMenuSheet(
                     }
                     Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
                     MenuRow(Icons.Rounded.Info, "Details") { details = true }
+                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+                    MenuRow(Icons.Rounded.Equalizer, "Equalizer") {
+                        val i = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+                            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, ctx.packageName)
+                            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, 0)
+                            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+                        }
+                        try {
+                            ctx.startActivity(i)
+                        } catch (e: Exception) {
+                            toast("No system equalizer found on this phone")
+                        }
+                    }
+                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+                    MenuRow(
+                        Icons.Rounded.Speed,
+                        "Tempo and Pitch",
+                        "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)
+                    ) { tempoOpen = true }
                 }
             }
         }
     }
+    if (tempoOpen) TempoPitchDialog(s) { tempoOpen = false }
     if (details) {
         AlertDialog(
             onDismissRequest = { details = false },
@@ -1022,4 +1052,108 @@ private fun PlayerMenuSheet(
             }
         )
     }
+}
+
+
+// ------------------------------------------------------------ tempo and pitch
+
+@Composable
+private fun TempoPitchDialog(s: AppState, onDismiss: () -> Unit) {
+    var stMode by remember { mutableStateOf(true) }
+    fun semis(): Int = Math.round(12.0 * Math.log(s.pitch.toDouble()) / Math.log(2.0)).toInt()
+    fun setTempo(v: Float) {
+        s.tempo = Math.round(v.coerceIn(0.25f, 2f) * 20) / 20f
+        s.applyTempoPitch()
+    }
+    fun setSemis(n: Int) {
+        s.pitch = Math.pow(2.0, n.coerceIn(-12, 12) / 12.0).toFloat()
+        s.applyTempoPitch()
+    }
+    fun setRatio(v: Float) {
+        s.pitch = Math.round(v.coerceIn(0.5f, 2f) * 20) / 20f
+        s.applyTempoPitch()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardBg2,
+        shape = RoundedCornerShape(32.dp),
+        title = { Text("Tempo and Pitch", color = Color.White, fontSize = 28.sp) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = s.accent, fontSize = 17.sp) } },
+        dismissButton = {
+            TextButton(onClick = {
+                s.tempo = 1f
+                s.pitch = 1f
+                s.applyTempoPitch()
+            }) { Text("Reset", color = s.accent, fontSize = 17.sp) }
+        },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Speed, contentDescription = null, tint = Color.White.copy(alpha = 0.85f))
+                    Spacer(Modifier.width(14.dp))
+                    Text("Tempo", color = Color.White, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                    Text("x" + "%.2f".format(s.tempo), color = Color.White, fontSize = 20.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Remove, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp).clickable { setTempo(s.tempo - 0.05f) })
+                    SeekBar(
+                        positionProvider = { s.tempo - 0.25f },
+                        max = 1.75f,
+                        onSeek = { setTempo(it + 0.25f) },
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+                    )
+                    Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp).clickable { setTempo(s.tempo + 0.05f) })
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { v ->
+                        Chip("x" + "%.2f".format(v), Math.abs(s.tempo - v) < 0.001f, s.accent) { setTempo(v) }
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+                Spacer(Modifier.height(18.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = Color.White.copy(alpha = 0.85f))
+                    Spacer(Modifier.width(14.dp))
+                    Text("Pitch", color = Color.White, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                    Text(if (stMode) semis().toString() else "%.2f".format(s.pitch), color = Color.White, fontSize = 20.sp)
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("st", stMode, s.accent) { stMode = true }
+                    Chip("x", !stMode, s.accent) { stMode = false }
+                }
+                Spacer(Modifier.height(12.dp))
+                if (stMode) {
+                    SeekBar(
+                        positionProvider = { (semis() + 12).toFloat() },
+                        max = 24f,
+                        onSeek = { setSemis(Math.round(it) - 12) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(-12, -7, -5, 0, 5, 7, 12).forEach { n ->
+                            Chip(if (n > 0) "+" + n else n.toString(), semis() == n, s.accent) { setSemis(n) }
+                        }
+                    }
+                } else {
+                    SeekBar(
+                        positionProvider = { s.pitch - 0.5f },
+                        max = 1.5f,
+                        onSeek = { setRatio(it + 0.5f) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { v ->
+                            Chip("x" + "%.2f".format(v), Math.abs(s.pitch - v) < 0.001f, s.accent) { setRatio(v) }
+                        }
+                    }
+                }
+            }
+        }
+    )
 }

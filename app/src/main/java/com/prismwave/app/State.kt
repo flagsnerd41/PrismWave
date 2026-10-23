@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -87,6 +88,12 @@ class AppState(private val ctx: Context) {
     var shuffle by mutableStateOf(false)
     var repeat by mutableStateOf(false)
     var crossfade by mutableStateOf(0f)
+    var tempo by mutableStateOf(1f)
+    var pitch by mutableStateOf(1f)
+
+    fun applyTempoPitch() {
+        controller?.playbackParameters = PlaybackParameters(tempo, pitch)
+    }
     var sleepLeft by mutableStateOf(0)
     var status by mutableStateOf("")
     var searchQuery by mutableStateOf("")
