@@ -386,6 +386,7 @@ fun AddToPlaylistDialog(song: Song, s: AppState, onDone: () -> Unit) {
 
 @Composable
 fun SongMenu(song: Song, s: AppState, playlistId: String?, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
     var pick by remember { mutableStateOf(false) }
     if (pick) {
         AddToPlaylistDialog(song, s) { pick = false; onDismiss() }
@@ -399,6 +400,10 @@ fun SongMenu(song: Song, s: AppState, playlistId: String?, onDismiss: () -> Unit
                 val items = buildList<Pair<String, () -> Unit>> {
                     add((if (s.isLiked(song)) "Remove from liked" else "Like") to { s.toggleLike(song); onDismiss() })
                     add("Add to playlist" to { pick = true })
+                    add((if (DownloadStore.isDownloaded(song)) "Remove download" else "Download") to {
+                        if (DownloadStore.isDownloaded(song)) DownloadStore.remove(ctx, song) else DownloadStore.start(ctx, song)
+                        onDismiss()
+                    })
                     if (playlistId != null) {
                         add("Remove from this playlist" to { s.removeFromPlaylist(playlistId, song.id); onDismiss() })
                     }

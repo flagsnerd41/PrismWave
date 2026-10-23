@@ -1,7 +1,6 @@
 package com.prismwave.app
 
 import androidx.compose.ui.unit.IntSize
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -988,7 +987,20 @@ private fun PlayerMenuSheet(
                         onDismiss()
                     }
                     Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                    MenuRow(Icons.Rounded.Download, "Download") { toast("Downloads are coming in a later wave") }
+                    val isDown = DownloadStore.isDownloaded(song)
+                    val dlProg = DownloadStore.progress[song.id]
+                    MenuRow(
+                        Icons.Rounded.Download,
+                        if (isDown) "Remove download" else if (dlProg != null) "Downloading " + (dlProg * 100).toInt() + "%" else "Download"
+                    ) {
+                        if (isDown) {
+                            DownloadStore.remove(ctx, song)
+                            toast("Download removed")
+                        } else if (dlProg == null) {
+                            DownloadStore.start(ctx, song)
+                            toast("Downloading")
+                        }
+                    }
                     Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
                     MenuRow(Icons.Rounded.Info, "Details") { details = true }
                 }

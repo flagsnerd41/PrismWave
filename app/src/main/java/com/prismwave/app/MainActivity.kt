@@ -204,7 +204,11 @@ fun Main(s: AppState) {
                         if (scr == Screen.Home) {
                             HomeScreen(s)
                         } else {
-                            Box(Modifier.fillMaxSize().statusBarsPadding()) {
+                            Box(
+                                Modifier.fillMaxSize().then(
+                                    if (scr == Screen.Library && s.openPlaylist != null) Modifier else Modifier.statusBarsPadding()
+                                )
+                            ) {
                                 when (scr) {
                                     Screen.Search -> SearchScreen(s)
                                     Screen.Library -> LibraryScreen(s)

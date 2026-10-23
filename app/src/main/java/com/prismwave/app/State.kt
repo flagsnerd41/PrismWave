@@ -112,6 +112,7 @@ class AppState(private val ctx: Context) {
     val signedIn: Boolean get() = cookie.contains("SAPISID")
 
     init {
+        DownloadStore.ensure(ctx)
         liked.addAll(loadSongs("liked"))
         history.addAll(loadSongs("history"))
         loadSongs("known").forEach { known[it.id] = it }
@@ -427,7 +428,7 @@ class AppState(private val ctx: Context) {
         saveAll()
         scope.launch {
             try {
-                val url = Engine.streamUrl(song.url)
+                val url = DownloadStore.localUri(song) ?: Engine.streamUrl(song.url)
                 var c = controller
                 var tries = 0
                 while (c == null && tries < 50) {
