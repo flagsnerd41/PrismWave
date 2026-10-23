@@ -155,6 +155,30 @@ object YtAccount {
         return parts.fold(0) { acc, n -> acc * 60 + n }
     }
 
+    private val durRegex = Regex("^\\d{1,2}(:\\d{2}){1,2}$")
+
+    private fun findDurationSecs(node: Any?): Int {
+        when (node) {
+            is JSONObject -> {
+                val keys = node.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val v = node.opt(k)
+                    if (v is String && (k == "text" || k == "simpleText") && durRegex.matches(v.trim())) {
+                        return seconds(v)
+                    }
+                    val r = findDurationSecs(v)
+                    if (r > 0) return r
+                }
+            }
+            is JSONArray -> for (i in 0 until node.length()) {
+                val r = findDurationSecs(node.opt(i))
+                if (r > 0) return r
+            }
+        }
+        return 0
+    }
+
     private fun parseSong(r: JSONObject): Song? {
         var videoId = r.optJSONObject("playlistItemData")?.optString("videoId").orEmpty()
         if (videoId.isEmpty()) videoId = findString(r, "videoId")
@@ -176,7 +200,9 @@ object YtAccount {
                 ?.optJSONObject("thumbnail")?.optJSONArray("thumbnails")
         )
         val url = "https://www.youtube.com/watch?v=" + videoId
-        return Song(url, title, artist, seconds(firstRunText(dur)), url, thumb)
+        var secs = seconds(firstRunText(dur))
+        if (secs <= 0) secs = findDurationSecs(r)
+        return Song(url, title, artist, secs, url, thumb)
     }
 
     private fun findContinuation(json: JSONObject): String? {

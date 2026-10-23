@@ -495,10 +495,34 @@ class AppState(private val ctx: Context) {
         }
     }
 
+    // Songs imported with a missing length get the real one from the player once it is ready.
+    private fun fixDuration(real: Int) {
+        val cur = current ?: return
+        if (real < 2 || kotlin.math.abs(cur.seconds - real) <= 2) return
+        val fixed = cur.copy(seconds = real)
+        current = fixed
+        queue = queue.map { if (it.id == cur.id) fixed else it }
+        known[cur.id] = fixed
+        val li = liked.indexOfFirst { it.id == cur.id }
+        if (li >= 0) liked[li] = fixed
+        val hi = history.indexOfFirst { it.id == cur.id }
+        if (hi >= 0) history[hi] = fixed
+        for (i in playlists.indices) {
+            val p = playlists[i]
+            if (p.songs.any { it.id == cur.id }) {
+                playlists[i] = p.copy(songs = p.songs.map { if (it.id == cur.id) fixed else it })
+            }
+        }
+        savePlaylists()
+        saveAll()
+    }
+
     fun tick() {
         val c = controller
         if (c != null && playing && c.playbackState == Player.STATE_READY) {
             position = c.currentPosition / 1000f
+            val dur = c.duration
+            if (dur > 0) fixDuration((dur / 1000).toInt())
             listenSeconds++
             ticks++
             if (ticks % 30 == 0) saveAll()
