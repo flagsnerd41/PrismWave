@@ -886,36 +886,41 @@ private fun PlayerMenuSheet(
     )
     val maxH = (LocalConfiguration.current.screenHeightDp * 0.92f).dp
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
-            exit = slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
-        ) {
+        AnimatedVisibility(visible = visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Night)
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
-            ) {
-                Cover(song, Modifier.fillMaxSize().blur(60.dp), 0.dp, 120.sp, quality = 400)
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { close() }
+            )
+        }
+        AnimatedVisibility(
+            visible = visible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = 300f)) { it },
+            exit = slideOutVertically(tween(220)) { it }
+        ) {
             Column(
                 Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .heightIn(max = maxH)
+                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .background(Night)
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
                     .verticalScroll(rememberScrollState())
-                    .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 16.dp)
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { close() })
-                    Spacer(Modifier.width(14.dp))
-                    Text("Options", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                }
+                Box(
+                    Modifier
+                        .padding(vertical = 14.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .width(44.dp)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.White.copy(alpha = 0.35f))
+                )
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg).padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -992,12 +997,12 @@ private fun PlayerMenuSheet(
                         Icons.Rounded.Speed,
                         "Tempo and Pitch",
                         "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)
-                    ) { Pages.show("tempo") }
+                    ) { tempoOpen = true }
                 }
-            }
             }
         }
     }
+    if (tempoOpen) TempoPitchDialog(s) { tempoOpen = false }
     if (details) {
         LaunchedEffect(Unit) {
             Pages.show("details", song)

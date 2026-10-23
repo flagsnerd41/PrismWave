@@ -323,8 +323,11 @@ fun HomeScreen(s: AppState) {
             }
             if (history.isNotEmpty() && Opts.showKeep) {
                 item { Spacer(Modifier.height(18.dp)) }
-                item { SectionTitle("Keep listening") }
-                item { SongShelf(history, s) }
+                item { FeaturedCard(history.first(), history, s) }
+                if (history.size > 1) {
+                    item { Spacer(Modifier.height(14.dp)) }
+                    item { SongShelf(history.drop(1), s) }
+                }
             }
             if (speedDial.size >= 3 && Opts.showSpeed) {
                 item { Spacer(Modifier.height(18.dp)) }
