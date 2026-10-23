@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.compose.ui.unit.IntSize
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
