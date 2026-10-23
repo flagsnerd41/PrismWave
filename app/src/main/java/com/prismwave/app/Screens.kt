@@ -1,6 +1,9 @@
 package com.prismwave.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
@@ -292,7 +295,12 @@ fun HomeScreen(s: AppState) {
                     )
                 )
         )
-        LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
+        LazyColumn(
+            contentPadding = PaddingValues(
+                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                bottom = 220.dp
+            )
+        ) {
             item { Header(s) }
             item {
                 LazyRow(
@@ -1117,7 +1125,7 @@ private fun ActionButton(text: String, accent: Color, enabled: Boolean = true, o
 private class SettingsItem(val key: String, val title: String, val subtitle: String, val icon: ImageVector)
 
 @Composable
-private fun SettingsGroup(items: List<SettingsItem>, accent: Color, onOpen: (String) -> Unit) {
+private fun SettingsGroup(items: List<SettingsItem>, accent: Color, base: Int, onOpen: (String) -> Unit) {
     Column(
         Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -1129,6 +1137,7 @@ private fun SettingsGroup(items: List<SettingsItem>, accent: Color, onOpen: (Str
             val bottom = if (i == items.lastIndex) big else small
             Row(
                 Modifier
+                    .appear(base + i)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom))
                     .background(CardBg)
@@ -1177,7 +1186,23 @@ fun SettingsScreen(s: AppState) {
         "backup" to "Backup & restore"
     )
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 220.dp)) {
-        if (page == null) {
+      AnimatedContent(
+        targetState = page,
+        transitionSpec = {
+            val forward = targetState != null
+            if (s.reduceMotion) {
+                fadeIn(tween(120)) togetherWith fadeOut(tween(80))
+            } else {
+                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> if (forward) w / 4 else -w / 4 } +
+                    fadeIn(tween(260))) togetherWith
+                    (slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> if (forward) -w / 4 else w / 4 } +
+                        fadeOut(tween(160)))
+            }
+        },
+        label = "settingsPage"
+      ) { pg ->
+       Column {
+        if (pg == null) {
             Column(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 8.dp)) {
                 RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { s.screen = Screen.Home })
                 Spacer(Modifier.height(26.dp))
@@ -1188,7 +1213,8 @@ fun SettingsScreen(s: AppState) {
                     SettingsItem("account", "Account", "Sign in and manage account sync", Icons.Rounded.AccountCircle),
                     SettingsItem("stats", "Listening Stats", "Your songs played and listening time", Icons.Rounded.BarChart)
                 ),
-                s.accent
+                s.accent,
+                0
             ) { page = it }
             SettingsGroup(
                 listOf(
@@ -1196,21 +1222,23 @@ fun SettingsScreen(s: AppState) {
                     SettingsItem("playback", "Playback", "Audio behavior, crossfade, and sleep", Icons.Rounded.MusicNote),
                     SettingsItem("performance", "Performance", "Blur, motion, and battery saver", Icons.Rounded.Speed)
                 ),
-                s.accent
+                s.accent,
+                2
             ) { page = it }
             SettingsGroup(
                 listOf(
                     SettingsItem("backup", "Backup & restore", "Save or bring back your library", Icons.Rounded.Folder)
                 ),
-                s.accent
+                s.accent,
+                5
             ) { page = it }
         } else {
             Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { page = null })
                 Spacer(Modifier.width(14.dp))
-                Text(titles[page] ?: "Settings", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(titles[pg] ?: "Settings", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
-            when (page) {
+            when (pg) {
                 "account" -> {
         Section("YouTube Music account") {
             if (s.signedIn) {
@@ -1376,5 +1404,7 @@ fun SettingsScreen(s: AppState) {
                 }
             }
         }
+       }
+      }
     }
 }

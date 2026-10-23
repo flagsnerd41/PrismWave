@@ -1,5 +1,29 @@
 package com.prismwave.app
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
+import android.widget.Toast
+import android.os.Build
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.lazy.LazyColumn
@@ -366,7 +390,12 @@ fun FullPlayer(s: AppState) {
             }
         }
     }
-    if (menuDialog) SongMenu(song, s, null) { menuDialog = false }
+    if (menuDialog) {
+        PlayerMenuSheet(
+            s, song,
+            { menuDialog = false }, { addDialog = true }, { sleepDialog = true }, { queueDialog = true }
+        )
+    }
     if (addDialog) AddToPlaylistDialog(song, s) { addDialog = false }
     if (queueDialog) {
         AlertDialog(
@@ -717,5 +746,266 @@ fun PlayButton(s: AppState, size: Dp, iconSize: Dp) {
                 modifier = Modifier.size(iconSize)
             )
         }
+    }
+}
+
+
+// ------------------------------------------------------------ blurred strip under the status bar
+
+@Composable
+fun TopBlur(height: Dp) {
+    val backdrop = LocalBackdrop.current
+    val useBlur = backdrop != null && backdrop.enabled && Build.VERSION.SDK_INT >= 31
+    val blurLayer = rememberGraphicsLayer()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(0f to Color.Black, 0.6f to Color.Black, 1f to Color.Transparent),
+                    blendMode = BlendMode.DstIn
+                )
+            }
+            .drawBehind {
+                if (useBlur && backdrop != null && backdrop.size.width > 0) {
+                    blurLayer.renderEffect = BlurEffect(backdrop.radius, backdrop.radius, TileMode.Clamp)
+                    blurLayer.clip = true
+                    blurLayer.record(this, layoutDirection, IntSize(size.width.toInt(), size.height.toInt())) {
+                        drawLayer(backdrop.layer)
+                    }
+                    drawLayer(blurLayer)
+                }
+                drawRect(Night.copy(alpha = if (useBlur) 0.35f else 0.85f))
+            }
+    )
+}
+
+// ------------------------------------------------------------ player options sheet
+
+private class MenuAction(val icon: ImageVector, val label: String, val on: Boolean, val run: () -> Unit)
+
+@Composable
+private fun MenuTile(a: MenuAction, accent: Color, modifier: Modifier) {
+    Column(
+        modifier
+            .height(96.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(CardBg2)
+            .softClick(a.run)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(a.icon, contentDescription = null, tint = if (a.on) accent else Color.White.copy(alpha = 0.85f), modifier = Modifier.size(28.dp))
+        Spacer(Modifier.height(8.dp))
+        Text(a.label, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(26.dp))
+        Spacer(Modifier.width(18.dp))
+        Text(label, color = Color.White, fontSize = 18.sp)
+    }
+}
+
+@Composable
+private fun VolumeCard(accent: Color) {
+    val ctx = LocalContext.current
+    val am = remember { ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    val maxVol = remember { am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
+    var vol by remember { mutableStateOf(am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg).padding(18.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Volume", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text((vol / maxVol * 100).toInt().toString() + "%", color = accent, fontSize = 18.sp)
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(CardBg2).padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Rounded.VolumeDown, contentDescription = null, tint = Color.White.copy(alpha = 0.8f))
+            SeekBar(
+                positionProvider = { vol },
+                max = maxVol.toFloat(),
+                onSeek = {
+                    vol = it
+                    am.setStreamVolume(AudioManager.STREAM_MUSIC, it.toInt(), 0)
+                },
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+            )
+            Icon(Icons.Rounded.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.8f))
+        }
+    }
+}
+
+@Composable
+private fun PlayerMenuSheet(
+    s: AppState,
+    song: Song,
+    onDismiss: () -> Unit,
+    onAdd: () -> Unit,
+    onSleep: () -> Unit,
+    onQueue: () -> Unit
+) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val appScope = remember {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+    }
+    var visible by remember { mutableStateOf(false) }
+    var details by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    val close: () -> Unit = {
+        scope.launch {
+            visible = false
+            delay(230)
+            onDismiss()
+        }
+    }
+    BackHandler { close() }
+    fun toast(t: String) = Toast.makeText(ctx, t, Toast.LENGTH_SHORT).show()
+    val liked = s.isLiked(song)
+    val actions = listOf(
+        MenuAction(Icons.Rounded.Bedtime, "Sleep timer", s.sleepLeft > 0) { close(); onSleep() },
+        MenuAction(Icons.Rounded.Radio, "Start radio", false) {
+            close()
+            toast("Starting radio")
+            appScope.launch {
+                try {
+                    val r = Engine.search(song.artist + " " + song.title)
+                    s.queue = listOf(song) + r.filter { it.id != song.id }
+                } catch (e: Exception) {
+                    toast("Radio failed, check your connection")
+                }
+            }
+        },
+        MenuAction(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Unlike" else "Like", liked) {
+            s.toggleLike(song)
+        },
+        MenuAction(Icons.Rounded.PlaylistAdd, "Add to playlist", false) { close(); onAdd() },
+        MenuAction(Icons.Rounded.ContentCopy, "Copy link", false) {
+            val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("link", song.url))
+            toast("Link copied")
+        },
+        MenuAction(Icons.Rounded.QueueMusic, "Queue", false) { close(); onQueue() },
+        MenuAction(Icons.Rounded.Share, "Share", false) {
+            val i = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, song.title + " - " + song.artist + "\n" + song.url)
+            }
+            ctx.startActivity(Intent.createChooser(i, null))
+        }
+    )
+    val maxH = (LocalConfiguration.current.screenHeightDp * 0.92f).dp
+    Box(Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { close() }
+            )
+        }
+        AnimatedVisibility(
+            visible = visible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = 300f)) { it },
+            exit = slideOutVertically(tween(220)) { it }
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxH)
+                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .background(Night)
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
+                    .verticalScroll(rememberScrollState())
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp)
+            ) {
+                Box(
+                    Modifier
+                        .padding(vertical = 14.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .width(44.dp)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.White.copy(alpha = 0.35f))
+                )
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg).padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Cover(song, Modifier.size(72.dp), 16.dp, 24.sp)
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Now Playing", color = s.accent, fontSize = 17.sp)
+                        Text(
+                            song.title,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                VolumeCard(s.accent)
+                Spacer(Modifier.height(12.dp))
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    actions.chunked(3).forEach { rowItems ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            rowItems.forEach { a -> MenuTile(a, s.accent, Modifier.weight(1f)) }
+                            repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg)) {
+                    MenuRow(Icons.Rounded.Person, "View artist") {
+                        s.searchQuery = song.artist
+                        s.screen = Screen.Search
+                        s.showPlayer = false
+                        onDismiss()
+                    }
+                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+                    MenuRow(Icons.Rounded.Download, "Download") { toast("Downloads are coming in a later wave") }
+                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+                    MenuRow(Icons.Rounded.Info, "Details") { details = true }
+                }
+            }
+        }
+    }
+    if (details) {
+        AlertDialog(
+            onDismissRequest = { details = false },
+            confirmButton = { TextButton(onClick = { details = false }) { Text("Close") } },
+            title = { Text("Details") },
+            text = {
+                Column {
+                    Text("Title: " + song.title)
+                    Text("Artist: " + song.artist)
+                    if (song.seconds > 1) Text("Length: " + fmt(song.seconds))
+                    Text("Link: " + song.url, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        )
     }
 }

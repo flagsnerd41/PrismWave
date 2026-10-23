@@ -1,6 +1,9 @@
 package com.prismwave.app
 
 import android.os.Build
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -182,7 +185,7 @@ fun Main(s: AppState) {
                     }
                     .drawBehind { drawRect(Brush.verticalGradient(listOf(tintTop, tintBot))) }
             ) {
-                Box(Modifier.fillMaxSize().statusBarsPadding()) {
+                Box(Modifier.fillMaxSize()) {
                     AnimatedContent(
                         targetState = s.screen,
                         transitionSpec = {
@@ -198,15 +201,26 @@ fun Main(s: AppState) {
                         },
                         label = "screens"
                     ) { scr ->
-                        when (scr) {
-                            Screen.Home -> HomeScreen(s)
-                            Screen.Search -> SearchScreen(s)
-                            Screen.Library -> LibraryScreen(s)
-                            Screen.Settings -> SettingsScreen(s)
+                        if (scr == Screen.Home) {
+                            HomeScreen(s)
+                        } else {
+                            Box(Modifier.fillMaxSize().statusBarsPadding()) {
+                                when (scr) {
+                                    Screen.Search -> SearchScreen(s)
+                                    Screen.Library -> LibraryScreen(s)
+                                    else -> SettingsScreen(s)
+                                }
+                            }
                         }
                     }
                 }
             }
+            AnimatedVisibility(
+                visible = s.screen == Screen.Home,
+                modifier = Modifier.align(Alignment.TopCenter),
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(200))
+            ) { TopBlur(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 18.dp) }
             Column(
                 Modifier
                     .align(Alignment.BottomCenter)
