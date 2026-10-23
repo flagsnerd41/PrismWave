@@ -1,5 +1,9 @@
 package com.prismwave.app
 
+import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Info
+
 import androidx.activity.compose.BackHandler
 import android.widget.Toast
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -137,19 +141,10 @@ fun Header(s: AppState) {
         RoundBtn(Icons.Rounded.Settings, 0.9f, { s.screen = Screen.Settings }, 46.dp)
     }
     if (stats) {
-        AlertDialog(
-            onDismissRequest = { stats = false },
-            confirmButton = { TextButton(onClick = { stats = false }) { Text("Close") } },
-            title = { Text("Your stats") },
-            text = {
-                Column {
-                    Text("Songs played: " + s.playCount)
-                    Text("Listening time: " + (s.listenSeconds / 60) + " min")
-                    Text("Liked songs: " + s.liked.size)
-                    Text("Playlists: " + s.playlists.size)
-                }
-            }
-        )
+        LaunchedEffect(Unit) {
+            Pages.show("stats")
+            stats = false
+        }
     }
 }
 
@@ -326,12 +321,12 @@ fun HomeScreen(s: AppState) {
             item {
                 if (quick == null) LoadingRow(s) else QuickPicksGrid(quick, s)
             }
-            if (history.isNotEmpty()) {
+            if (history.isNotEmpty() && Opts.showKeep) {
                 item { Spacer(Modifier.height(18.dp)) }
                 item { SectionTitle("Keep listening") }
                 item { SongShelf(history, s) }
             }
-            if (speedDial.size >= 3) {
+            if (speedDial.size >= 3 && Opts.showSpeed) {
                 item { Spacer(Modifier.height(18.dp)) }
                 item { SectionTitle("Speed dial") }
                 item { SongShelf(speedDial, s) }
@@ -346,14 +341,16 @@ fun HomeScreen(s: AppState) {
                     ) { items(ytPlaylists.take(12)) { p -> PlaylistCard(p, s) } }
                 }
             }
-            if (forgotten.size >= 3) {
+            if (forgotten.size >= 3 && Opts.showForgotten) {
                 item { Spacer(Modifier.height(18.dp)) }
                 item { SectionTitle("Forgotten favorites") }
                 item { SongShelf(forgotten, s) }
             }
             item { Spacer(Modifier.height(18.dp)) }
-            item { SongRowList("Chill", chill, s) }
-            item { SongRowList("Workout", workout, s) }
+            if (Opts.showMixes) {
+                item { SongRowList("Chill", chill, s) }
+                item { SongRowList("Workout", workout, s) }
+            }
         }
     }
 }
@@ -436,7 +433,7 @@ fun SearchScreen(s: AppState) {
         busy = false
     }
     val searching = s.searchQuery.trim().length >= 2
-    LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
+    LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
         item { Header(s) }
         item {
             OutlinedTextField(
@@ -614,7 +611,7 @@ fun LibraryScreen(s: AppState) {
 private fun LibraryMain(s: AppState) {
     var creating by remember { mutableStateOf(false) }
     val top = s.topPlayed()
-    LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
+    LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
         item { Header(s) }
         item {
             LazyRow(
@@ -823,7 +820,7 @@ fun SongListScreen(s: AppState, title: String) {
         "Offline" -> DownloadStore.songs.toList()
         else -> emptyList()
     }
-    LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
+    LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
         item {
             Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { s.libraryOpen = null })
@@ -1092,32 +1089,10 @@ fun PlaylistScreen(s: AppState, id: String) {
         }
     }
     if (menu) {
-        AlertDialog(
-            onDismissRequest = { menu = false },
-            confirmButton = { TextButton(onClick = { menu = false }) { Text("Close") } },
-            title = { Text(pl.name) },
-            text = {
-                Column {
-                    Text(
-                        "Rename",
-                        color = Color.White,
-                        modifier = Modifier.fillMaxWidth().clickable { menu = false; renaming = true }.padding(vertical = 12.dp)
-                    )
-                    Text(
-                        "Delete playlist",
-                        color = Color.White,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                menu = false
-                                s.openPlaylist = null
-                                s.deletePlaylist(pl.id)
-                            }
-                            .padding(vertical = 12.dp)
-                    )
-                }
-            }
-        )
+        LaunchedEffect(Unit) {
+            Pages.show("plmenu", null, pl.id)
+            menu = false
+        }
     }
     if (renaming) {
         NamePlaylistDialog("Rename playlist", pl.name, { n ->
@@ -1204,6 +1179,17 @@ private fun SettingsGroup(items: List<SettingsItem>, accent: Color, base: Int, o
 }
 
 @Composable
+private fun ToggleRow(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White)
+            Text(sub, color = TextDim, fontSize = 13.sp)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
 fun SettingsScreen(s: AppState) {
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -1219,9 +1205,12 @@ fun SettingsScreen(s: AppState) {
         "appearance" to "Appearance",
         "playback" to "Playback",
         "performance" to "Performance",
-        "backup" to "Backup & restore"
+        "backup" to "Backup & restore",
+        "behavior" to "Behavior",
+        "content" to "Content",
+        "about" to "About"
     )
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 220.dp)) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(top = statusTop(), bottom = 220.dp)) {
       AnimatedContent(
         targetState = page,
         transitionSpec = {
@@ -1263,7 +1252,10 @@ fun SettingsScreen(s: AppState) {
             ) { page = it }
             SettingsGroup(
                 listOf(
-                    SettingsItem("backup", "Backup & restore", "Save or bring back your library", Icons.Rounded.Folder)
+                    SettingsItem("behavior", "Behavior", "Haptics, taps, and look extras", Icons.Rounded.TouchApp),
+                    SettingsItem("content", "Content", "Choose what shows on Home", Icons.Rounded.Home),
+                    SettingsItem("backup", "Backup & restore", "Save or bring back your library", Icons.Rounded.Folder),
+                    SettingsItem("about", "About", "Version and build info", Icons.Rounded.Info)
                 ),
                 s.accent,
                 5
@@ -1326,7 +1318,7 @@ fun SettingsScreen(s: AppState) {
             Text("Accent", color = TextDim)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf(Gold, Color(0xFF4DB6AC), Color(0xFFE57A8A), Color(0xFF8AB4F8)).forEach { c ->
+                listOf(Gold, Color(0xFF4DB6AC), Color(0xFFE57A8A), Color(0xFF8AB4F8), Color(0xFFB39DDB), Color(0xFFFFA45C)).forEach { c ->
                     Box(
                         Modifier
                             .size(36.dp)
@@ -1416,6 +1408,30 @@ fun SettingsScreen(s: AppState) {
             }
         }
 
+                }
+                "behavior" -> {
+                    Section("Feel") {
+                        ToggleRow("Haptic feedback", "A small tick when you tap", Opts.haptics) { Opts.haptics = it; Opts.save() }
+                        ToggleRow("Bounce on tap", "Buttons squish when pressed", Opts.bounce) { Opts.bounce = it; Opts.save() }
+                    }
+                    Section("Look") {
+                        ToggleRow("Blur under status bar", "Blurred strip on every screen", Opts.statusBlur) { Opts.statusBlur = it; Opts.save() }
+                        ToggleRow("Living background", "Tint the app with the song's cover color", Opts.livingBg) { Opts.livingBg = it; Opts.save() }
+                    }
+                }
+                "content" -> {
+                    Section("Home sections") {
+                        ToggleRow("Keep listening", "Your recent songs", Opts.showKeep) { Opts.showKeep = it; Opts.save() }
+                        ToggleRow("Speed dial", "Your most played", Opts.showSpeed) { Opts.showSpeed = it; Opts.save() }
+                        ToggleRow("Forgotten favorites", "Liked songs you haven't played lately", Opts.showForgotten) { Opts.showForgotten = it; Opts.save() }
+                        ToggleRow("Chill and Workout", "Mix shelves at the bottom", Opts.showMixes) { Opts.showMixes = it; Opts.save() }
+                    }
+                }
+                "about" -> {
+                    Section("PrismWave") {
+                        Text("Version v12", color = Color.White)
+                        Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
+                    }
                 }
                 "backup" -> {
         Section("Backup") {

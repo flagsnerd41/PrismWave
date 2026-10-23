@@ -1,5 +1,10 @@
 package com.prismwave.app
 
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.material.icons.rounded.ArrowBack
+
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Equalizer
@@ -405,56 +410,16 @@ fun FullPlayer(s: AppState) {
     }
     if (addDialog) AddToPlaylistDialog(song, s) { addDialog = false }
     if (queueDialog) {
-        AlertDialog(
-            onDismissRequest = { queueDialog = false },
-            confirmButton = { TextButton(onClick = { queueDialog = false }) { Text("Close") } },
-            title = { Text("Queue") },
-            text = {
-                LazyColumn(Modifier.heightIn(max = 380.dp)) {
-                    items(s.queue.take(100)) { q ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { s.play(q, s.queue) }.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Cover(q, Modifier.size(42.dp), 10.dp, 16.sp)
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    q.title,
-                                    color = if (q.id == song.id) s.accent else Color.White,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(q.artist, color = TextDim, fontSize = 12.sp, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-            }
-        )
+        LaunchedEffect(Unit) {
+            Pages.show("queue")
+            queueDialog = false
+        }
     }
     if (sleepDialog) {
-        AlertDialog(
-            onDismissRequest = { sleepDialog = false },
-            confirmButton = { TextButton(onClick = { sleepDialog = false }) { Text("Close") } },
-            title = { Text("Sleep timer") },
-            text = {
-                Column {
-                    listOf(0 to "Off", 15 to "15 minutes", 30 to "30 minutes", 60 to "60 minutes").forEach { (m, label) ->
-                        Text(
-                            label,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    s.sleepLeft = m * 60
-                                    sleepDialog = false
-                                }
-                                .padding(vertical = 12.dp)
-                        )
-                    }
-                }
-            }
-        )
+        LaunchedEffect(Unit) {
+            Pages.show("sleep")
+            sleepDialog = false
+        }
     }
 }
 
@@ -761,6 +726,7 @@ fun PlayButton(s: AppState, size: Dp, iconSize: Dp) {
 
 @Composable
 fun TopBlur(height: Dp) {
+    if (!Opts.statusBlur) return
     val backdrop = LocalBackdrop.current
     val useBlur = backdrop != null && backdrop.enabled && Build.VERSION.SDK_INT >= 31
     val blurLayer = rememberGraphicsLayer()
@@ -920,41 +886,36 @@ private fun PlayerMenuSheet(
     )
     val maxH = (LocalConfiguration.current.screenHeightDp * 0.92f).dp
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
+            exit = slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
+        ) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { close() }
-            )
-        }
-        AnimatedVisibility(
-            visible = visible,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = 300f)) { it },
-            exit = slideOutVertically(tween(220)) { it }
-        ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = maxH)
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                     .background(Night)
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
+            ) {
+                Cover(song, Modifier.fillMaxSize().blur(60.dp), 0.dp, 120.sp, quality = 400)
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
+            Column(
+                Modifier
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 16.dp)
             ) {
-                Box(
-                    Modifier
-                        .padding(vertical = 14.dp)
-                        .align(Alignment.CenterHorizontally)
-                        .width(44.dp)
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(Color.White.copy(alpha = 0.35f))
-                )
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { close() })
+                    Spacer(Modifier.width(14.dp))
+                    Text("Options", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                }
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg).padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -1031,129 +992,16 @@ private fun PlayerMenuSheet(
                         Icons.Rounded.Speed,
                         "Tempo and Pitch",
                         "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)
-                    ) { tempoOpen = true }
+                    ) { Pages.show("tempo") }
                 }
+            }
             }
         }
     }
-    if (tempoOpen) TempoPitchDialog(s) { tempoOpen = false }
     if (details) {
-        AlertDialog(
-            onDismissRequest = { details = false },
-            confirmButton = { TextButton(onClick = { details = false }) { Text("Close") } },
-            title = { Text("Details") },
-            text = {
-                Column {
-                    Text("Title: " + song.title)
-                    Text("Artist: " + song.artist)
-                    if (song.seconds > 1) Text("Length: " + fmt(song.seconds))
-                    Text("Link: " + song.url, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        )
-    }
-}
-
-
-// ------------------------------------------------------------ tempo and pitch
-
-@Composable
-private fun TempoPitchDialog(s: AppState, onDismiss: () -> Unit) {
-    var stMode by remember { mutableStateOf(true) }
-    fun semis(): Int = Math.round(12.0 * Math.log(s.pitch.toDouble()) / Math.log(2.0)).toInt()
-    fun setTempo(v: Float) {
-        s.tempo = Math.round(v.coerceIn(0.25f, 2f) * 20) / 20f
-        s.applyTempoPitch()
-    }
-    fun setSemis(n: Int) {
-        s.pitch = Math.pow(2.0, n.coerceIn(-12, 12) / 12.0).toFloat()
-        s.applyTempoPitch()
-    }
-    fun setRatio(v: Float) {
-        s.pitch = Math.round(v.coerceIn(0.5f, 2f) * 20) / 20f
-        s.applyTempoPitch()
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CardBg2,
-        shape = RoundedCornerShape(32.dp),
-        title = { Text("Tempo and Pitch", color = Color.White, fontSize = 28.sp) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = s.accent, fontSize = 17.sp) } },
-        dismissButton = {
-            TextButton(onClick = {
-                s.tempo = 1f
-                s.pitch = 1f
-                s.applyTempoPitch()
-            }) { Text("Reset", color = s.accent, fontSize = 17.sp) }
-        },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Speed, contentDescription = null, tint = Color.White.copy(alpha = 0.85f))
-                    Spacer(Modifier.width(14.dp))
-                    Text("Tempo", color = Color.White, fontSize = 20.sp, modifier = Modifier.weight(1f))
-                    Text("x" + "%.2f".format(s.tempo), color = Color.White, fontSize = 20.sp)
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Remove, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp).clickable { setTempo(s.tempo - 0.05f) })
-                    SeekBar(
-                        positionProvider = { s.tempo - 0.25f },
-                        max = 1.75f,
-                        onSeek = { setTempo(it + 0.25f) },
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-                    )
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp).clickable { setTempo(s.tempo + 0.05f) })
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { v ->
-                        Chip("x" + "%.2f".format(v), Math.abs(s.tempo - v) < 0.001f, s.accent) { setTempo(v) }
-                    }
-                }
-                Spacer(Modifier.height(18.dp))
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                Spacer(Modifier.height(18.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = Color.White.copy(alpha = 0.85f))
-                    Spacer(Modifier.width(14.dp))
-                    Text("Pitch", color = Color.White, fontSize = 20.sp, modifier = Modifier.weight(1f))
-                    Text(if (stMode) semis().toString() else "%.2f".format(s.pitch), color = Color.White, fontSize = 20.sp)
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Chip("st", stMode, s.accent) { stMode = true }
-                    Chip("x", !stMode, s.accent) { stMode = false }
-                }
-                Spacer(Modifier.height(12.dp))
-                if (stMode) {
-                    SeekBar(
-                        positionProvider = { (semis() + 12).toFloat() },
-                        max = 24f,
-                        onSeek = { setSemis(Math.round(it) - 12) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(-12, -7, -5, 0, 5, 7, 12).forEach { n ->
-                            Chip(if (n > 0) "+" + n else n.toString(), semis() == n, s.accent) { setSemis(n) }
-                        }
-                    }
-                } else {
-                    SeekBar(
-                        positionProvider = { s.pitch - 0.5f },
-                        max = 1.5f,
-                        onSeek = { setRatio(it + 0.5f) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { v ->
-                            Chip("x" + "%.2f".format(v), Math.abs(s.pitch - v) < 0.001f, s.accent) { setRatio(v) }
-                        }
-                    }
-                }
-            }
+        LaunchedEffect(Unit) {
+            Pages.show("details", song)
+            details = false
         }
-    )
+    }
 }

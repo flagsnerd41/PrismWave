@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
+            remember { Opts.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(false) }
@@ -165,8 +166,8 @@ fun Main(s: AppState) {
         backdrop.enabled = blurActive
     }
     val cur = s.current
-    val artC = if (cur != null) rememberArtColor(cur) else s.accent
-    val strength = if (cur != null) 1f else 0.5f
+    val artC = if (cur != null && Opts.livingBg) rememberArtColor(cur) else s.accent
+    val strength = if (cur != null && Opts.livingBg) 1f else 0.5f
     val tintTop by animateColorAsState(lerp(Night, artC, 0.42f * strength), tween(900), label = "tintTop")
     val tintBot by animateColorAsState(lerp(Night, artC, 0.16f * strength), tween(900), label = "tintBot")
     CompositionLocalProvider(LocalBackdrop provides backdrop, LocalReduceMotion provides s.reduceMotion) {
@@ -205,9 +206,7 @@ fun Main(s: AppState) {
                             HomeScreen(s)
                         } else {
                             Box(
-                                Modifier.fillMaxSize().then(
-                                    if (scr == Screen.Library && s.openPlaylist != null) Modifier else Modifier.statusBarsPadding()
-                                )
+                                Modifier.fillMaxSize()
                             ) {
                                 when (scr) {
                                     Screen.Search -> SearchScreen(s)
@@ -220,7 +219,7 @@ fun Main(s: AppState) {
                 }
             }
             AnimatedVisibility(
-                visible = s.screen == Screen.Home,
+                visible = true,
                 modifier = Modifier.align(Alignment.TopCenter),
                 enter = fadeIn(tween(200)),
                 exit = fadeOut(tween(200))
@@ -247,6 +246,7 @@ fun Main(s: AppState) {
                 enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = 300f)) { it } + fadeIn(tween(200)),
                 exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))
             ) { FullPlayer(s) }
+            PagesHost(s)
             if (s.showLogin) LoginScreen(s)
         }
     }

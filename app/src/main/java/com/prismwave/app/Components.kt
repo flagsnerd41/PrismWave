@@ -110,7 +110,7 @@ private fun Modifier.pressable(scaleTo: Float, onClick: () -> Unit): Modifier = 
     val haptic = LocalHapticFeedback.current
     val cb by rememberUpdatedState(onClick)
     val scale by animateFloatAsState(
-        targetValue = if (pressed) scaleTo else 1f,
+        targetValue = if (pressed && Opts.bounce) scaleTo else 1f,
         animationSpec = spring(dampingRatio = 0.4f, stiffness = 500f),
         label = "bounce"
     )
@@ -127,7 +127,7 @@ private fun Modifier.pressable(scaleTo: Float, onClick: () -> Unit): Modifier = 
                     pressed = false
                 },
                 onTap = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    if (Opts.haptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     cb()
                 }
             )
@@ -319,106 +319,23 @@ fun NamePlaylistDialog(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var name by remember { mutableStateOf(initial) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                placeholder = { Text("Playlist name", color = TextDim) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = Gold,
-                    cursorColor = Gold
-                )
-            )
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(name) }) { Text("OK") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
+    LaunchedEffect(Unit) { Pages.askName(title, initial, onConfirm, onDismiss) }
 }
 
 @Composable
 fun AddToPlaylistDialog(song: Song, s: AppState, onDone: () -> Unit) {
-    var creating by remember { mutableStateOf(false) }
-    if (creating) {
-        NamePlaylistDialog("New playlist", "", { n ->
-            val id = s.createPlaylist(n)
-            s.addToPlaylist(id, song)
-            onDone()
-        }, { creating = false })
-        return
+    LaunchedEffect(Unit) {
+        Pages.show("add", song)
+        onDone()
     }
-    AlertDialog(
-        onDismissRequest = onDone,
-        title = { Text("Add to playlist") },
-        text = {
-            Column {
-                Text(
-                    "+ New playlist",
-                    color = Gold,
-                    modifier = Modifier.fillMaxWidth().clickable { creating = true }.padding(vertical = 12.dp)
-                )
-                s.playlists.forEach { p ->
-                    Text(
-                        p.name + "  (" + p.songs.size + ")",
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                s.addToPlaylist(p.id, song)
-                                onDone()
-                            }
-                            .padding(vertical = 12.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDone) { Text("Close") } }
-    )
 }
 
 @Composable
 fun SongMenu(song: Song, s: AppState, playlistId: String?, onDismiss: () -> Unit) {
-    val ctx = LocalContext.current
-    var pick by remember { mutableStateOf(false) }
-    if (pick) {
-        AddToPlaylistDialog(song, s) { pick = false; onDismiss() }
-        return
+    LaunchedEffect(Unit) {
+        Pages.show("songmenu", song, playlistId)
+        onDismiss()
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        text = {
-            Column {
-                val items = buildList<Pair<String, () -> Unit>> {
-                    add((if (s.isLiked(song)) "Remove from liked" else "Like") to { s.toggleLike(song); onDismiss() })
-                    add("Add to playlist" to { pick = true })
-                    add((if (DownloadStore.isDownloaded(song)) "Remove download" else "Download") to {
-                        if (DownloadStore.isDownloaded(song)) DownloadStore.remove(ctx, song) else DownloadStore.start(ctx, song)
-                        onDismiss()
-                    })
-                    if (playlistId != null) {
-                        add("Remove from this playlist" to { s.removeFromPlaylist(playlistId, song.id); onDismiss() })
-                    }
-                }
-                items.forEach { (label, action) ->
-                    Text(
-                        label,
-                        color = Color.White,
-                        modifier = Modifier.fillMaxWidth().clickable { action() }.padding(vertical = 12.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
-    )
 }
 
 @Composable
