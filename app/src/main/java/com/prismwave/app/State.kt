@@ -426,7 +426,7 @@ class AppState(private val ctx: Context) {
         saveAll()
     }
 
-    fun setQueue(l: List<Song>) {
+    fun replaceQueue(l: List<Song>) {
         queue = l
         planned.clear()
     }
@@ -439,7 +439,7 @@ class AppState(private val ctx: Context) {
         val l = queue.filter { it.id != song.id }.toMutableList()
         val i = l.indexOfFirst { it.id == current?.id }
         l.add(i + 1, song)
-        setQueue(l)
+        replaceQueue(l)
     }
 
     fun addToQueue(song: Song) {
@@ -447,7 +447,7 @@ class AppState(private val ctx: Context) {
             play(song)
             return
         }
-        setQueue(queue.filter { it.id != song.id } + song)
+        replaceQueue(queue.filter { it.id != song.id } + song)
     }
 
     fun topArtists(): List<Pair<String, Int>> =
@@ -573,7 +573,7 @@ class AppState(private val ctx: Context) {
                     emptyList()
                 }
                 if (more.isNotEmpty()) {
-                    setQueue(queue + more)
+                    replaceQueue(queue + more)
                     skipTo(more[0])
                 } else {
                     skipTo(queue[0])

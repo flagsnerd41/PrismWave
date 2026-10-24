@@ -511,7 +511,7 @@ private fun QueuePage(s: AppState) {
         if (i !in l.indices || t !in l.indices) return
         val x = l.removeAt(i)
         l.add(t, x)
-        s.setQueue(l)
+        s.replaceQueue(l)
         rev++
     }
     SlidePage(s, "Queue", scroll = false) {
@@ -540,7 +540,7 @@ private fun QueuePage(s: AppState) {
                     SmallIcon(Icons.Rounded.KeyboardArrowUp) { move(i, -1) }
                     SmallIcon(Icons.Rounded.KeyboardArrowDown) { move(i, 1) }
                     SmallIcon(Icons.Rounded.Close) {
-                        s.setQueue(s.queue.filterIndexed { k, _ -> k != i })
+                        s.replaceQueue(s.queue.filterIndexed { k, _ -> k != i })
                         rev++
                     }
                 }

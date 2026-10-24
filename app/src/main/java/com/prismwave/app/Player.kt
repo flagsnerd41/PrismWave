@@ -975,7 +975,7 @@ private fun PlayerMenuSheet(
                         emptyList()
                     }
                     val r = if (rel.size >= 5) rel else Engine.search(song.artist + " " + song.title)
-                    s.setQueue(listOf(song) + r.filter { it.id != song.id })
+                    s.replaceQueue(listOf(song) + r.filter { it.id != song.id })
                     s.radio = true
                     toast("Radio ready")
                 } catch (e: Exception) {
