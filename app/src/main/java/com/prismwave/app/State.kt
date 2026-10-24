@@ -1,5 +1,9 @@
 package com.prismwave.app
 
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
@@ -79,6 +83,11 @@ class AppState(private val ctx: Context) {
     private var endedFor: String? = null
     private var retriedId: String? = null
     private var failStreak = 0
+    private var fadeJob: Job? = null
+    private var preloadJob: Job? = null
+    private val planned = ArrayList<Song>()
+    private var pausedByUnplug = false
+    private var pausedAt = 0L
 
     var screen by mutableStateOf(Screen.Home)
     var current by mutableStateOf<Song?>(null)
@@ -138,6 +147,7 @@ class AppState(private val ctx: Context) {
         } catch (e: Exception) {
         }
         connect()
+        watchHeadphones()
         if (signedIn && System.currentTimeMillis() - prefs.getLong("lastImport", 0L) > 6L * 3600 * 1000) {
             importAccount()
         }
@@ -431,6 +441,8 @@ class AppState(private val ctx: Context) {
 
     // ---------- playback ----------
     fun play(song: Song, from: List<Song> = listOf(song)) {
+        if (from !== queue) planned.clear()
+        pausedByUnplug = false
         current = song
         queue = from
         position = 0f
@@ -468,8 +480,11 @@ class AppState(private val ctx: Context) {
                     .build()
                 c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setCustomCacheKey(song.id).setMediaMetadata(meta).build())
                 c.prepare()
+                if (Opts.fade) c.volume = 0f
                 c.play()
+                if (Opts.fade) fade(0f, 1f, 450) else c.volume = 1f
                 status = ""
+                preload()
             } catch (e: Exception) {
                 status = "Can't play this one: " + (e.message ?: "error").take(50)
                 loading = false
@@ -481,7 +496,26 @@ class AppState(private val ctx: Context) {
     fun toggle() {
         val c = controller ?: return
         if (current == null) return
-        if (c.playWhenReady) c.pause() else c.play()
+        if (playing) {
+            if (Opts.fade && c.playbackState == Player.STATE_READY) {
+                playing = false
+                fade(c.volume, 0f, 260) {
+                    c.pause()
+                    c.volume = 1f
+                }
+            } else {
+                c.pause()
+            }
+        } else {
+            pausedByUnplug = false
+            if (Opts.fade) {
+                c.volume = 0f
+                c.play()
+                fade(0f, 1f, 320)
+            } else {
+                c.play()
+            }
+        }
     }
 
     fun seekTo(sec: Float) {
@@ -493,8 +527,9 @@ class AppState(private val ctx: Context) {
         val cur = current ?: return
         if (queue.isEmpty()) return
         val i = queue.indexOfFirst { it.id == cur.id }
-        val n = if (shuffle) queue.random() else queue[(i + 1) % queue.size]
-        play(n, queue)
+        val n = if (shuffle) (planned.firstOrNull { it.id != cur.id } ?: queue.random()) else queue[(i + 1) % queue.size]
+        planned.remove(n)
+        skipTo(n)
     }
 
     fun prev() {
@@ -505,8 +540,93 @@ class AppState(private val ctx: Context) {
         }
         if (queue.isEmpty()) return
         val i = queue.indexOfFirst { it.id == cur.id }
-        play(queue[(i - 1 + queue.size) % queue.size], queue)
+        skipTo(queue[(i - 1 + queue.size) % queue.size])
     }
+
+    private fun fade(from: Float, to: Float, ms: Long, done: () -> Unit = {}) {
+        fadeJob?.cancel()
+        fadeJob = scope.launch {
+            val steps = 10
+            for (k in 1..steps) {
+                controller?.volume = from + (to - from) * k / steps
+                delay(ms / steps)
+            }
+            done()
+        }
+    }
+
+    private fun skipTo(n: Song) {
+        val c = controller
+        if (Opts.fade && c != null && playing && c.playbackState == Player.STATE_READY) {
+            fade(c.volume, 0f, 160) { play(n, queue) }
+        } else {
+            play(n, queue)
+        }
+    }
+
+    // the next two songs, so they can be loaded while the current one plays
+    private fun upcoming(): List<Song> {
+        val cur = current ?: return emptyList()
+        if (queue.size < 2) return emptyList()
+        if (shuffle) {
+            planned.removeAll { it.id == cur.id }
+            while (planned.size < 2 && queue.size > planned.size + 1) {
+                val r = queue.random()
+                if (r.id != cur.id && planned.none { it.id == r.id }) planned.add(r)
+            }
+            return planned.toList()
+        }
+        planned.clear()
+        val i = queue.indexOfFirst { it.id == cur.id }
+        return (1..2).map { queue[(i + it) % queue.size] }.filter { it.id != cur.id }.distinctBy { it.id }
+    }
+
+    private fun preload() {
+        preloadJob?.cancel()
+        if (!Opts.preload || Opts.offline) return
+        preloadJob = scope.launch {
+            delay(2500)
+            for (sg in upcoming()) {
+                if (DownloadStore.localUri(sg) != null || AudioCache.isFull(ctx, sg.id)) continue
+                try {
+                    val url = Engine.streamUrl(sg.url)
+                    AudioCache.warm(ctx, sg.id, url)
+                } catch (e: Exception) {
+                }
+            }
+        }
+    }
+
+    private fun watchHeadphones() {
+        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        fun isHp(d: AudioDeviceInfo) = d.isSink && (
+            d.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                d.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                d.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                d.type == AudioDeviceInfo.TYPE_USB_HEADSET
+            )
+        am.registerAudioDeviceCallback(object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+                if (Opts.headphones && pausedByUnplug &&
+                    System.currentTimeMillis() - pausedAt < 10 * 60 * 1000 &&
+                    addedDevices.any { isHp(it) }
+                ) {
+                    pausedByUnplug = false
+                    controller?.play()
+                }
+            }
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+                if (Opts.headphones && playing && removedDevices.any { isHp(it) }) {
+                    pausedByUnplug = true
+                    pausedAt = System.currentTimeMillis()
+                    controller?.pause()
+                }
+            }
+        }, null)
+    }
+
+    fun offlineSongs(): List<Song> = (DownloadStore.songs.toList() + cachedSongs()).distinctBy { it.id }
 
     private fun onEnded() {
         val id = current?.id ?: return
@@ -592,7 +712,7 @@ class AppState(private val ctx: Context) {
 
     fun tick() {
         val c = controller
-        if (c != null && current != null && c.playbackState == Player.STATE_ENDED) onEnded()
+        if (c != null && current != null && c.playbackState == Player.STATE_ENDED && c.currentMediaItem?.mediaId == current?.id) onEnded()
         if (c != null && playing && c.playbackState == Player.STATE_READY) {
             position = c.currentPosition / 1000f
             val dur = c.duration

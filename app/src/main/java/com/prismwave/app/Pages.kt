@@ -106,6 +106,10 @@ object Opts {
     var blurAmount by mutableStateOf(1f)
     var blurDark by mutableStateOf(0.35f)
     var cacheMb by mutableStateOf(512)
+    var preload by mutableStateOf(true)
+    var fade by mutableStateOf(true)
+    var offline by mutableStateOf(false)
+    var headphones by mutableStateOf(true)
 
     fun init(c: Context) {
         val p = c.getSharedPreferences("prismwave_opts", Context.MODE_PRIVATE)
@@ -121,6 +125,10 @@ object Opts {
         blurAmount = p.getFloat("blurAmount", 1f)
         blurDark = p.getFloat("blurDark", 0.35f)
         cacheMb = p.getInt("cacheMb", 512)
+        preload = p.getBoolean("preload", true)
+        fade = p.getBoolean("fade", true)
+        offline = p.getBoolean("offline", false)
+        headphones = p.getBoolean("headphones", true)
     }
 
     fun save() {
@@ -136,6 +144,10 @@ object Opts {
             ?.putFloat("blurAmount", blurAmount)
             ?.putFloat("blurDark", blurDark)
             ?.putInt("cacheMb", cacheMb)
+            ?.putBoolean("preload", preload)
+            ?.putBoolean("fade", fade)
+            ?.putBoolean("offline", offline)
+            ?.putBoolean("headphones", headphones)
             ?.apply()
     }
 }
@@ -726,7 +738,7 @@ fun TempoPitchDialog(s: AppState, onDismiss: () -> Unit) {
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = CardBg2,
+        containerColor = Color(0xFF241F1F),
         shape = RoundedCornerShape(32.dp),
         title = { Text("Tempo and Pitch", color = Color.White, fontSize = 28.sp) },
         confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = s.accent, fontSize = 17.sp) } },
@@ -779,7 +791,7 @@ fun TempoPitchDialog(s: AppState, onDismiss: () -> Unit) {
 // ------------------------------------------------------------ Home: big "Keep listening" card
 
 @Composable
-fun FeaturedCard(song: Song, from: List<Song>, s: AppState) {
+fun FeaturedCard(song: Song, from: List<Song>, s: AppState, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(32.dp)
     val art = rememberArtColor(song)
     val fade = remember {
@@ -791,9 +803,7 @@ fun FeaturedCard(song: Song, from: List<Song>, s: AppState) {
         )
     }
     Box(
-        Modifier
-            .padding(horizontal = 20.dp)
-            .fillMaxWidth()
+        modifier
             .height(330.dp)
             .clip(shape)
             .border(1.dp, Color.White.copy(alpha = 0.15f), shape)

@@ -1,5 +1,12 @@
 # PrismWave changelog
 
+## v17
+- Fixed: song ending no longer skips several songs
+- Added: Keep listening at the top of Home, 3 swipeable cards
+- Added: preload the next 2 songs while one plays
+- Added: offline mode, fade in and out, headphone smarts
+- Changed: solid Tempo and Pitch dialog, new mini player glow
+
 ## v16
 - Added: search filters (All, Songs, Videos, Albums, Artists, Playlists)
 - Added: cached songs (replay fast and offline), Library > Cached, Settings > Storage and cache

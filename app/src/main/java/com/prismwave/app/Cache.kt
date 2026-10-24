@@ -1,5 +1,12 @@
 package com.prismwave.app
 
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -57,6 +64,14 @@ object AudioCache {
             c.keys.toList().forEach { c.removeResource(it) }
         } catch (e: Exception) {
         }
+    }
+
+    suspend fun warm(ctx: Context, key: String, url: String) = withContext(Dispatchers.IO) {
+        val factory = CacheDataSource.Factory()
+            .setCache(get(ctx))
+            .setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory())
+        val spec = DataSpec.Builder().setUri(url).setKey(key).build()
+        CacheWriter(factory.createDataSource(), spec, null, null).cache()
     }
 
     fun usedMb(ctx: Context, refresh: Int = 0): Long = get(ctx).cacheSpace / (1024L * 1024L)

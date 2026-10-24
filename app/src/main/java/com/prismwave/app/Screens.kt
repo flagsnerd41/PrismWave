@@ -289,14 +289,16 @@ private fun SongShelf(songs: List<Song>, s: AppState) {
 
 @Composable
 fun HomeScreen(s: AppState) {
-    LaunchedEffect(Unit) {
-        s.loadFeed("quick", "new music hits")
-        s.loadFeed("chill", "chill songs")
-        s.loadFeed("workout", "workout songs")
+    LaunchedEffect(Opts.offline) {
+        if (!Opts.offline) {
+            s.loadFeed("quick", "new music hits")
+            s.loadFeed("chill", "chill songs")
+            s.loadFeed("workout", "workout songs")
+        }
     }
-    val quick = s.feeds["quick"]
-    val chill = s.feeds["chill"] ?: emptyList()
-    val workout = s.feeds["workout"] ?: emptyList()
+    val quick = if (Opts.offline) s.offlineSongs() else s.feeds["quick"]
+    val chill = if (Opts.offline) emptyList<Song>() else (s.feeds["chill"] ?: emptyList())
+    val workout = if (Opts.offline) emptyList<Song>() else (s.feeds["workout"] ?: emptyList())
     val chips = listOf("Relax", "Workout", "Energize", "Party", "Commute", "Focus", "Sleep")
     val history = s.history.toList()
     val recentIds = history.map { it.id }.toSet()
@@ -329,6 +331,12 @@ fun HomeScreen(s: AppState) {
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item {
+                        Chip("Offline", Opts.offline, s.accent) {
+                            Opts.offline = !Opts.offline
+                            Opts.save()
+                        }
+                    }
                     items(chips) { c ->
                         Chip(c, false, s.accent) {
                             s.searchQuery = c + " music"
@@ -337,17 +345,24 @@ fun HomeScreen(s: AppState) {
                     }
                 }
             }
+            if (history.isNotEmpty() && Opts.showKeep) {
+                item { Spacer(Modifier.height(14.dp)) }
+                item {
+                    val cardW = (LocalConfiguration.current.screenWidthDp * 0.86f).dp
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) { items(history.take(3)) { sg -> FeaturedCard(sg, history, s, Modifier.width(cardW)) } }
+                }
+            }
             item { SectionTitle("Quick picks") }
             item {
                 if (quick == null) LoadingRow(s) else QuickPicksGrid(quick, s)
             }
-            if (history.isNotEmpty() && Opts.showKeep) {
+            if (history.size > 3 && Opts.showKeep) {
                 item { Spacer(Modifier.height(18.dp)) }
-                item { FeaturedCard(history.first(), history, s) }
-                if (history.size > 1) {
-                    item { Spacer(Modifier.height(14.dp)) }
-                    item { SongShelf(history.drop(1), s) }
-                }
+                item { SectionTitle("Recently played") }
+                item { SongShelf(history.drop(3), s) }
             }
             if (speedDial.size >= 3 && Opts.showSpeed) {
                 item { Spacer(Modifier.height(18.dp)) }
@@ -450,7 +465,13 @@ fun SearchScreen(s: AppState) {
         delay(500)
         busy = true
         try {
-            hits = Engine.searchHits(q, kind)
+            hits = if (Opts.offline) {
+                s.offlineSongs()
+                    .filter { it.title.contains(q, true) || it.artist.contains(q, true) }
+                    .map { Hit(0, it.title, it.artist, it.thumb, it.url, it) }
+            } else {
+                Engine.searchHits(q, kind)
+            }
         } catch (e: Exception) {
             err = "Search failed: " + (e.message ?: "unknown").take(80)
         }
@@ -1487,6 +1508,12 @@ fun SettingsScreen(s: AppState) {
                         ToggleRow("Haptic feedback", "A small tick when you tap", Opts.haptics) { Opts.haptics = it; Opts.save() }
                         ToggleRow("Bounce on tap", "Buttons squish when pressed", Opts.bounce) { Opts.bounce = it; Opts.save() }
                     }
+                    Section("Playback") {
+                        ToggleRow("Preload next songs", "Loads the next 2 songs while one plays (uses data)", Opts.preload) { Opts.preload = it; Opts.save() }
+                        ToggleRow("Fade in and out", "Soft volume fade on play, pause and skip", Opts.fade) { Opts.fade = it; Opts.save() }
+                        ToggleRow("Headphone smarts", "Pause on disconnect, resume when they reconnect", Opts.headphones) { Opts.headphones = it; Opts.save() }
+                        ToggleRow("Offline mode", "Only show downloaded and cached songs", Opts.offline) { Opts.offline = it; Opts.save() }
+                    }
                     Section("Status bar") {
                         ToggleRow("Blur under status bar", "Blurred strip on every screen", Opts.statusBlur) { Opts.statusBlur = it; Opts.save() }
                         Text("Blur strength " + (Opts.blurAmount * 100).toInt() + "%", color = TextDim)
@@ -1517,6 +1544,15 @@ fun SettingsScreen(s: AppState) {
                     }
                 }
                 "changelog" -> {
+                    Section("v17") {
+                        ChangeList(listOf(
+                            "Fix: song ending no longer skips several songs",
+                            "Keep listening at the top of Home: 3 swipeable cards",
+                            "Preload the next 2 songs while one plays",
+                            "Offline mode, fade in and out, headphone smarts",
+                            "Solid Tempo and Pitch dialog, new mini player glow"
+                        ))
+                    }
                     Section("v16") {
                         ChangeList(listOf(
                             "Search filters: All, Songs, Videos, Albums, Artists, Playlists",
@@ -1563,7 +1599,7 @@ fun SettingsScreen(s: AppState) {
                 }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v16", color = Color.White)
+                        Text("Version v17", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }

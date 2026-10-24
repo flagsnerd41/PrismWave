@@ -1,5 +1,9 @@
 package com.prismwave.app
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.animation.core.animateFloat
+
 import androidx.compose.material3.CircularProgressIndicator
 
 import androidx.compose.animation.slideInHorizontally
@@ -217,6 +221,12 @@ fun MiniPlayer(s: AppState) {
     val art = rememberArtColor(song)
     var shown by remember { mutableStateOf(false) }
     val glow = remember { Animatable(1f) }
+    val pulseT = androidx.compose.animation.core.rememberInfiniteTransition(label = "mpp")
+    val pulseA by pulseT.animateFloat(
+        0.10f, 0.28f,
+        androidx.compose.animation.core.infiniteRepeatable(tween(1600), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "mppa"
+    )
     LaunchedEffect(Unit) {
         shown = true
         delay(350)
@@ -230,7 +240,23 @@ fun MiniPlayer(s: AppState) {
             s.glassAlpha(),
             Modifier
                 .fillMaxWidth()
-                .shadow((30f * glow.value).dp, RoundedCornerShape(32.dp), false, art, art)
+                .drawBehind {
+                    val a = maxOf(glow.value * 0.6f, if (s.playing) pulseA else 0f)
+                    if (a > 0.01f) {
+                        val padX = 36.dp.toPx()
+                        val padY = 26.dp.toPx()
+                        drawRoundRect(
+                            brush = Brush.radialGradient(
+                                listOf(art.copy(alpha = a), Color.Transparent),
+                                center = Offset(size.width / 2f, size.height / 2f),
+                                radius = size.width * 0.62f
+                            ),
+                            topLeft = Offset(-padX, -padY),
+                            size = Size(size.width + padX * 2, size.height + padY * 2),
+                            cornerRadius = CornerRadius(60.dp.toPx())
+                        )
+                    }
+                }
                 .softClick { s.showPlayer = true }
                 .pointerInput(Unit) {
                     var dx = 0f
