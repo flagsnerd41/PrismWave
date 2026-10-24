@@ -76,6 +76,9 @@ class AppState(private val ctx: Context) {
     private var ticks = 0
     private var saveJob: Job? = null
     private var plJob: Job? = null
+    private var endedFor: String? = null
+    private var retriedId: String? = null
+    private var failStreak = 0
 
     var screen by mutableStateOf(Screen.Home)
     var current by mutableStateOf<Song?>(null)
@@ -88,6 +91,7 @@ class AppState(private val ctx: Context) {
     var shuffle by mutableStateOf(false)
     var repeat by mutableStateOf(false)
     var crossfade by mutableStateOf(0f)
+    var loading by mutableStateOf(false)
     var tempo by mutableStateOf(1f)
     var pitch by mutableStateOf(1f)
 
@@ -152,12 +156,18 @@ class AppState(private val ctx: Context) {
                     }
 
                     override fun onPlaybackStateChanged(state: Int) {
+                        loading = state == Player.STATE_BUFFERING
+                        if (state == Player.STATE_READY) {
+                            failStreak = 0
+                            retriedId = null
+                            if (status.startsWith("Retrying") || status.startsWith("Skipped")) status = ""
+                        }
                         if (state == Player.STATE_ENDED) onEnded()
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        status = "Playback error, tap next"
-                        playing = false
+                        loading = false
+                        handleError()
                     }
                 })
             } catch (e: Exception) {
@@ -426,6 +436,8 @@ class AppState(private val ctx: Context) {
         position = 0f
         playing = true
         status = "Loading..."
+        loading = true
+        endedFor = null
         playCount++
         known[song.id] = song
         counts[song.id] = (counts[song.id] ?: 0) + 1
@@ -435,7 +447,8 @@ class AppState(private val ctx: Context) {
         saveAll()
         scope.launch {
             try {
-                val url = DownloadStore.localUri(song) ?: Engine.streamUrl(song.url)
+                val url = DownloadStore.localUri(song)
+                    ?: (if (AudioCache.isFull(ctx, song.id)) "https://cached.invalid/" + song.id else Engine.streamUrl(song.url))
                 var c = controller
                 var tries = 0
                 while (c == null && tries < 50) {
@@ -453,13 +466,14 @@ class AppState(private val ctx: Context) {
                     .setArtist(song.artist)
                     .setArtworkUri(song.thumb?.let { Uri.parse(artUrl(it, 800)) })
                     .build()
-                c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setMediaMetadata(meta).build())
+                c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setCustomCacheKey(song.id).setMediaMetadata(meta).build())
                 c.prepare()
                 c.play()
                 status = ""
             } catch (e: Exception) {
                 status = "Can't play this one: " + (e.message ?: "error").take(50)
-                playing = false
+                loading = false
+                skipBroken()
             }
         }
     }
@@ -495,13 +509,64 @@ class AppState(private val ctx: Context) {
     }
 
     private fun onEnded() {
+        val id = current?.id ?: return
+        if (endedFor == id) return
+        endedFor = id
         if (repeat) {
+            endedFor = null
             controller?.seekTo(0)
             controller?.play()
         } else {
             next()
         }
     }
+
+    // One retry with a fresh stream link, then skip to the next song instead of getting stuck.
+    private fun handleError() {
+        val cur = current ?: return
+        if (retriedId == cur.id) {
+            skipBroken()
+            return
+        }
+        retriedId = cur.id
+        status = "Retrying..."
+        AudioCache.remove(ctx, cur.id)
+        val resume = (position * 1000).toLong()
+        scope.launch {
+            try {
+                val url = Engine.streamUrl(cur.url)
+                val c = controller ?: return@launch
+                if (current?.id != cur.id) return@launch
+                val meta = MediaMetadata.Builder()
+                    .setTitle(cur.title)
+                    .setArtist(cur.artist)
+                    .setArtworkUri(cur.thumb?.let { Uri.parse(artUrl(it, 800)) })
+                    .build()
+                c.setMediaItem(
+                    MediaItem.Builder().setUri(url).setMediaId(cur.id).setCustomCacheKey(cur.id).setMediaMetadata(meta).build(),
+                    resume
+                )
+                c.prepare()
+                c.play()
+            } catch (e: Exception) {
+                skipBroken()
+            }
+        }
+    }
+
+    private fun skipBroken() {
+        failStreak++
+        if (failStreak <= 3 && queue.size > 1) {
+            next()
+            status = "Skipped an unplayable song"
+        } else {
+            playing = false
+            loading = false
+            status = "Can't play, check your connection"
+        }
+    }
+
+    fun cachedSongs(): List<Song> = AudioCache.keys(ctx).mapNotNull { known[it] }
 
     // Songs imported with a missing length get the real one from the player once it is ready.
     private fun fixDuration(real: Int) {
@@ -527,6 +592,7 @@ class AppState(private val ctx: Context) {
 
     fun tick() {
         val c = controller
+        if (c != null && current != null && c.playbackState == Player.STATE_ENDED) onEnded()
         if (c != null && playing && c.playbackState == Player.STATE_READY) {
             position = c.currentPosition / 1000f
             val dur = c.duration

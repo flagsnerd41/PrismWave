@@ -1,5 +1,10 @@
 package com.prismwave.app
 
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -15,6 +20,17 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(
+                DefaultMediaSourceFactory(
+                    DefaultDataSource.Factory(
+                        this,
+                        CacheDataSource.Factory()
+                            .setCache(AudioCache.get(this))
+                            .setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory())
+                            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+                    )
+                )
+            )
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)

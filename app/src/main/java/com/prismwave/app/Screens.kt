@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.compose.animation.core.animateFloat
+
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
@@ -150,8 +152,26 @@ fun Header(s: AppState) {
 
 @Composable
 fun LoadingRow(s: AppState) {
-    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = s.accent, modifier = Modifier.size(28.dp))
+    val tr = androidx.compose.animation.core.rememberInfiniteTransition(label = "sk")
+    val a by tr.animateFloat(
+        0.05f, 0.16f,
+        androidx.compose.animation.core.infiniteRepeatable(tween(850), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "ska"
+    )
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        repeat(4) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = a)))
+                Spacer(Modifier.width(12.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.width(180.dp).height(14.dp).clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = a)))
+                    Box(Modifier.width(110.dp).height(12.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = a)))
+                }
+            }
+        }
     }
 }
 
@@ -414,22 +434,23 @@ private fun MoodTile(m: Mood, s: AppState, modifier: Modifier) {
 
 @Composable
 fun SearchScreen(s: AppState) {
-    var results by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var hits by remember { mutableStateOf<List<Hit>>(emptyList()) }
+    var kind by remember { mutableStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf("") }
     var tab by remember { mutableStateOf(0) }
-    LaunchedEffect(s.searchQuery) {
+    LaunchedEffect(s.searchQuery, kind) {
         err = ""
         val q = s.searchQuery.trim()
         if (q.length < 2) {
-            results = emptyList()
+            hits = emptyList()
             busy = false
             return@LaunchedEffect
         }
         delay(500)
         busy = true
         try {
-            results = Engine.search(q)
+            hits = Engine.searchHits(q, kind)
         } catch (e: Exception) {
             err = "Search failed: " + (e.message ?: "unknown").take(80)
         }
@@ -506,14 +527,27 @@ fun SearchScreen(s: AppState) {
                 }
             }
         } else {
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    itemsIndexed(listOf("All", "Songs", "Videos", "Albums", "Artists", "Playlists")) { i, label ->
+                        Chip(label, kind == i, s.accent) { kind = i }
+                    }
+                }
+            }
             if (busy) item { LoadingRow(s) }
             if (err.isNotEmpty()) item { Text(err, color = TextDim, modifier = Modifier.padding(20.dp)) }
             if (!busy) {
-                item { SectionTitle("Results") }
-                if (results.isEmpty() && err.isEmpty()) {
-                    item { Text("Nothing found", color = TextDim, modifier = Modifier.padding(horizontal = 20.dp)) }
+                if (hits.isEmpty() && err.isEmpty()) {
+                    item { Text("Nothing found", color = TextDim, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) }
                 }
-                items(results) { SongRow(it, s, results) }
+                val songList = hits.mapNotNull { it.song }
+                items(hits) { h ->
+                    val sg = h.song
+                    if (sg != null) SongRow(sg, s, songList) else HitRow(h, s)
+                }
             }
         }
     }
@@ -821,6 +855,7 @@ fun SongListScreen(s: AppState, title: String) {
         "History" -> s.history.toList()
         "My top 50" -> s.topPlayed()
         "Offline" -> DownloadStore.songs.toList()
+        "Cached" -> s.cachedSongs()
         else -> emptyList()
     }
     LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
@@ -838,6 +873,7 @@ fun SongListScreen(s: AppState, title: String) {
                         "Liked songs" -> "No liked songs yet. Open a song's menu and tap Like."
                         "Offline" -> "No downloads yet. Open a song's menu and tap Download."
                         "History", "My top 50" -> "Play something first"
+                        "Cached" -> "Songs you play are kept here for instant, offline playback."
                         else -> "Coming in a later wave"
                     },
                     color = TextDim,
@@ -1213,6 +1249,7 @@ fun SettingsScreen(s: AppState) {
         "appearance" to "Appearance",
         "playback" to "Playback",
         "performance" to "Performance",
+        "cache" to "Storage and cache",
         "backup" to "Backup & restore",
         "behavior" to "Behavior",
         "content" to "Content",
@@ -1254,7 +1291,8 @@ fun SettingsScreen(s: AppState) {
                 listOf(
                     SettingsItem("appearance", "Appearance", "Themes, layout, and player styles", Icons.Rounded.Palette),
                     SettingsItem("playback", "Playback", "Audio behavior, crossfade, and sleep", Icons.Rounded.MusicNote),
-                    SettingsItem("performance", "Performance", "Blur, motion, and battery saver", Icons.Rounded.Speed)
+                    SettingsItem("performance", "Performance", "Blur, motion, and battery saver", Icons.Rounded.Speed),
+                    SettingsItem("cache", "Storage and cache", "Cached songs and size limit", Icons.Rounded.Download)
                 ),
                 s.accent,
                 2
@@ -1381,6 +1419,31 @@ fun SettingsScreen(s: AppState) {
         }
 
                 }
+                "cache" -> {
+                    val ctx = LocalContext.current
+                    var tick by remember { mutableStateOf(0) }
+                    Section("Cached songs") {
+                        Text("Using " + AudioCache.usedMb(ctx, tick) + " MB of " + Opts.cacheMb + " MB", color = Color.White)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Songs you play are saved here for instant and offline playback. Find them in Library, Cached.", color = TextDim, fontSize = 13.sp)
+                        Spacer(Modifier.height(12.dp))
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(256, 512, 1024, 2048).forEach { mb ->
+                                Chip(if (mb >= 1024) (mb / 1024).toString() + " GB" else mb.toString() + " MB", Opts.cacheMb == mb, s.accent) {
+                                    Opts.cacheMb = mb
+                                    Opts.save()
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text("The size limit applies after you restart the app.", color = TextDim, fontSize = 13.sp)
+                        Spacer(Modifier.height(12.dp))
+                        ActionButton("Clear cache", s.accent) {
+                            AudioCache.clear(ctx)
+                            tick++
+                        }
+                    }
+                }
                 "performance" -> {
         Section("Performance") {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1424,8 +1487,24 @@ fun SettingsScreen(s: AppState) {
                         ToggleRow("Haptic feedback", "A small tick when you tap", Opts.haptics) { Opts.haptics = it; Opts.save() }
                         ToggleRow("Bounce on tap", "Buttons squish when pressed", Opts.bounce) { Opts.bounce = it; Opts.save() }
                     }
-                    Section("Look") {
+                    Section("Status bar") {
                         ToggleRow("Blur under status bar", "Blurred strip on every screen", Opts.statusBlur) { Opts.statusBlur = it; Opts.save() }
+                        Text("Blur strength " + (Opts.blurAmount * 100).toInt() + "%", color = TextDim)
+                        Slider(
+                            value = Opts.blurAmount,
+                            onValueChange = { Opts.blurAmount = it },
+                            valueRange = 0.2f..2f,
+                            onValueChangeFinished = { Opts.save() }
+                        )
+                        Text("Darkness " + (Opts.blurDark * 100).toInt() + "%", color = TextDim)
+                        Slider(
+                            value = Opts.blurDark,
+                            onValueChange = { Opts.blurDark = it },
+                            valueRange = 0f..0.9f,
+                            onValueChangeFinished = { Opts.save() }
+                        )
+                    }
+                    Section("Look") {
                         ToggleRow("Living background", "Tint the app with the song's cover color", Opts.livingBg) { Opts.livingBg = it; Opts.save() }
                     }
                 }
@@ -1438,6 +1517,17 @@ fun SettingsScreen(s: AppState) {
                     }
                 }
                 "changelog" -> {
+                    Section("v16") {
+                        ChangeList(listOf(
+                            "Search filters: All, Songs, Videos, Albums, Artists, Playlists",
+                            "Cached songs: replay fast and offline, list in Library, size in Settings",
+                            "Status bar blur strength and darkness controls",
+                            "Fix: song ending no longer gets stuck, retries then skips",
+                            "Loading ring on the play button",
+                            "Animated player icons, mini player slides up with a glow",
+                            "Swipe song rows and the mini player, shimmer loading"
+                        ))
+                    }
                     Section("v15") { ChangeList(listOf("What's new page in Settings")) }
                     Section("v14") {
                         ChangeList(listOf(
@@ -1473,7 +1563,7 @@ fun SettingsScreen(s: AppState) {
                 }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v15", color = Color.White)
+                        Text("Version v16", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }

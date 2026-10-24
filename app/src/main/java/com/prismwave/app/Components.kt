@@ -1,5 +1,8 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import android.widget.Toast
+
 import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -341,11 +344,27 @@ fun SongMenu(song: Song, s: AppState, playlistId: String?, onDismiss: () -> Unit
 @Composable
 fun SongRow(song: Song, s: AppState, from: List<Song> = listOf(song), playlistId: String? = null) {
     val isCurrent = s.current?.id == song.id
+    val ctx = LocalContext.current
     var menu by remember { mutableStateOf(false) }
     Row(
         Modifier
             .fillMaxWidth()
             .softClick { s.play(song, from) }
+            .pointerInput(song.id) {
+                var dx = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { dx = 0f },
+                    onDragEnd = {
+                        if (dx > 140f) {
+                            s.toggleLike(song)
+                            Toast.makeText(ctx, "Like updated", Toast.LENGTH_SHORT).show()
+                        } else if (dx < -140f) {
+                            s.queue = s.queue + song
+                            Toast.makeText(ctx, "Added to queue", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) { _, d -> dx += d }
+            }
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -103,6 +103,9 @@ object Opts {
     var showSpeed by mutableStateOf(true)
     var showForgotten by mutableStateOf(true)
     var showMixes by mutableStateOf(true)
+    var blurAmount by mutableStateOf(1f)
+    var blurDark by mutableStateOf(0.35f)
+    var cacheMb by mutableStateOf(512)
 
     fun init(c: Context) {
         val p = c.getSharedPreferences("prismwave_opts", Context.MODE_PRIVATE)
@@ -115,6 +118,9 @@ object Opts {
         showSpeed = p.getBoolean("showSpeed", true)
         showForgotten = p.getBoolean("showForgotten", true)
         showMixes = p.getBoolean("showMixes", true)
+        blurAmount = p.getFloat("blurAmount", 1f)
+        blurDark = p.getFloat("blurDark", 0.35f)
+        cacheMb = p.getInt("cacheMb", 512)
     }
 
     fun save() {
@@ -127,6 +133,9 @@ object Opts {
             ?.putBoolean("showSpeed", showSpeed)
             ?.putBoolean("showForgotten", showForgotten)
             ?.putBoolean("showMixes", showMixes)
+            ?.putFloat("blurAmount", blurAmount)
+            ?.putFloat("blurDark", blurDark)
+            ?.putInt("cacheMb", cacheMb)
             ?.apply()
     }
 }
@@ -142,6 +151,9 @@ object Pages {
     var playlistId by mutableStateOf<String?>(null)
     var nameTitle by mutableStateOf("")
     var nameInitial by mutableStateOf("")
+    var collTitle by mutableStateOf("")
+    var collUrl by mutableStateOf("")
+    var collKind by mutableStateOf(1)
     private var nameOk: ((String) -> Unit)? = null
     private var onClosed: (() -> Unit)? = null
 
@@ -158,6 +170,15 @@ object Pages {
         nameOk = onConfirm
         onClosed = onCancel
         open = "name"
+    }
+
+    fun openCollection(title: String, url: String, kind: Int) {
+        collTitle = title
+        collUrl = url
+        collKind = kind
+        song = null
+        onClosed = null
+        open = "collection"
     }
 
     fun confirmName(n: String) {
@@ -196,6 +217,7 @@ fun PagesHost(s: AppState) {
             "plmenu" -> PlaylistMenuPage(s, Pages.playlistId)
             "name" -> NamePage(s)
             "stats" -> StatsPage(s)
+            "collection" -> CollectionPage(s)
             else -> Box(Modifier.fillMaxSize().background(Night))
         }
     }
@@ -850,6 +872,72 @@ fun FeaturedCard(song: Song, from: List<Song>, s: AppState) {
                     Text("Shuffle", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                 }
             }
+        }
+    }
+}
+
+
+// ------------------------------------------------------------ search: albums, playlists, artists
+
+@Composable
+fun HitRow(h: Hit, s: AppState) {
+    val fake = Song(h.url, h.title, h.sub, 0, h.url, h.thumb)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .softClick { Pages.openCollection(h.title, h.url, h.kind) }
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Cover(fake, Modifier.size(60.dp), if (h.kind == 3) 30.dp else 14.dp, 20.sp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(h.title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                (if (h.kind == 1) "Album" else if (h.kind == 2) "Playlist" else "Artist") + (if (h.sub.isNotEmpty() && h.kind != 3) "  •  " + h.sub else ""),
+                color = TextDim,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun CollectionPage(s: AppState) {
+    val url = Pages.collUrl
+    val title = Pages.collTitle
+    val kind = Pages.collKind
+    var songs by remember(url) { mutableStateOf<List<Song>>(emptyList()) }
+    var busy by remember(url) { mutableStateOf(true) }
+    var err by remember(url) { mutableStateOf("") }
+    LaunchedEffect(url) {
+        busy = true
+        err = ""
+        try {
+            songs = if (kind == 3) Engine.search(title) else Engine.collection(url)
+        } catch (e: Exception) {
+            err = "Couldn't load: " + (e.message ?: "error").take(60)
+        }
+        busy = false
+    }
+    SlidePage(s, title, scroll = false) {
+        LazyColumn(Modifier.weight(1f)) {
+            if (busy) item { LoadingRow(s) }
+            if (err.isNotEmpty()) item { Text(err, color = TextDim, modifier = Modifier.padding(vertical = 12.dp)) }
+            if (songs.isNotEmpty()) {
+                item {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PageButton("Play", s.accent, Modifier.weight(1f)) { s.play(songs[0], songs) }
+                        PageButton("Shuffle", s.accent, Modifier.weight(1f)) {
+                            s.shuffle = true
+                            s.play(songs.random(), songs)
+                        }
+                    }
+                }
+            }
+            items(songs) { SongRow(it, s, songs) }
         }
     }
 }

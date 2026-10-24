@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.compose.material3.CircularProgressIndicator
+
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -212,49 +214,72 @@ fun NavBar(s: AppState) {
 @Composable
 fun MiniPlayer(s: AppState) {
     val song = s.current ?: return
-    Glass(
-        s.glassAlpha(),
-        Modifier.fillMaxWidth().softClick { s.showPlayer = true },
-        RoundedCornerShape(32.dp)
+    val art = rememberArtColor(song)
+    var shown by remember { mutableStateOf(false) }
+    val glow = remember { Animatable(1f) }
+    LaunchedEffect(Unit) {
+        shown = true
+        delay(350)
+        glow.animateTo(0f, tween(1500))
+    }
+    AnimatedVisibility(
+        visible = shown,
+        enter = slideInVertically(spring(dampingRatio = 0.75f, stiffness = 260f)) { it } + fadeIn(tween(250))
     ) {
-        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
-                val ring = s.accent
-                val total = song.seconds.coerceAtLeast(1)
-                Canvas(Modifier.fillMaxSize()) {
-                    val progress = (s.position / total).coerceIn(0f, 1f)
-                    drawArc(
-                        color = ring,
-                        startAngle = -90f,
-                        sweepAngle = 360f * progress,
-                        useCenter = false,
-                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+        Glass(
+            s.glassAlpha(),
+            Modifier
+                .fillMaxWidth()
+                .shadow((30f * glow.value).dp, RoundedCornerShape(32.dp), false, art, art)
+                .softClick { s.showPlayer = true }
+                .pointerInput(Unit) {
+                    var dx = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { dx = 0f },
+                        onDragEnd = { if (dx > 120f) s.prev() else if (dx < -120f) s.next() }
+                    ) { _, d -> dx += d }
+                },
+            RoundedCornerShape(32.dp)
+        ) {
+            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+                    val ring = s.accent
+                    val total = song.seconds.coerceAtLeast(1)
+                    Canvas(Modifier.fillMaxSize()) {
+                        val progress = (s.position / total).coerceIn(0f, 1f)
+                        drawArc(
+                            color = ring,
+                            startAngle = -90f,
+                            sweepAngle = 360f * progress,
+                            useCenter = false,
+                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
+                    Cover(song, Modifier.size(46.dp).clip(CircleShape), 23.dp)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        song.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        if (s.status.isNotEmpty()) s.status else song.artist,
+                        color = TextDim,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                Cover(song, Modifier.size(46.dp).clip(CircleShape), 23.dp)
+                RoundBtn(Icons.Rounded.SkipPrevious, 0.9f, { s.prev() }, 42.dp)
+                Spacer(Modifier.width(6.dp))
+                PlayButton(s, 52.dp, 30.dp)
+                Spacer(Modifier.width(6.dp))
+                RoundBtn(Icons.Rounded.SkipNext, 0.9f, { s.next() }, 42.dp)
             }
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    song.title,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    if (s.status.isNotEmpty()) s.status else song.artist,
-                    color = TextDim,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            RoundBtn(Icons.Rounded.SkipPrevious, 0.9f, { s.prev() }, 42.dp)
-            Spacer(Modifier.width(6.dp))
-            PlayButton(s, 52.dp, 30.dp)
-            Spacer(Modifier.width(6.dp))
-            RoundBtn(Icons.Rounded.SkipNext, 0.9f, { s.next() }, 42.dp)
         }
     }
 }
@@ -334,8 +359,27 @@ private fun TimeLabels(s: AppState, total: Float) {
 
 @Composable
 private fun PlayerIcon(icon: ImageVector, tint: Color, size: Dp = 26.dp, box: Dp = 48.dp, onClick: () -> Unit) {
+    val c by animateColorAsState(tint, tween(250), label = "pit")
+    val pop = remember { Animatable(1f) }
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(tint) {
+        if (first) {
+            first = false
+        } else {
+            pop.animateTo(1.3f, tween(100))
+            pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 350f))
+        }
+    }
     Box(Modifier.bounceClick(onClick).size(box), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = c,
+            modifier = Modifier.size(size).graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+            }
+        )
     }
 }
 
@@ -454,9 +498,19 @@ private fun TitleRow(
             )
         }
         val liked = s.isLiked(song)
+        val likePop = remember { Animatable(1f) }
+        LaunchedEffect(liked) {
+            if (liked) {
+                likePop.animateTo(1.4f, tween(110))
+                likePop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 300f))
+            }
+        }
         val bgMod = if (circles) Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.18f)) else Modifier
         Box(
-            Modifier.bounceClick { s.toggleLike(song) }.size(40.dp).then(bgMod),
+            Modifier.bounceClick { s.toggleLike(song) }.size(40.dp).graphicsLayer {
+                scaleX = likePop.value
+                scaleY = likePop.value
+            }.then(bgMod),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -478,31 +532,54 @@ private fun TitleRow(
 }
 
 @Composable
+private fun NudgeIcon(icon: ImageVector, dir: Float, size: Dp, box: Dp, onClick: () -> Unit) {
+    val nudge = remember { Animatable(0f) }
+    val sc = rememberCoroutineScope()
+    Box(
+        Modifier
+            .bounceClick {
+                sc.launch {
+                    nudge.animateTo(dir * 18f, tween(90))
+                    nudge.animateTo(0f, spring(dampingRatio = 0.35f, stiffness = 400f))
+                }
+                onClick()
+            }
+            .size(box)
+            .graphicsLayer { translationX = nudge.value },
+        contentAlignment = Alignment.Center
+    ) { Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size)) }
+}
+
+@Composable
 private fun TransportRow(s: AppState, side: Dp, big: Dp, skipIcons: Boolean = false) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PlayerIcon(if (skipIcons) Icons.Rounded.SkipPrevious else Icons.Rounded.FastRewind, Color.White, side, side + 28.dp) { s.prev() }
+        NudgeIcon(if (skipIcons) Icons.Rounded.SkipPrevious else Icons.Rounded.FastRewind, -1f, side, side + 28.dp) { s.prev() }
         Box(Modifier.bounceClick { s.toggle() }.size(big + 18.dp), contentAlignment = Alignment.Center) {
-            AnimatedContent(
-                targetState = s.playing,
-                transitionSpec = {
-                    (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
-                        (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
-                },
-                label = "bigplay"
-            ) { p ->
-                Icon(
-                    if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(big)
-                )
+            if (s.loading) {
+                CircularProgressIndicator(color = Color.White, strokeWidth = 4.dp, modifier = Modifier.size(big))
+            } else {
+                AnimatedContent(
+                    targetState = s.playing,
+                    transitionSpec = {
+                        (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
+                            (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
+                    },
+                    label = "bigplay"
+                ) { p ->
+                    Icon(
+                        if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(big)
+                    )
+                }
             }
         }
-        PlayerIcon(if (skipIcons) Icons.Rounded.SkipNext else Icons.Rounded.FastForward, Color.White, side, side + 28.dp) { s.next() }
+        NudgeIcon(if (skipIcons) Icons.Rounded.SkipNext else Icons.Rounded.FastForward, 1f, side, side + 28.dp) { s.next() }
     }
 }
 
@@ -545,7 +622,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
                     scaleX = coverScale
                     scaleY = coverScale
                 }
-                .shadow(22.dp, coverShape)
+                .shadow(22.dp, coverShape, ambientColor = art, spotColor = art)
         ) { Cover(song, Modifier.fillMaxSize(), 20.dp, 96.sp, quality = 1000) }
         Spacer(Modifier.height(26.dp))
         TitleRow(s, song, 22.sp, 19.sp, true, onMenu)
@@ -703,20 +780,24 @@ fun PlayButton(s: AppState, size: Dp, iconSize: Dp) {
             .background(s.accent),
         contentAlignment = Alignment.Center
     ) {
-        AnimatedContent(
-            targetState = s.playing,
-            transitionSpec = {
-                (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
-                    (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
-            },
-            label = "playicon"
-        ) { playing ->
-            Icon(
-                if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(iconSize)
-            )
+        if (s.loading) {
+            CircularProgressIndicator(color = Color.Black, strokeWidth = 3.dp, modifier = Modifier.size(iconSize))
+        } else {
+            AnimatedContent(
+                targetState = s.playing,
+                transitionSpec = {
+                    (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
+                        (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
+                },
+                label = "playicon"
+            ) { playing ->
+                Icon(
+                    if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(iconSize)
+                )
+            }
         }
     }
 }
@@ -744,14 +825,14 @@ fun TopBlur(height: Dp) {
             }
             .drawBehind {
                 if (useBlur && backdrop != null && backdrop.size.width > 0) {
-                    blurLayer.renderEffect = BlurEffect(backdrop.radius, backdrop.radius, TileMode.Clamp)
+                    blurLayer.renderEffect = BlurEffect(backdrop.radius * Opts.blurAmount, backdrop.radius * Opts.blurAmount, TileMode.Clamp)
                     blurLayer.clip = true
                     blurLayer.record(this, layoutDirection, IntSize(size.width.toInt(), size.height.toInt())) {
                         drawLayer(backdrop.layer)
                     }
                     drawLayer(blurLayer)
                 }
-                drawRect(Night.copy(alpha = if (useBlur) 0.35f else 0.85f))
+                drawRect(Night.copy(alpha = if (useBlur) Opts.blurDark else 0.85f))
             }
     )
 }

@@ -1,5 +1,10 @@
 package com.prismwave.app
 
+import org.schabi.newpipe.extractor.InfoItem
+import org.schabi.newpipe.extractor.channel.ChannelInfoItem
+import org.schabi.newpipe.extractor.playlist.PlaylistInfo
+import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
+
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +94,46 @@ object Engine {
             .map { it.toSong() }
     }
 
+    // kind: 0 = All, 1 = Songs, 2 = Videos, 3 = Albums, 4 = Artists, 5 = Playlists
+    suspend fun searchHits(query: String, kind: Int): List<Hit> = withContext(Dispatchers.IO) {
+        init()
+        val yt = ServiceList.YouTube
+        fun run(filter: String): List<InfoItem> {
+            val handler = yt.searchQHFactory.fromQuery(query, listOf(filter), "")
+            return SearchInfo.getInfo(yt, handler).relatedItems
+        }
+        fun songs(filter: String, limit: Int): List<Hit> =
+            run(filter).filterIsInstance<StreamInfoItem>().filter { it.duration > 0 }.take(limit).map {
+                val sg = it.toSong()
+                Hit(0, sg.title, sg.artist, sg.thumb, sg.url, sg)
+            }
+        fun lists(filter: String, k: Int): List<Hit> =
+            run(filter).filterIsInstance<PlaylistInfoItem>().map {
+                Hit(k, it.name, it.uploaderName ?: "", it.thumbnails.maxByOrNull { t -> t.height }?.url, it.url)
+            }
+        when (kind) {
+            1 -> songs(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS, 50)
+            2 -> songs(YoutubeSearchQueryHandlerFactory.MUSIC_VIDEOS, 50)
+            3 -> lists(YoutubeSearchQueryHandlerFactory.MUSIC_ALBUMS, 1)
+            4 -> run(YoutubeSearchQueryHandlerFactory.MUSIC_ARTISTS).filterIsInstance<ChannelInfoItem>().map {
+                Hit(3, it.name, "Artist", it.thumbnails.maxByOrNull { t -> t.height }?.url, it.url)
+            }
+            5 -> lists(YoutubeSearchQueryHandlerFactory.MUSIC_PLAYLISTS, 2)
+            else -> songs(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS, 20) +
+                (try {
+                    songs(YoutubeSearchQueryHandlerFactory.MUSIC_VIDEOS, 6)
+                } catch (e: Exception) {
+                    emptyList()
+                })
+        }
+    }
+
+    suspend fun collection(url: String): List<Song> = withContext(Dispatchers.IO) {
+        init()
+        val info = PlaylistInfo.getInfo(ServiceList.YouTube, url)
+        info.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toSong() }
+    }
+
     suspend fun streamUrl(videoUrl: String): String = withContext(Dispatchers.IO) {
         init()
         val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
@@ -98,3 +143,14 @@ object Engine {
         best?.content ?: throw IOException("No audio stream found")
     }
 }
+
+
+// kind: 0 = song or video, 1 = album, 2 = playlist, 3 = artist
+data class Hit(
+    val kind: Int,
+    val title: String,
+    val sub: String,
+    val thumb: String?,
+    val url: String,
+    val song: Song? = null
+)
