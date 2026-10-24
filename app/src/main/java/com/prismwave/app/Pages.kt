@@ -1,5 +1,23 @@
 package com.prismwave.app
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.platform.LocalView
+
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
@@ -110,6 +128,10 @@ object Opts {
     var fade by mutableStateOf(true)
     var offline by mutableStateOf(false)
     var headphones by mutableStateOf(true)
+    var crossfade by mutableStateOf(0)
+    var eqOn by mutableStateOf(false)
+    var eqLevels by mutableStateOf("")
+    var bassBoost by mutableStateOf(0)
 
     fun init(c: Context) {
         val p = c.getSharedPreferences("prismwave_opts", Context.MODE_PRIVATE)
@@ -129,6 +151,10 @@ object Opts {
         fade = p.getBoolean("fade", true)
         offline = p.getBoolean("offline", false)
         headphones = p.getBoolean("headphones", true)
+        crossfade = p.getInt("crossfade", 0)
+        eqOn = p.getBoolean("eqOn", false)
+        eqLevels = p.getString("eqLevels", "") ?: ""
+        bassBoost = p.getInt("bassBoost", 0)
     }
 
     fun save() {
@@ -148,6 +174,10 @@ object Opts {
             ?.putBoolean("fade", fade)
             ?.putBoolean("offline", offline)
             ?.putBoolean("headphones", headphones)
+            ?.putInt("crossfade", crossfade)
+            ?.putBoolean("eqOn", eqOn)
+            ?.putString("eqLevels", eqLevels)
+            ?.putInt("bassBoost", bassBoost)
             ?.apply()
     }
 }
@@ -230,6 +260,9 @@ fun PagesHost(s: AppState) {
             "name" -> NamePage(s)
             "stats" -> StatsPage(s)
             "collection" -> CollectionPage(s)
+            "lyrics" -> LyricsPage(s)
+            "eq" -> EqPage(s)
+            "car" -> CarPage(s)
             else -> Box(Modifier.fillMaxSize().background(Night))
         }
     }
@@ -461,22 +494,40 @@ private fun TempoPage(s: AppState) {
 // ------------------------------------------------------------ queue, sleep timer
 
 @Composable
+private fun SmallIcon(icon: ImageVector, onClick: () -> Unit) {
+    Box(Modifier.size(38.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
 private fun QueuePage(s: AppState) {
     val song = s.current
+    var rev by remember { mutableStateOf(0) }
+    val list = remember(rev) { s.queue.take(100) }
+    fun move(i: Int, d: Int) {
+        val l = s.queue.toMutableList()
+        val t = i + d
+        if (i !in l.indices || t !in l.indices) return
+        val x = l.removeAt(i)
+        l.add(t, x)
+        s.setQueue(l)
+        rev++
+    }
     SlidePage(s, "Queue", scroll = false) {
         LazyColumn(Modifier.weight(1f)) {
-            items(s.queue.take(100)) { q ->
+            itemsIndexed(list) { i, q ->
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .clickable { s.play(q, s.queue) }
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Cover(q, Modifier.size(48.dp), 12.dp, 16.sp)
-                    Spacer(Modifier.width(14.dp))
-                    Column {
+                    Cover(q, Modifier.size(46.dp), 12.dp, 16.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
                         Text(
                             q.title,
                             color = if (song != null && q.id == song.id) s.accent else Color.White,
@@ -485,6 +536,12 @@ private fun QueuePage(s: AppState) {
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(q.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, maxLines = 1)
+                    }
+                    SmallIcon(Icons.Rounded.KeyboardArrowUp) { move(i, -1) }
+                    SmallIcon(Icons.Rounded.KeyboardArrowDown) { move(i, 1) }
+                    SmallIcon(Icons.Rounded.Close) {
+                        s.setQueue(s.queue.filterIndexed { k, _ -> k != i })
+                        rev++
                     }
                 }
             }
@@ -621,6 +678,16 @@ private fun SongMenuPage(s: AppState, song: Song?, playlistId: String?) {
                 s.toggleLike(song)
                 Pages.close()
             }
+            PageRow(Icons.Rounded.QueueMusic, "Play next") {
+                s.playNext(song)
+                Toast.makeText(ctx, "Plays next", Toast.LENGTH_SHORT).show()
+                Pages.close()
+            }
+            PageRow(Icons.Rounded.QueueMusic, "Add to end of queue") {
+                s.addToQueue(song)
+                Toast.makeText(ctx, "Added to queue", Toast.LENGTH_SHORT).show()
+                Pages.close()
+            }
             PageRow(Icons.Rounded.PlaylistAdd, "Add to playlist") { Pages.show("add", song) }
             PageRow(Icons.Rounded.Download, if (down) "Remove download" else "Download") {
                 if (down) DownloadStore.remove(ctx, song) else DownloadStore.start(ctx, song)
@@ -709,7 +776,9 @@ private fun StatCard(label: String, value: String, modifier: Modifier) {
 
 @Composable
 private fun StatsPage(s: AppState) {
-    SlidePage(s, "Your stats") {
+    val top = remember { s.topPlayed().take(5) }
+    val artists = remember { s.topArtists() }
+    SlidePage(s, "Your recap") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatCard("Songs played", "" + s.playCount, Modifier.weight(1f))
             StatCard("Minutes listened", "" + (s.listenSeconds / 60), Modifier.weight(1f))
@@ -719,173 +788,234 @@ private fun StatsPage(s: AppState) {
             StatCard("Liked songs", "" + s.liked.size, Modifier.weight(1f))
             StatCard("Playlists", "" + s.playlists.size, Modifier.weight(1f))
         }
-    }
-}
-
-
-// ------------------------------------------------------------ tempo and pitch: simple middle dialog (ArchiveTune style)
-
-@Composable
-fun TempoPitchDialog(s: AppState, onDismiss: () -> Unit) {
-    fun semis(): Int = Math.round(12.0 * Math.log(s.pitch.toDouble()) / Math.log(2.0)).toInt()
-    fun setTempo(v: Float) {
-        s.tempo = Math.round(v.coerceIn(0.25f, 2f) * 20) / 20f
-        s.applyTempoPitch()
-    }
-    fun setSemis(n: Int) {
-        s.pitch = Math.pow(2.0, n.coerceIn(-12, 12) / 12.0).toFloat()
-        s.applyTempoPitch()
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF241F1F),
-        shape = RoundedCornerShape(32.dp),
-        title = { Text("Tempo and Pitch", color = Color.White, fontSize = 28.sp) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("OK", color = s.accent, fontSize = 17.sp) } },
-        dismissButton = {
-            TextButton(onClick = {
-                s.tempo = 1f
-                s.pitch = 1f
-                s.applyTempoPitch()
-            }) { Text("Reset", color = s.accent, fontSize = 17.sp) }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(26.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Speed, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(30.dp))
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        StepIcon(Icons.Rounded.Remove) { setTempo(s.tempo - 0.05f) }
-                    }
-                    Text(
-                        "x" + "%.2f".format(s.tempo),
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1.3f)
-                    )
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        StepIcon(Icons.Rounded.Add) { setTempo(s.tempo + 0.05f) }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(30.dp))
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        StepIcon(Icons.Rounded.Remove) { setSemis(semis() - 1) }
-                    }
-                    Text(
-                        (if (semis() > 0) "+" else "") + semis(),
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1.3f)
-                    )
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        StepIcon(Icons.Rounded.Add) { setSemis(semis() + 1) }
-                    }
-                }
-            }
-        }
-    )
-}
-
-// ------------------------------------------------------------ Home: big "Keep listening" card
-
-@Composable
-fun FeaturedCard(song: Song, from: List<Song>, s: AppState, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(32.dp)
-    val art = rememberArtColor(song)
-    val fade = remember {
-        Brush.verticalGradient(
-            0f to Color.Transparent,
-            0.40f to Color.Transparent,
-            0.75f to Color.Black,
-            1f to Color.Black
-        )
-    }
-    Box(
-        modifier
-            .height(330.dp)
-            .clip(shape)
-            .border(1.dp, Color.White.copy(alpha = 0.15f), shape)
-    ) {
-        Cover(song, Modifier.fillMaxSize(), 0.dp, 90.sp, quality = 900)
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(brush = fade, blendMode = BlendMode.DstIn)
-                }
-        ) { Cover(song, Modifier.fillMaxSize().blur(24.dp), 0.dp, 90.sp, quality = 400) }
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.40f to Color.Transparent,
-                    1f to lerp(Color.Black, art, 0.25f).copy(alpha = 0.92f)
-                )
-            )
-        )
-        Row(
-            Modifier
-                .padding(18.dp)
-                .align(Alignment.TopStart)
-                .clip(RoundedCornerShape(50))
-                .background(Color.Black.copy(alpha = 0.35f))
-                .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(Modifier.size(9.dp).clip(CircleShape).background(s.accent))
-            Spacer(Modifier.width(8.dp))
-            Text("KEEP LISTENING", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        }
-        Column(Modifier.align(Alignment.BottomStart).padding(22.dp)) {
-            Text(
-                song.title,
-                color = Color.White,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    Modifier
-                        .bounceClick { s.play(song, from) }
-                        .clip(RoundedCornerShape(50))
-                        .background(s.accent)
-                        .padding(horizontal = 24.dp, vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Play", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-                }
-                Row(
-                    Modifier
-                        .bounceClick {
-                            s.shuffle = true
-                            s.play(from.random(), from)
+        if (top.isNotEmpty()) {
+            Spacer(Modifier.height(18.dp))
+            Text("Top songs", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            PageCard {
+                top.forEachIndexed { i, sg ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { s.play(sg, top) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text((i + 1).toString(), color = s.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(30.dp))
+                        Cover(sg, Modifier.size(44.dp), 10.dp, 14.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(sg.title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(sg.artist, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, maxLines = 1)
                         }
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.16f))
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
-                        .padding(horizontal = 22.dp, vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Shuffle", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+        if (artists.isNotEmpty()) {
+            Spacer(Modifier.height(18.dp))
+            Text("Top artists", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            PageCard {
+                artists.forEachIndexed { i, a ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text((i + 1).toString(), color = s.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(30.dp))
+                        Text(a.first, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text(a.second.toString() + " plays", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+                    }
                 }
             }
         }
     }
 }
 
+@Composable
+private fun LyricsPage(s: AppState) {
+    val song = s.current
+    var lines by remember(song?.id) { mutableStateOf<List<LyricLine>>(emptyList()) }
+    var busy by remember(song?.id) { mutableStateOf(true) }
+    LaunchedEffect(song?.id) {
+        busy = true
+        lines = if (song != null && !Opts.offline) Lyrics.fetch(song) else emptyList()
+        busy = false
+    }
+    val synced = lines.isNotEmpty() && lines[0].ms >= 0
+    val posMs = (s.position * 1000).toLong()
+    val active = if (synced) lines.indexOfLast { it.ms <= posMs + 200 } else -1
+    val listState = rememberLazyListState()
+    LaunchedEffect(active) {
+        if (active >= 0) listState.animateScrollToItem((active - 3).coerceAtLeast(0))
+    }
+    SlidePage(s, "Lyrics", scroll = false) {
+        if (song != null) {
+            Text(song.title, color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (busy) {
+            LoadingRow(s)
+        } else if (lines.isEmpty()) {
+            Text("No lyrics found for this song", color = TextDim, modifier = Modifier.padding(vertical = 20.dp))
+        } else {
+            LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(vertical = 40.dp)) {
+                itemsIndexed(lines) { i, ln ->
+                    val on = i == active
+                    val a by animateFloatAsState(if (!synced || on) 1f else 0.38f, tween(250), label = "lya")
+                    val sc by animateFloatAsState(if (on) 1f else 0.94f, tween(250), label = "lys")
+                    Text(
+                        if (ln.text.isEmpty()) "♪" else ln.text,
+                        color = (if (on) s.accent else Color.White).copy(alpha = a),
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = synced) { s.seekTo(ln.ms / 1000f) }
+                            .padding(vertical = 10.dp)
+                            .graphicsLayer {
+                                scaleX = sc
+                                scaleY = sc
+                                transformOrigin = TransformOrigin(0f, 0.5f)
+                            }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EqPage(s: AppState) {
+    val eq = EqHolder.eq
+    var on by remember { mutableStateOf(Opts.eqOn) }
+    var bass by remember { mutableStateOf(Opts.bassBoost.toFloat()) }
+    SlidePage(s, "Equalizer") {
+        if (eq == null) {
+            Text("Play a song first, then open the equalizer again.", color = TextDim, modifier = Modifier.padding(vertical = 20.dp))
+        } else {
+            val lo = eq.bandLevelRange[0].toInt()
+            val hi = eq.bandLevelRange[1].toInt()
+            val n = eq.numberOfBands.toInt()
+            val levels = remember {
+                mutableStateListOf<Float>().also { l -> for (b in 0 until n) l.add(eq.getBandLevel(b.toShort()).toFloat()) }
+            }
+            fun ensureOn() {
+                if (!on) {
+                    on = true
+                    Opts.eqOn = true
+                    EqHolder.setEnabled(true)
+                    Opts.save()
+                }
+            }
+            PageCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Equalizer", color = Color.White, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = on,
+                        onCheckedChange = {
+                            on = it
+                            Opts.eqOn = it
+                            EqHolder.setEnabled(it)
+                            Opts.save()
+                        }
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Flat", "Bass", "Vocal", "Treble").forEach { name ->
+                    Chip(name, false, s.accent) {
+                        val v = EqHolder.preset(name, n, lo, hi)
+                        for (b in 0 until n) {
+                            levels[b] = v[b]
+                            EqHolder.setBand(b, v[b].toInt())
+                        }
+                        ensureOn()
+                        EqHolder.saveLevels()
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            PageCard {
+                for (b in 0 until n) {
+                    val hz = eq.getCenterFreq(b.toShort()) / 1000
+                    Text(if (hz >= 1000) "%.1f kHz".format(hz / 1000f) else hz.toString() + " Hz", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+                    Slider(
+                        value = levels[b].coerceIn(lo.toFloat(), hi.toFloat()),
+                        onValueChange = {
+                            levels[b] = it
+                            EqHolder.setBand(b, it.toInt())
+                        },
+                        valueRange = lo.toFloat()..hi.toFloat(),
+                        enabled = on,
+                        onValueChangeFinished = { EqHolder.saveLevels() }
+                    )
+                }
+            }
+            if (EqHolder.bass != null) {
+                Spacer(Modifier.height(12.dp))
+                PageCard {
+                    Text("Bass boost", color = Color.White, fontSize = 18.sp)
+                    Slider(
+                        value = bass,
+                        onValueChange = {
+                            bass = it
+                            EqHolder.setBass(it.toInt())
+                        },
+                        valueRange = 0f..1000f,
+                        onValueChangeFinished = { Opts.save() }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CarButton(icon: ImageVector, size: Dp, bg: Color, tint: Color, onClick: () -> Unit) {
+    Box(
+        Modifier.size(size).bounceClick(onClick).clip(CircleShape).background(bg),
+        contentAlignment = Alignment.Center
+    ) { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.5f)) }
+}
+
+@Composable
+private fun CarPage(s: AppState) {
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
+    val song = s.current
+    SlidePage(s, "Car mode", scroll = false) {
+        if (song == null) {
+            Text("Play a song first", color = TextDim, modifier = Modifier.padding(vertical = 20.dp))
+        } else {
+            Column(
+                Modifier.weight(1f).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Cover(song, Modifier.size(220.dp), 36.dp, 80.sp, quality = 800)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        song.title,
+                        color = Color.White,
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(song.artist, color = Color.White.copy(alpha = 0.7f), fontSize = 20.sp, maxLines = 1)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                    CarButton(Icons.Rounded.SkipPrevious, 96.dp, Color.White.copy(alpha = 0.14f), Color.White) { s.prev() }
+                    CarButton(if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, 128.dp, s.accent, Color.Black) { s.toggle() }
+                    CarButton(Icons.Rounded.SkipNext, 96.dp, Color.White.copy(alpha = 0.14f), Color.White) { s.next() }
+                }
+            }
+        }
+    }
+}
 
 // ------------------------------------------------------------ search: albums, playlists, artists
 
@@ -919,10 +1049,10 @@ private fun CollectionPage(s: AppState) {
     val url = Pages.collUrl
     val title = Pages.collTitle
     val kind = Pages.collKind
-    var songs by remember(url) { mutableStateOf<List<Song>>(emptyList()) }
-    var busy by remember(url) { mutableStateOf(true) }
-    var err by remember(url) { mutableStateOf("") }
-    LaunchedEffect(url) {
+    var songs by remember(url + title) { mutableStateOf<List<Song>>(emptyList()) }
+    var busy by remember(url + title) { mutableStateOf(true) }
+    var err by remember(url + title) { mutableStateOf("") }
+    LaunchedEffect(url + title) {
         busy = true
         err = ""
         try {

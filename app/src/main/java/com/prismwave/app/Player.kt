@@ -1,5 +1,8 @@
 package com.prismwave.app
 
+import androidx.compose.material.icons.rounded.Subtitles
+import androidx.compose.material.icons.rounded.DirectionsCar
+
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.animation.core.animateFloat
@@ -966,8 +969,15 @@ private fun PlayerMenuSheet(
             toast("Starting radio")
             appScope.launch {
                 try {
-                    val r = Engine.search(song.artist + " " + song.title)
-                    s.queue = listOf(song) + r.filter { it.id != song.id }
+                    val rel = try {
+                        Engine.related(song.url)
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                    val r = if (rel.size >= 5) rel else Engine.search(song.artist + " " + song.title)
+                    s.setQueue(listOf(song) + r.filter { it.id != song.id })
+                    s.radio = true
+                    toast("Radio ready")
                 } catch (e: Exception) {
                     toast("Radio failed, check your connection")
                 }
@@ -989,7 +999,9 @@ private fun PlayerMenuSheet(
                 putExtra(Intent.EXTRA_TEXT, song.title + " - " + song.artist + "\n" + song.url)
             }
             ctx.startActivity(Intent.createChooser(i, null))
-        }
+        },
+        MenuAction(Icons.Rounded.Subtitles, "Lyrics", false) { close(); Pages.show("lyrics") },
+        MenuAction(Icons.Rounded.DirectionsCar, "Car mode", false) { close(); Pages.show("car") }
     )
     val maxH = (LocalConfiguration.current.screenHeightDp * 0.92f).dp
     Box(Modifier.fillMaxSize()) {
@@ -1063,12 +1075,7 @@ private fun PlayerMenuSheet(
                 }
                 Spacer(Modifier.height(12.dp))
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg)) {
-                    MenuRow(Icons.Rounded.Person, "View artist") {
-                        s.searchQuery = song.artist
-                        s.screen = Screen.Search
-                        s.showPlayer = false
-                        onDismiss()
-                    }
+                    MenuRow(Icons.Rounded.Person, "View artist", song.artist) { Pages.openCollection(song.artist, "", 3) }
                     Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
                     val isDown = DownloadStore.isDownloaded(song)
                     val dlProg = DownloadStore.progress[song.id]
@@ -1087,18 +1094,7 @@ private fun PlayerMenuSheet(
                     Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
                     MenuRow(Icons.Rounded.Info, "Details") { details = true }
                     Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                    MenuRow(Icons.Rounded.Equalizer, "Equalizer") {
-                        val i = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
-                            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, ctx.packageName)
-                            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, 0)
-                            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
-                        }
-                        try {
-                            ctx.startActivity(i)
-                        } catch (e: Exception) {
-                            toast("No system equalizer found on this phone")
-                        }
-                    }
+                    MenuRow(Icons.Rounded.Equalizer, "Equalizer") { Pages.show("eq") }
                     Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
                     MenuRow(
                         Icons.Rounded.Speed,

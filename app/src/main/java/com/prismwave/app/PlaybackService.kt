@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.media3.common.Player
+
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
@@ -41,6 +43,13 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        Opts.init(this)
+        EqHolder.attach(player.audioSessionId)
+        player.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                EqHolder.attach(audioSessionId)
+            }
+        })
         session = MediaSession.Builder(this, player).build()
     }
 

@@ -1513,6 +1513,17 @@ fun SettingsScreen(s: AppState) {
                         ToggleRow("Fade in and out", "Soft volume fade on play, pause and skip", Opts.fade) { Opts.fade = it; Opts.save() }
                         ToggleRow("Headphone smarts", "Pause on disconnect, resume when they reconnect", Opts.headphones) { Opts.headphones = it; Opts.save() }
                         ToggleRow("Offline mode", "Only show downloaded and cached songs", Opts.offline) { Opts.offline = it; Opts.save() }
+                        Text(
+                            "Fade between songs: " + (if (Opts.crossfade == 0) "off" else Opts.crossfade.toString() + " s"),
+                            color = TextDim
+                        )
+                        Slider(
+                            value = Opts.crossfade.toFloat(),
+                            onValueChange = { Opts.crossfade = it.toInt() },
+                            valueRange = 0f..12f,
+                            steps = 11,
+                            onValueChangeFinished = { Opts.save() }
+                        )
                     }
                     Section("Status bar") {
                         ToggleRow("Blur under status bar", "Blurred strip on every screen", Opts.statusBlur) { Opts.statusBlur = it; Opts.save() }
@@ -1544,6 +1555,16 @@ fun SettingsScreen(s: AppState) {
                     }
                 }
                 "changelog" -> {
+                    Section("v18") {
+                        ChangeList(listOf(
+                            "Synced lyrics (Options, Lyrics)",
+                            "In-app equalizer with presets and bass boost",
+                            "Fade between songs, slider in Behavior",
+                            "Real radio: endless related songs",
+                            "Queue: move up/down, remove, Play next, Add to end",
+                            "Real artist page, Car mode, recap with top songs and artists"
+                        ))
+                    }
                     Section("v17") {
                         ChangeList(listOf(
                             "Fix: song ending no longer skips several songs",
@@ -1599,7 +1620,7 @@ fun SettingsScreen(s: AppState) {
                 }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v17", color = Color.White)
+                        Text("Version v18", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }

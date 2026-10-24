@@ -1,5 +1,9 @@
 # PrismWave changelog
 
+## v18
+- Added: synced lyrics, in-app equalizer, fade between songs, real radio
+- Added: queue reorder, Play next, Add to end, real artist page, car mode, recap
+
 ## v17
 - Fixed: song ending no longer skips several songs
 - Added: Keep listening at the top of Home, 3 swipeable cards

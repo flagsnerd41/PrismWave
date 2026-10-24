@@ -88,6 +88,8 @@ class AppState(private val ctx: Context) {
     private val planned = ArrayList<Song>()
     private var pausedByUnplug = false
     private var pausedAt = 0L
+    private var fading = false
+    var radio = false
 
     var screen by mutableStateOf(Screen.Home)
     var current by mutableStateOf<Song?>(null)
@@ -424,6 +426,37 @@ class AppState(private val ctx: Context) {
         saveAll()
     }
 
+    fun setQueue(l: List<Song>) {
+        queue = l
+        planned.clear()
+    }
+
+    fun playNext(song: Song) {
+        if (current == null) {
+            play(song)
+            return
+        }
+        val l = queue.filter { it.id != song.id }.toMutableList()
+        val i = l.indexOfFirst { it.id == current?.id }
+        l.add(i + 1, song)
+        setQueue(l)
+    }
+
+    fun addToQueue(song: Song) {
+        if (current == null) {
+            play(song)
+            return
+        }
+        setQueue(queue.filter { it.id != song.id } + song)
+    }
+
+    fun topArtists(): List<Pair<String, Int>> =
+        counts.entries.mapNotNull { e -> known[e.key]?.let { it.artist to e.value } }
+            .groupBy({ it.first }, { it.second })
+            .map { it.key to it.value.sum() }
+            .sortedByDescending { it.second }
+            .take(5)
+
     fun topPlayed(): List<Song> =
         counts.entries.sortedByDescending { it.value }.take(50).mapNotNull { known[it.key] }
 
@@ -441,7 +474,11 @@ class AppState(private val ctx: Context) {
 
     // ---------- playback ----------
     fun play(song: Song, from: List<Song> = listOf(song)) {
-        if (from !== queue) planned.clear()
+        if (from !== queue) {
+            planned.clear()
+            radio = false
+        }
+        fading = false
         pausedByUnplug = false
         current = song
         queue = from
@@ -480,9 +517,10 @@ class AppState(private val ctx: Context) {
                     .build()
                 c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setCustomCacheKey(song.id).setMediaMetadata(meta).build())
                 c.prepare()
-                if (Opts.fade) c.volume = 0f
+                val soft = Opts.fade || Opts.crossfade > 0
+                if (soft) c.volume = 0f
                 c.play()
-                if (Opts.fade) fade(0f, 1f, 450) else c.volume = 1f
+                if (soft) fade(0f, 1f, if (Opts.crossfade > 0) Opts.crossfade * 1000L else 450L) else c.volume = 1f
                 status = ""
                 preload()
             } catch (e: Exception) {
@@ -527,6 +565,22 @@ class AppState(private val ctx: Context) {
         val cur = current ?: return
         if (queue.isEmpty()) return
         val i = queue.indexOfFirst { it.id == cur.id }
+        if (radio && !shuffle && i == queue.size - 1) {
+            scope.launch {
+                val more = try {
+                    Engine.related(cur.url).filter { r -> queue.none { q -> q.id == r.id } }
+                } catch (e: Exception) {
+                    emptyList()
+                }
+                if (more.isNotEmpty()) {
+                    setQueue(queue + more)
+                    skipTo(more[0])
+                } else {
+                    skipTo(queue[0])
+                }
+            }
+            return
+        }
         val n = if (shuffle) (planned.firstOrNull { it.id != cur.id } ?: queue.random()) else queue[(i + 1) % queue.size]
         planned.remove(n)
         skipTo(n)
@@ -717,6 +771,14 @@ class AppState(private val ctx: Context) {
             position = c.currentPosition / 1000f
             val dur = c.duration
             if (dur > 0) fixDuration((dur / 1000).toInt())
+            if (Opts.crossfade > 0 && dur > 0 && !fading && !repeat) {
+                val left = dur / 1000f - position
+                val cf = Opts.crossfade.toFloat()
+                if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
+                    fading = true
+                    fade(c.volume, 0f, (left * 1000).toLong() - 150)
+                }
+            }
             listenSeconds++
             ticks++
             if (ticks % 30 == 0) saveAll()

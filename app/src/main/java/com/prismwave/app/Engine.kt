@@ -128,6 +128,12 @@ object Engine {
         }
     }
 
+    suspend fun related(url: String): List<Song> = withContext(Dispatchers.IO) {
+        init()
+        org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(ServiceList.YouTube, url)
+            .relatedItems.filterIsInstance<StreamInfoItem>().filter { it.duration > 0 }.map { it.toSong() }
+    }
+
     suspend fun collection(url: String): List<Song> = withContext(Dispatchers.IO) {
         init()
         val info = PlaylistInfo.getInfo(ServiceList.YouTube, url)
