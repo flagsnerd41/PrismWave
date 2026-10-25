@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.layout.fillMaxWidth
+
 import androidx.compose.foundation.border
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.input.nestedscroll.nestedScroll
