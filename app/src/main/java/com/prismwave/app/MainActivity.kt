@@ -194,7 +194,7 @@ fun Main(s: AppState) {
         }
     }
     CompositionLocalProvider(LocalBackdrop provides backdrop, LocalReduceMotion provides s.reduceMotion) {
-        Box(Modifier.fillMaxSize().background(Night).nestedScroll(scrollConn)) {
+        Box(Modifier.fillMaxSize().background(Night)) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -247,31 +247,7 @@ fun Main(s: AppState) {
                 enter = fadeIn(tween(200)),
                 exit = fadeOut(tween(200))
             ) { TopBlur(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 18.dp) }
-            if (showBar && s.openPlaylist == null) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .graphicsLayer { alpha = (scrolled / 240f).coerceIn(0f, 1f) }
-                        .background(Night.copy(alpha = 0.96f))
-                        .statusBarsPadding()
-                        .height(54.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        when (s.screen) {
-                            Screen.Home -> "PrismWave"
-                            Screen.Search -> "Search"
-                            Screen.Library -> s.libraryOpen ?: "Library"
-                            else -> "Settings"
-                        },
-                        color = Color.White,
-                        fontFamily = PrismFont,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+            
             Column(
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -280,7 +256,7 @@ fun Main(s: AppState) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 MiniPlayer(s)
-                FloatingNavBar(s)
+                NavBar(s)
             }
             BackHandler(enabled = s.screen != Screen.Home || s.libraryOpen != null || s.openPlaylist != null) {
                 when {
