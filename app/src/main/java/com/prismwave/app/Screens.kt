@@ -1171,7 +1171,8 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
             .padding(horizontal = 20.dp, vertical = 8.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(CardBg)
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.04f))))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
             .padding(18.dp)
     ) {
         Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1333,7 +1334,7 @@ fun SettingsScreen(s: AppState) {
             Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { page = null })
                 Spacer(Modifier.width(14.dp))
-                Text(titles[pg] ?: "Settings", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(titles[pg] ?: "Settings", color = Color.White, fontFamily = PrismFont, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
             when (pg) {
                 "account" -> {
@@ -1525,6 +1526,20 @@ fun SettingsScreen(s: AppState) {
                             onValueChangeFinished = { Opts.save() }
                         )
                     }
+                    Section("Style") {
+                        Text("Theme", color = TextDim)
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("Warm", "Dark", "AMOLED", "Midnight").forEachIndexed { i, n ->
+                                Chip(n, Opts.theme == i, s.accent) {
+                                    Opts.theme = i
+                                    Opts.save()
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        ToggleRow("Lite mode", "Turns off glow, blur and heavy effects for low-end phones", Opts.lite) { Opts.lite = it; Opts.save() }
+                    }
                     Section("Status bar") {
                         ToggleRow("Blur under status bar", "Blurred strip on every screen", Opts.statusBlur) { Opts.statusBlur = it; Opts.save() }
                         Text("Blur strength " + (Opts.blurAmount * 100).toInt() + "%", color = TextDim)
@@ -1555,6 +1570,16 @@ fun SettingsScreen(s: AppState) {
                     }
                 }
                 "changelog" -> {
+                    Section("v19") {
+                        ChangeList(listOf(
+                            "Themes: Warm, Dark, AMOLED, Midnight",
+                            "Floating bottom bar with a glowing selected tab",
+                            "Title bar that fades in as you scroll",
+                            "Welcome animation: made by flagsnerd, word by word",
+                            "Gradient cards and bolder titles",
+                            "Lite mode for low-end phones"
+                        ))
+                    }
                     Section("v18") {
                         ChangeList(listOf(
                             "Synced lyrics (Options, Lyrics)",
@@ -1620,7 +1645,7 @@ fun SettingsScreen(s: AppState) {
                 }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v18", color = Color.White)
+                        Text("Version v19", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }

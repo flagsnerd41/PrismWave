@@ -298,7 +298,7 @@ fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(text, color = Color.White, fontFamily = PrismFont, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         if (action != null) {
             Text(action, color = Gold, fontSize = 14.sp, modifier = Modifier.clickable(onClick = onAction))
         }

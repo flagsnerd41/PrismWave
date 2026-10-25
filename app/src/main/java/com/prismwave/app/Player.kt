@@ -244,7 +244,7 @@ fun MiniPlayer(s: AppState) {
             Modifier
                 .fillMaxWidth()
                 .drawBehind {
-                    val a = maxOf(glow.value * 0.6f, if (s.playing) pulseA else 0f)
+                    val a = if (Opts.lite) 0f else maxOf(glow.value * 0.6f, if (s.playing) pulseA else 0f)
                     if (a > 0.01f) {
                         val padX = 36.dp.toPx()
                         val padY = 26.dp.toPx()
@@ -836,7 +836,7 @@ fun PlayButton(s: AppState, size: Dp, iconSize: Dp) {
 
 @Composable
 fun TopBlur(height: Dp) {
-    if (!Opts.statusBlur) return
+    if (!Opts.statusBlur || Opts.lite) return
     val backdrop = LocalBackdrop.current
     val useBlur = backdrop != null && backdrop.enabled && Build.VERSION.SDK_INT >= 31
     val blurLayer = rememberGraphicsLayer()

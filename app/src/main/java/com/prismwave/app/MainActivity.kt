@@ -1,5 +1,9 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.border
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+
 import android.os.Build
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -99,7 +103,7 @@ class MainActivity : ComponentActivity() {
                     launch { logoIn.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 180f)) }
                     delay(350)
                     launch { titleIn.animateTo(1f, tween(600)) }
-                    delay(1250)
+                    delay(2300)
                     launch { shown.animateTo(0f, tween(450)) }
                     blur.animateTo(0f, tween(1400, easing = FastOutSlowInEasing))
                     splashDone = true
@@ -144,6 +148,8 @@ class MainActivity : ComponentActivity() {
                                         translationY = (1f - titleIn.value) * 140f
                                     }
                                 )
+                                Spacer(Modifier.height(10.dp))
+                                GlowWords(s.accent)
                             }
                         }
                     }
@@ -160,18 +166,33 @@ fun Main(s: AppState) {
     val layer = rememberGraphicsLayer()
     val backdrop = remember { Backdrop(layer) }
     val blurR = s.blurRadius
-    val blurActive = s.blurOn && !s.batterySaver && Build.VERSION.SDK_INT >= 31
+    val blurActive = s.blurOn && !s.batterySaver && !Opts.lite && Build.VERSION.SDK_INT >= 31
     SideEffect {
         backdrop.radius = blurR
         backdrop.enabled = blurActive
     }
     val cur = s.current
     val artC = if (cur != null && Opts.livingBg) rememberArtColor(cur) else s.accent
-    val strength = if (cur != null && Opts.livingBg) 1f else 0.5f
+    val strength = (if (cur != null && Opts.livingBg) 1f else 0.5f) * (if (Opts.theme == 2) 0.35f else 1f)
     val tintTop by animateColorAsState(lerp(Night, artC, 0.42f * strength), tween(900), label = "tintTop")
     val tintBot by animateColorAsState(lerp(Night, artC, 0.16f * strength), tween(900), label = "tintBot")
+    var scrolled by remember { mutableStateOf(0f) }
+    LaunchedEffect(s.screen, s.openPlaylist, s.libraryOpen) { scrolled = 0f }
+    val showBar by remember { derivedStateOf { scrolled > 6f } }
+    val scrollConn = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
+            ): androidx.compose.ui.geometry.Offset {
+                scrolled = (scrolled - consumed.y).coerceAtLeast(0f)
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
     CompositionLocalProvider(LocalBackdrop provides backdrop, LocalReduceMotion provides s.reduceMotion) {
-        Box(Modifier.fillMaxSize().background(Night)) {
+        Box(Modifier.fillMaxSize().background(Night).nestedScroll(scrollConn)) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -224,6 +245,31 @@ fun Main(s: AppState) {
                 enter = fadeIn(tween(200)),
                 exit = fadeOut(tween(200))
             ) { TopBlur(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 18.dp) }
+            if (showBar && s.openPlaylist == null) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .graphicsLayer { alpha = (scrolled / 240f).coerceIn(0f, 1f) }
+                        .background(Night.copy(alpha = 0.96f))
+                        .statusBarsPadding()
+                        .height(54.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        when (s.screen) {
+                            Screen.Home -> "PrismWave"
+                            Screen.Search -> "Search"
+                            Screen.Library -> s.libraryOpen ?: "Library"
+                            else -> "Settings"
+                        },
+                        color = Color.White,
+                        fontFamily = PrismFont,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Column(
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -232,7 +278,7 @@ fun Main(s: AppState) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 MiniPlayer(s)
-                NavBar(s)
+                FloatingNavBar(s)
             }
             BackHandler(enabled = s.screen != Screen.Home || s.libraryOpen != null || s.openPlaylist != null) {
                 when {

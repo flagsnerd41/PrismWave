@@ -1,5 +1,10 @@
 # PrismWave changelog
 
+## v19
+- Added: themes (Warm, Dark, AMOLED, Midnight), floating bottom bar, title bar that fades in on scroll
+- Added: welcome animation with glowing "made by flagsnerd", gradient cards, bolder titles
+- Added: Lite mode for low-end phones
+
 ## v18
 - Added: synced lyrics, in-app equalizer, fade between songs, real radio
 - Added: queue reorder, Play next, Add to end, real artist page, car mode, recap

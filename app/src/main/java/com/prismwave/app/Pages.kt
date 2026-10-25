@@ -1,5 +1,19 @@
 package com.prismwave.app
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -132,6 +146,8 @@ object Opts {
     var eqOn by mutableStateOf(false)
     var eqLevels by mutableStateOf("")
     var bassBoost by mutableStateOf(0)
+    var theme by mutableStateOf(0)
+    var lite by mutableStateOf(false)
 
     fun init(c: Context) {
         val p = c.getSharedPreferences("prismwave_opts", Context.MODE_PRIVATE)
@@ -155,6 +171,8 @@ object Opts {
         eqOn = p.getBoolean("eqOn", false)
         eqLevels = p.getString("eqLevels", "") ?: ""
         bassBoost = p.getInt("bassBoost", 0)
+        theme = p.getInt("theme", 0)
+        lite = p.getBoolean("lite", false)
     }
 
     fun save() {
@@ -178,6 +196,8 @@ object Opts {
             ?.putBoolean("eqOn", eqOn)
             ?.putString("eqLevels", eqLevels)
             ?.putInt("bassBoost", bassBoost)
+            ?.putInt("theme", theme)
+            ?.putBoolean("lite", lite)
             ?.apply()
     }
 }
@@ -279,7 +299,7 @@ fun SlidePage(s: AppState, title: String, scroll: Boolean = true, content: @Comp
             .pointerInput(Unit) { detectTapGestures { } }
     ) {
         if (cur != null) {
-            Cover(cur, Modifier.fillMaxSize().blur(60.dp), 0.dp, 120.sp, quality = 400)
+            Cover(cur, if (Opts.lite) Modifier.fillMaxSize() else Modifier.fillMaxSize().blur(60.dp), 0.dp, 120.sp, quality = if (Opts.lite) 200 else 400)
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
         }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -289,7 +309,7 @@ fun SlidePage(s: AppState, title: String, scroll: Boolean = true, content: @Comp
             ) {
                 RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { Pages.close() })
                 Spacer(Modifier.width(14.dp))
-                Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(title, color = Color.White, fontFamily = PrismFont, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
             Column(
                 Modifier
@@ -310,7 +330,8 @@ fun PageCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(26.dp))
-            .background(Color.White.copy(alpha = 0.09f))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.05f))))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(26.dp))
             .padding(18.dp),
         content = content
     )
@@ -1243,6 +1264,103 @@ fun FeaturedCard(song: Song, from: List<Song>, s: AppState, modifier: Modifier =
                     Text("Shuffle", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                 }
             }
+        }
+    }
+}
+
+
+// ------------------------------------------------------------ floating bottom bar
+
+@Composable
+fun FloatingNavBar(s: AppState) {
+    val shape = RoundedCornerShape(36.dp)
+    val tabs = listOf(
+        Triple(Screen.Home, Icons.Rounded.Home, "Home"),
+        Triple(Screen.Search, Icons.Rounded.Search, "Search"),
+        Triple(Screen.Library, Icons.Rounded.LibraryMusic, "Library"),
+        Triple(Screen.Settings, Icons.Rounded.Settings, "Settings")
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Surface1.copy(alpha = 0.97f))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        tabs.forEach { (scr, icon, label) ->
+            val sel = s.screen == scr
+            val a by animateFloatAsState(if (sel) 1f else 0f, tween(260), label = "navsel")
+            val accent = s.accent
+            Row(
+                Modifier
+                    .weight(if (sel) 1.7f else 1f)
+                    .height(52.dp)
+                    .drawBehind {
+                        if (a > 0.01f) {
+                            if (!Opts.lite) {
+                                drawRoundRect(
+                                    brush = Brush.radialGradient(
+                                        listOf(accent.copy(alpha = 0.30f * a), Color.Transparent),
+                                        center = Offset(size.width / 2f, size.height / 2f),
+                                        radius = size.width * 0.75f
+                                    ),
+                                    topLeft = Offset(-12.dp.toPx(), -10.dp.toPx()),
+                                    size = androidx.compose.ui.geometry.Size(size.width + 24.dp.toPx(), size.height + 20.dp.toPx()),
+                                    cornerRadius = CornerRadius(40.dp.toPx())
+                                )
+                            }
+                            drawRoundRect(accent.copy(alpha = 0.18f * a), cornerRadius = CornerRadius(size.height / 2f))
+                        }
+                    }
+                    .bounceClick {
+                        s.openPlaylist = null
+                        s.libraryOpen = null
+                        s.screen = scr
+                    },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, contentDescription = null, tint = lerp(TextDim, accent, a), modifier = Modifier.size(26.dp))
+                if (sel) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, color = accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------ welcome: "made by flagsnerd", word by word
+
+@Composable
+fun GlowWords(accent: Color) {
+    val words = listOf("made", "by", "flagsnerd")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        words.forEachIndexed { i, w ->
+            val a = remember { Animatable(0f) }
+            val g = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                delay(900L + i * 330L)
+                launch { a.animateTo(1f, tween(420)) }
+                g.animateTo(1f, tween(280))
+                g.animateTo(if (i == 2) 0.85f else 0.3f, tween(700))
+            }
+            val c = if (i == 2) accent else Color.White
+            Text(
+                w,
+                color = c,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp,
+                style = TextStyle(shadow = Shadow(color = c, offset = Offset.Zero, blurRadius = 4f + 22f * g.value)),
+                modifier = Modifier.graphicsLayer {
+                    alpha = a.value
+                    translationY = (1f - a.value) * 24f
+                }
+            )
         }
     }
 }
