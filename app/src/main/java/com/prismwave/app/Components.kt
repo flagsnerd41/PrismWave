@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -238,18 +239,27 @@ fun Glass(
             .drawBehind {
                 if (useBlur && backdrop != null && backdrop.size.width > 0) {
                     // Only the bar's own area is blurred (much cheaper than the whole screen).
-                    blurLayer.renderEffect = BlurEffect(backdrop.radius, backdrop.radius, TileMode.Clamp)
+                    // blur a quarter-size copy and scale it back up: about 16x less work for the GPU
+                    val k = 0.25f
+                    blurLayer.renderEffect = BlurEffect(backdrop.radius * k, backdrop.radius * k, TileMode.Clamp)
                     blurLayer.clip = true
-                    blurLayer.record(this, layoutDirection, IntSize(size.width.toInt(), size.height.toInt())) {
-                        translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
+                    blurLayer.record(
+                        this, layoutDirection,
+                        IntSize((size.width * k).toInt().coerceAtLeast(1), (size.height * k).toInt().coerceAtLeast(1))
+                    ) {
+                        scale(k, k, Offset.Zero) { translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) } }
                     }
-                    drawLayer(blurLayer)
+                    scale(1f / k, 1f / k, Offset.Zero) { drawLayer(blurLayer) }
                 } else {
                     drawRect(Night)
                 }
             }
             .background(Surface2.copy(alpha = if (useBlur) alpha * 0.6f else alpha))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), shape),
+            .border(
+                1.dp,
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.26f), Color.White.copy(alpha = 0.05f))),
+                shape
+            ),
         content = content
     )
 }
