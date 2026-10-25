@@ -89,6 +89,8 @@ class AppState(private val ctx: Context) {
     private var pausedByUnplug = false
     private var pausedAt = 0L
     private var fading = false
+    private var queuedId: String? = null
+    private var autoAdvance = false
     var radio = false
 
     var screen by mutableStateOf(Screen.Home)
@@ -175,6 +177,13 @@ class AppState(private val ctx: Context) {
                             if (status.startsWith("Retrying") || status.startsWith("Skipped")) status = ""
                         }
                         if (state == Player.STATE_ENDED) onEnded()
+                    }
+
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) return
+                        val sg = mediaItem?.mediaId?.let { known[it] } ?: return
+                        if (sg.id == current?.id) return
+                        onAutoAdvance(sg)
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
@@ -429,6 +438,7 @@ class AppState(private val ctx: Context) {
     fun replaceQueue(l: List<Song>) {
         queue = l
         planned.clear()
+        refreshQueued()
     }
 
     fun playNext(song: Song) {
@@ -479,6 +489,7 @@ class AppState(private val ctx: Context) {
             radio = false
         }
         fading = false
+        queuedId = null
         pausedByUnplug = false
         current = song
         queue = from
@@ -497,7 +508,7 @@ class AppState(private val ctx: Context) {
         scope.launch {
             try {
                 val url = DownloadStore.localUri(song)
-                    ?: (if (AudioCache.isFull(ctx, song.id)) "https://cached.invalid/" + song.id else Engine.streamUrl(song.url))
+                    ?: (if (Opts.offline && AudioCache.isFull(ctx, song.id)) "https://cached.invalid/" + song.id else Engine.streamUrl(song.url))
                 var c = controller
                 var tries = 0
                 while (c == null && tries < 50) {
@@ -517,12 +528,14 @@ class AppState(private val ctx: Context) {
                     .build()
                 c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setCustomCacheKey(song.id).setMediaMetadata(meta).build())
                 c.prepare()
-                val soft = Opts.fade || Opts.crossfade > 0
+                val soft = (Opts.fade || Opts.crossfade > 0) && !(autoAdvance && Opts.crossfade == 0)
+                autoAdvance = false
                 if (soft) c.volume = 0f
                 c.play()
                 if (soft) fade(0f, 1f, if (Opts.crossfade > 0) Opts.crossfade * 1000L else 450L) else c.volume = 1f
                 status = ""
                 preload()
+                queueNextItem()
             } catch (e: Exception) {
                 status = "Can't play this one: " + (e.message ?: "error").take(50)
                 loading = false
@@ -682,6 +695,80 @@ class AppState(private val ctx: Context) {
 
     fun offlineSongs(): List<Song> = (DownloadStore.songs.toList() + cachedSongs()).distinctBy { it.id }
 
+    // The next song is added to the player's own list while the current one plays,
+    // so Android never sees the audio stop between songs (this is what muted it in the background).
+    private fun queueNextItem() {
+        val c = controller ?: return
+        val cur = current ?: return
+        if (repeat) return
+        if (radio && !shuffle && queue.lastOrNull()?.id == cur.id) {
+            scope.launch {
+                try {
+                    val more = Engine.related(cur.url).filter { r -> queue.none { q -> q.id == r.id } }
+                    if (more.isNotEmpty() && current?.id == cur.id) replaceQueue(queue + more)
+                } catch (e: Exception) {
+                }
+            }
+            return
+        }
+        val nxt = upcoming().firstOrNull() ?: return
+        if (queuedId == nxt.id) return
+        scope.launch {
+            try {
+                val url = DownloadStore.localUri(nxt)
+                    ?: (if (Opts.offline && AudioCache.isFull(ctx, nxt.id)) "https://cached.invalid/" + nxt.id else Engine.streamUrl(nxt.url))
+                if (current?.id != cur.id || upcoming().firstOrNull()?.id != nxt.id) return@launch
+                while (c.mediaItemCount > c.currentMediaItemIndex + 1) c.removeMediaItem(c.mediaItemCount - 1)
+                val meta = MediaMetadata.Builder()
+                    .setTitle(nxt.title)
+                    .setArtist(nxt.artist)
+                    .setArtworkUri(nxt.thumb?.let { Uri.parse(artUrl(it, 800)) })
+                    .build()
+                c.addMediaItem(MediaItem.Builder().setUri(url).setMediaId(nxt.id).setCustomCacheKey(nxt.id).setMediaMetadata(meta).build())
+                queuedId = nxt.id
+            } catch (e: Exception) {
+            }
+        }
+    }
+
+    private fun refreshQueued() {
+        val c = controller ?: return
+        if (current == null) return
+        try {
+            while (c.mediaItemCount > c.currentMediaItemIndex + 1) c.removeMediaItem(c.mediaItemCount - 1)
+        } catch (e: Exception) {
+        }
+        queuedId = null
+        queueNextItem()
+    }
+
+    private fun onAutoAdvance(sg: Song) {
+        planned.removeAll { it.id == sg.id }
+        fading = false
+        current = sg
+        position = 0f
+        status = ""
+        loading = false
+        endedFor = null
+        retriedId = null
+        queuedId = null
+        playCount++
+        known[sg.id] = sg
+        counts[sg.id] = (counts[sg.id] ?: 0) + 1
+        history.removeAll { it.id == sg.id }
+        history.add(0, sg)
+        while (history.size > 30) history.removeAt(history.size - 1)
+        saveAll()
+        if (Opts.crossfade > 0) {
+            fade(0f, 1f, Opts.crossfade * 1000L)
+        } else {
+            fadeJob?.cancel()
+            controller?.volume = 1f
+        }
+        preload()
+        queueNextItem()
+    }
+
     private fun onEnded() {
         val id = current?.id ?: return
         if (endedFor == id) return
@@ -691,6 +778,7 @@ class AppState(private val ctx: Context) {
             controller?.seekTo(0)
             controller?.play()
         } else {
+            autoAdvance = true
             next()
         }
     }

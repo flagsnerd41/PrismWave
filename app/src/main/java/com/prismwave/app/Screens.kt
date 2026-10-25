@@ -1570,6 +1570,12 @@ fun SettingsScreen(s: AppState) {
                     }
                 }
                 "changelog" -> {
+                    Section("v20") {
+                        ChangeList(listOf(
+                            "Fix: audio cutting a few seconds into the next song when the app is in the background",
+                            "The player now moves to the next song by itself, so playback never stops in between"
+                        ))
+                    }
                     Section("v19") {
                         ChangeList(listOf(
                             "Themes: Warm, Dark, AMOLED, Midnight",
@@ -1645,7 +1651,7 @@ fun SettingsScreen(s: AppState) {
                 }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v19", color = Color.White)
+                        Text("Version v20", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }
