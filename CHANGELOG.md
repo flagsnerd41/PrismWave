@@ -1,5 +1,9 @@
 # PrismWave changelog
 
+## v21
+- Fixed: cache rebuilt, songs are saved as real files and play from there
+- Added: lyrics button on the player, full-screen karaoke lyrics
+
 ## v19
 - Added: themes (Warm, Dark, AMOLED, Midnight), floating bottom bar, title bar that fades in on scroll
 - Added: welcome animation with glowing "made by flagsnerd", gradient cards, bolder titles

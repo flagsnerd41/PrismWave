@@ -22,17 +22,6 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(
-                DefaultMediaSourceFactory(
-                    DefaultDataSource.Factory(
-                        this,
-                        CacheDataSource.Factory()
-                            .setCache(AudioCache.get(this))
-                            .setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory())
-                            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-                    )
-                )
-            )
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)

@@ -865,39 +865,74 @@ private fun LyricsPage(s: AppState) {
     val active = if (synced) lines.indexOfLast { it.ms <= posMs + 200 } else -1
     val listState = rememberLazyListState()
     LaunchedEffect(active) {
-        if (active >= 0) listState.animateScrollToItem((active - 3).coerceAtLeast(0))
+        if (active >= 0) listState.animateScrollToItem((active - 2).coerceAtLeast(0))
     }
-    SlidePage(s, "Lyrics", scroll = false) {
+    val total = (song?.seconds ?: 1).coerceAtLeast(1).toFloat()
+    SlidePage(s, "", scroll = false) {
         if (song != null) {
-            Text(song.title, color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    song.title,
+                    color = Color.White,
+                    fontFamily = PrismFont,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(song.artist, color = Color.White.copy(alpha = 0.65f), fontSize = 14.sp, maxLines = 1)
+            }
         }
         if (busy) {
             LoadingRow(s)
+            Spacer(Modifier.weight(1f))
         } else if (lines.isEmpty()) {
-            Text("No lyrics found for this song", color = TextDim, modifier = Modifier.padding(vertical = 20.dp))
+            Text(
+                "No lyrics found for this song",
+                color = TextDim,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp)
+            )
+            Spacer(Modifier.weight(1f))
         } else {
-            LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(vertical = 40.dp)) {
+            LazyColumn(
+                Modifier.weight(1f).fillMaxWidth(),
+                state = listState,
+                contentPadding = PaddingValues(vertical = 120.dp)
+            ) {
                 itemsIndexed(lines) { i, ln ->
                     val on = i == active
-                    val a by animateFloatAsState(if (!synced || on) 1f else 0.38f, tween(250), label = "lya")
-                    val sc by animateFloatAsState(if (on) 1f else 0.94f, tween(250), label = "lys")
+                    val a by animateFloatAsState(if (!synced || on) 1f else 0.35f, tween(300), label = "lya")
+                    val sc by animateFloatAsState(if (on) 1.08f else 0.92f, tween(300), label = "lys")
                     Text(
                         if (ln.text.isEmpty()) "♪" else ln.text,
                         color = (if (on) s.accent else Color.White).copy(alpha = a),
-                        fontSize = 26.sp,
+                        fontFamily = PrismFont,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable(enabled = synced) { s.seekTo(ln.ms / 1000f) }
-                            .padding(vertical = 10.dp)
+                            .padding(vertical = 12.dp, horizontal = 8.dp)
                             .graphicsLayer {
                                 scaleX = sc
                                 scaleY = sc
-                                transformOrigin = TransformOrigin(0f, 0.5f)
                             }
                     )
                 }
             }
+        }
+        SeekBar({ s.position }, total, { s.seekTo(it) }, Modifier.fillMaxWidth())
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CarButton(Icons.Rounded.SkipPrevious, 56.dp, Color.White.copy(alpha = 0.14f), Color.White) { s.prev() }
+            PlayButton(s, 72.dp, 36.dp)
+            CarButton(Icons.Rounded.SkipNext, 56.dp, Color.White.copy(alpha = 0.14f), Color.White) { s.next() }
         }
     }
 }

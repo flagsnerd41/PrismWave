@@ -508,7 +508,7 @@ class AppState(private val ctx: Context) {
         scope.launch {
             try {
                 val url = DownloadStore.localUri(song)
-                    ?: (if (Opts.offline && AudioCache.isFull(ctx, song.id)) "https://cached.invalid/" + song.id else Engine.streamUrl(song.url))
+                    ?: SongCache.uri(ctx, song.id) ?: Engine.streamUrl(song.url)
                 var c = controller
                 var tries = 0
                 while (c == null && tries < 50) {
@@ -536,6 +536,7 @@ class AppState(private val ctx: Context) {
                 status = ""
                 preload()
                 queueNextItem()
+                cacheCurrent(song, url)
             } catch (e: Exception) {
                 status = "Can't play this one: " + (e.message ?: "error").take(50)
                 loading = false
@@ -654,12 +655,24 @@ class AppState(private val ctx: Context) {
         preloadJob = scope.launch {
             delay(2500)
             for (sg in upcoming()) {
-                if (DownloadStore.localUri(sg) != null || AudioCache.isFull(ctx, sg.id)) continue
+                if (DownloadStore.localUri(sg) != null || SongCache.has(ctx, sg.id)) continue
                 try {
                     val url = Engine.streamUrl(sg.url)
-                    AudioCache.warm(ctx, sg.id, url)
+                    if (SongCache.fetch(ctx, sg.id, url) && queuedId == sg.id) refreshQueued()
                 } catch (e: Exception) {
                 }
+            }
+        }
+    }
+
+    // the song you are listening to is saved too, so it replays instantly and works offline
+    private fun cacheCurrent(song: Song, url: String) {
+        if (!url.startsWith("http") || Opts.offline) return
+        scope.launch {
+            delay(1500)
+            try {
+                SongCache.fetch(ctx, song.id, url)
+            } catch (e: Exception) {
             }
         }
     }
@@ -716,7 +729,7 @@ class AppState(private val ctx: Context) {
         scope.launch {
             try {
                 val url = DownloadStore.localUri(nxt)
-                    ?: (if (Opts.offline && AudioCache.isFull(ctx, nxt.id)) "https://cached.invalid/" + nxt.id else Engine.streamUrl(nxt.url))
+                    ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
                 if (current?.id != cur.id || upcoming().firstOrNull()?.id != nxt.id) return@launch
                 while (c.mediaItemCount > c.currentMediaItemIndex + 1) c.removeMediaItem(c.mediaItemCount - 1)
                 val meta = MediaMetadata.Builder()
@@ -767,6 +780,14 @@ class AppState(private val ctx: Context) {
         }
         preload()
         queueNextItem()
+        if (!SongCache.has(ctx, sg.id) && !Opts.offline) {
+            scope.launch {
+                try {
+                    SongCache.fetch(ctx, sg.id, Engine.streamUrl(sg.url))
+                } catch (e: Exception) {
+                }
+            }
+        }
     }
 
     private fun onEnded() {
@@ -792,7 +813,7 @@ class AppState(private val ctx: Context) {
         }
         retriedId = cur.id
         status = "Retrying..."
-        AudioCache.remove(ctx, cur.id)
+        SongCache.remove(ctx, cur.id)
         val resume = (position * 1000).toLong()
         scope.launch {
             try {
@@ -828,7 +849,7 @@ class AppState(private val ctx: Context) {
         }
     }
 
-    fun cachedSongs(): List<Song> = AudioCache.keys(ctx).mapNotNull { known[it] }
+    fun cachedSongs(): List<Song> = SongCache.keys(ctx).mapNotNull { known[it] }
 
     // Songs imported with a missing length get the real one from the player once it is ready.
     private fun fixDuration(real: Int) {

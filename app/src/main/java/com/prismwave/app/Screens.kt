@@ -1445,7 +1445,7 @@ fun SettingsScreen(s: AppState) {
                     val ctx = LocalContext.current
                     var tick by remember { mutableStateOf(0) }
                     Section("Cached songs") {
-                        Text("Using " + AudioCache.usedMb(ctx, tick) + " MB of " + Opts.cacheMb + " MB", color = Color.White)
+                        Text("Using " + SongCache.usedMb(ctx, tick) + " MB of " + Opts.cacheMb + " MB", color = Color.White)
                         Spacer(Modifier.height(4.dp))
                         Text("Songs you play are saved here for instant and offline playback. Find them in Library, Cached.", color = TextDim, fontSize = 13.sp)
                         Spacer(Modifier.height(12.dp))
@@ -1458,10 +1458,10 @@ fun SettingsScreen(s: AppState) {
                             }
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text("The size limit applies after you restart the app.", color = TextDim, fontSize = 13.sp)
+                        Text("Oldest songs are removed first when the limit is reached.", color = TextDim, fontSize = 13.sp)
                         Spacer(Modifier.height(12.dp))
                         ActionButton("Clear cache", s.accent) {
-                            AudioCache.clear(ctx)
+                            SongCache.clear(ctx)
                             tick++
                         }
                     }
@@ -1570,6 +1570,12 @@ fun SettingsScreen(s: AppState) {
                     }
                 }
                 "changelog" -> {
+                    Section("v21") {
+                        ChangeList(listOf(
+                            "Cache rebuilt: songs are saved as real files and play from there",
+                            "Lyrics button on the player and a full-screen karaoke view"
+                        ))
+                    }
                     Section("v20") {
                         ChangeList(listOf(
                             "Fix: audio cutting a few seconds into the next song when the app is in the background",
@@ -1651,7 +1657,7 @@ fun SettingsScreen(s: AppState) {
                 }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v20", color = Color.White)
+                        Text("Version v21", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }

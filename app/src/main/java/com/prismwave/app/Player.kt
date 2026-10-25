@@ -672,6 +672,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
                 s.shuffle = !s.shuffle
             }
             PlayerIcon(Icons.Rounded.Add, Color.White.copy(alpha = 0.7f)) { onAdd() }
+            PlayerIcon(Icons.Rounded.Subtitles, Color.White.copy(alpha = 0.7f)) { Pages.show("lyrics") }
             PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White.copy(alpha = 0.7f)) {
                 onSleep()
             }
@@ -782,6 +783,8 @@ private fun ImmersiveBody(
                     PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White) { onSleep() }
                     Box(Modifier.width(1.dp).height(26.dp).background(Color.White.copy(alpha = 0.25f)))
                     PlayerIcon(Icons.Rounded.Add, Color.White) { onAdd() }
+                    Box(Modifier.width(1.dp).height(26.dp).background(Color.White.copy(alpha = 0.25f)))
+                    PlayerIcon(Icons.Rounded.Subtitles, Color.White) { Pages.show("lyrics") }
                     Box(Modifier.width(1.dp).height(26.dp).background(Color.White.copy(alpha = 0.25f)))
                     PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White) {
                         s.repeat = !s.repeat
