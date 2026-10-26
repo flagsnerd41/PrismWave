@@ -1269,7 +1269,7 @@ private fun ToggleRow(title: String, sub: String, checked: Boolean, onChange: (B
 }
 
 @Composable
-fun SettingsScreen(s: AppState) {
+private fun SettingsScreenOld(s: AppState) {
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri -> if (uri != null) s.exportTo(uri) }
