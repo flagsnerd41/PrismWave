@@ -1,5 +1,14 @@
 package com.prismwave.app
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.NightsStay
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
@@ -1574,6 +1583,14 @@ fun SettingsScreen(s: AppState) {
                     }
                 }
                 "changelog" -> {
+                    Section("v22.1") {
+                        ChangeList(listOf(
+                            "Home header shows your YouTube Music profile picture when you are signed in",
+                            "Lighter glass blur on the bars",
+                            "Splash: made by flagsnerd appears letter by letter, blurred to clear",
+                            "New app icon"
+                        ))
+                    }
                     Section("v22") {
                         ChangeList(listOf(
                             "New Home design: greeting header, Featured card, Recently Played and Speed Dial shelves",
@@ -1668,7 +1685,7 @@ fun SettingsScreen(s: AppState) {
                 }
                 "about" -> {
                     Section("PrismWave") {
-                        Text("Version v22", color = Color.White)
+                        Text("Version v22.1", color = Color.White)
                         Text("Private build, made from scratch", color = TextDim, fontSize = 13.sp)
                     }
                 }
@@ -1735,13 +1752,7 @@ private fun HomeHeader2(s: AppState) {
                 )
             }
         }
-        Box(
-            Modifier
-                .bounceClick { s.screen = Screen.Settings }
-                .size(56.dp)
-                .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                .clip(CircleShape)
-        ) { AppLogo(56.dp) }
+        ProfileAvatar(s)
     }
 }
 
@@ -1949,5 +1960,37 @@ fun HomeScreen(s: AppState) {
                 item { SongRowList("Workout", workout, s) }
             }
         }
+    }
+}
+
+
+// ------------------------------------------------------------ home header picture
+
+object ProfilePic {
+    var url by mutableStateOf<String?>(null)
+}
+
+@Composable
+private fun ProfileAvatar(s: AppState) {
+    val ctx = LocalContext.current
+    LaunchedEffect(s.cookie) {
+        if (s.signedIn) {
+            if (ProfilePic.url == null) ProfilePic.url = YtAccount.profilePhoto(s.cookie)
+        } else {
+            ProfilePic.url = null
+        }
+    }
+    val url = ProfilePic.url
+    if (s.signedIn && url != null) {
+        val req = remember(url) { ImageRequest.Builder(ctx).data(artUrl(url, 200)).crossfade(300).build() }
+        AsyncImage(
+            model = req,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+        )
     }
 }

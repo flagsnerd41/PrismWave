@@ -216,6 +216,40 @@ object YtAccount {
         return token
     }
 
+    suspend fun profilePhoto(cookie: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val sid = cookieValue(cookie, "SAPISID") ?: cookieValue(cookie, "__Secure-3PAPISID") ?: return@withContext null
+            val client = JSONObject()
+                .put("clientName", "WEB_REMIX")
+                .put("clientVersion", CLIENT_VERSION)
+                .put("hl", "en")
+                .put("gl", "US")
+            val body = JSONObject().put("context", JSONObject().put("client", client))
+            val req = Request.Builder()
+                .url(ORIGIN + "/youtubei/v1/account/account_menu?prettyPrint=false")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .header("Cookie", cookie)
+                .header("Authorization", authHeader(sid))
+                .header("X-Goog-AuthUser", "0")
+                .header("Origin", ORIGIN)
+                .header("X-Origin", ORIGIN)
+                .header("Referer", "$ORIGIN/")
+                .header("User-Agent", UA)
+                .build()
+            val text = http.newCall(req).execute().use { r ->
+                if (!r.isSuccessful) null else r.body?.string()
+            }
+            if (text == null) return@withContext null
+            var found: String? = null
+            walk(JSONObject(text)) { key, v ->
+                if (found == null && key == "accountPhoto") found = lastThumb(v.optJSONArray("thumbnails"))
+            }
+            found
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun playlists(cookie: String): List<RemotePlaylist> = withContext(Dispatchers.IO) {
         val json = browse(cookie, "FEmusic_liked_playlists", null)
         val out = ArrayList<RemotePlaylist>()

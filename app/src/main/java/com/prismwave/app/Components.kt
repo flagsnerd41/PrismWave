@@ -241,7 +241,8 @@ fun Glass(
                     // Only the bar's own area is blurred (much cheaper than the whole screen).
                     // blur a quarter-size copy and scale it back up: about 16x less work for the GPU
                     val k = 0.25f
-                    blurLayer.renderEffect = BlurEffect(backdrop.radius * k, backdrop.radius * k, TileMode.Clamp)
+                    val r = backdrop.radius * 0.4f * k
+                    blurLayer.renderEffect = BlurEffect(r, r, TileMode.Clamp)
                     blurLayer.clip = true
                     blurLayer.record(
                         this, layoutDirection,
@@ -254,7 +255,7 @@ fun Glass(
                     drawRect(Night)
                 }
             }
-            .background(Surface2.copy(alpha = if (useBlur) alpha * 0.6f else alpha))
+            .background(Surface2.copy(alpha = if (useBlur) alpha * 0.4f else alpha))
             .border(
                 1.dp,
                 Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.26f), Color.White.copy(alpha = 0.05f))),

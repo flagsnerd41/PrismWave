@@ -1,5 +1,11 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.TextStyle
+
 import androidx.compose.foundation.layout.fillMaxWidth
 
 import androidx.compose.foundation.border
@@ -151,7 +157,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                                 Spacer(Modifier.height(10.dp))
-                                GlowWords(s.accent)
+                                GlowLetters(s.accent)
                             }
                         }
                     }
@@ -272,6 +278,39 @@ fun Main(s: AppState) {
             ) { FullPlayer(s) }
             PagesHost(s)
             if (s.showLogin) LoginScreen(s)
+        }
+    }
+}
+
+
+@Composable
+fun GlowLetters(accent: Color) {
+    val text = "made by flagsnerd"
+    Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        text.forEachIndexed { i, ch ->
+            if (ch == ' ') {
+                Spacer(Modifier.width(9.dp))
+            } else {
+                val p = remember { Animatable(0f) }
+                LaunchedEffect(Unit) {
+                    delay(600L + i * 70L)
+                    p.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+                }
+                val glow = kotlin.math.sin(p.value * Math.PI.toFloat())
+                Text(
+                    ch.toString(),
+                    color = lerp(accent, Color.White, p.value),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 1.sp,
+                    style = TextStyle(shadow = Shadow(accent.copy(alpha = 0.9f * glow), Offset.Zero, 18f * glow + 0.1f)),
+                    modifier = Modifier.graphicsLayer {
+                        alpha = p.value
+                        val r = (1f - p.value) * 16f
+                        renderEffect = if (Build.VERSION.SDK_INT >= 31 && r > 0.5f) BlurEffect(r, r, TileMode.Decal) else null
+                    }
+                )
+            }
         }
     }
 }
