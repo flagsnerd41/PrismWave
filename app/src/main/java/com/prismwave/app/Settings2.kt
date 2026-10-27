@@ -685,6 +685,16 @@ private fun PfAppearancePage(s: AppState) {
             s.glass, 0.3f..1f, a, { s.glass = it }, { s.saveSettings() }
         )
     }
+    PfLabel("Experimental", a)
+    PfGroup {
+        val lctx = LocalContext.current
+        val ok = android.os.Build.VERSION.SDK_INT >= 33
+        PfSwitch(
+            Icons.Rounded.AutoAwesome, "Liquid glass menu bar",
+            if (ok) "Real glass refraction on the bottom bar. Off or Lite mode uses the normal blur" else "Needs Android 13 or newer",
+            LiquidGlassOpt.on && ok, a
+        ) { if (ok) LiquidGlassOpt.set(lctx, it) }
+    }
     PfLabel("Status bar", a)
     PfGroup {
         PfSwitch(Icons.Rounded.AutoAwesome, "Blur under status bar", "Blurred strip on every screen", Opts.statusBlur, a) {
@@ -938,7 +948,7 @@ private fun PfAboutPage(s: AppState) {
     val a = s.accent
     PfLabel("PrismWave", a)
     PfGroup {
-        PfInfo(Icons.Rounded.Info, "Version", "v23", a)
+        PfInfo(Icons.Rounded.Info, "Version", "v24", a)
         PfNote("Private build, made from scratch")
     }
 }
@@ -946,6 +956,14 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("v24", a, listOf(
+        "New app background: navy to blue to teal to blue gradient",
+        "Liquid glass menu bar (Android 13+), own switch in Appearance",
+        "Full player is a sheet with rounded top corners",
+        "App icon zoomed a bit, media notification icon is a white P",
+        "Song and Video pills in the player (experiment)",
+        "Safer song cache and recovery if a song stops too early"
+    ))
     PfChange("v23", a, listOf(
         "Settings rebuilt in a new style: grouped cards, switches with a check, dotted sliders, value pickers",
         "New Integration page: scrobble to Last.fm, Libre.fm and ListenBrainz",

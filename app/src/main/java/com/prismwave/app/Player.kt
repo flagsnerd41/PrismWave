@@ -172,7 +172,7 @@ fun NavBar(s: AppState) {
         Triple(Screen.Search, Icons.Rounded.Search, "Search"),
         Triple(Screen.Library, Icons.Rounded.GridView, "Library")
     )
-    Glass(s.glassAlpha(), Modifier.fillMaxWidth().height(78.dp), RoundedCornerShape(30.dp)) {
+    LiquidGlass(s.glassAlpha(), Modifier.fillMaxWidth().height(78.dp), 30.dp) {
         Row(
             Modifier.fillMaxSize().padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -441,11 +441,13 @@ fun FullPlayer(s: AppState) {
     var menuDialog by remember { mutableStateOf(false) }
     var queueDialog by remember { mutableStateOf(false) }
     BackHandler { s.showPlayer = false }
+    LaunchedEffect(song.id) { VideoSync.check(song) }
     val dragY = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     Box(
         Modifier
             .fillMaxSize()
+            .padding(top = 8.dp)
             .offset { IntOffset(0, dragY.value.roundToInt()) }
             .draggable(
                 state = rememberDraggableState { d ->
@@ -457,6 +459,7 @@ fun FullPlayer(s: AppState) {
                     else dragY.animateTo(0f, spring(dampingRatio = 0.7f))
                 }
             )
+            .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
             .background(Night)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
     ) {
@@ -643,6 +646,10 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
                 .background(Color.White.copy(alpha = 0.45f))
                 .clickable { s.showPlayer = false }
         )
+        if (VideoSync.has[song.id] == true) {
+            ModePills()
+            Spacer(Modifier.height(14.dp))
+        }
         Box(
             Modifier
                 .fillMaxWidth()
@@ -652,7 +659,13 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
                     scaleY = coverScale
                 }
                 .shadow(22.dp, coverShape, ambientColor = art, spotColor = art)
-        ) { Cover(song, Modifier.fillMaxSize(), 20.dp, 96.sp, quality = 1000) }
+        ) {
+            if (VideoSync.showVideo(song)) {
+                VideoStage(s, song, Modifier.fillMaxSize().clip(coverShape))
+            } else {
+                Cover(song, Modifier.fillMaxSize(), 20.dp, 96.sp, quality = 1000)
+            }
+        }
         Spacer(Modifier.height(26.dp))
         TitleRow(s, song, 22.sp, 19.sp, true, onMenu)
         Spacer(Modifier.weight(1f))
@@ -730,7 +743,11 @@ private fun ImmersiveBody(
                     drawRect(brush = stageFade, blendMode = BlendMode.DstIn)
                 }
         ) {
-            Cover(song, Modifier.fillMaxSize(), 0.dp, 160.sp, quality = 1200)
+            if (VideoSync.showVideo(song)) {
+                VideoStage(s, song, Modifier.fillMaxSize())
+            } else {
+                Cover(song, Modifier.fillMaxSize(), 0.dp, 160.sp, quality = 1200)
+            }
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
@@ -748,13 +765,18 @@ private fun ImmersiveBody(
                 .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                "Playing from PrismWave",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(top = 18.dp).clickable { s.showPlayer = false }
-            )
+            if (VideoSync.has[song.id] == true) {
+                Spacer(Modifier.height(10.dp))
+                ModePills()
+            } else {
+                Text(
+                    "Playing from PrismWave",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 18.dp).clickable { s.showPlayer = false }
+                )
+            }
             Spacer(Modifier.weight(1f))
             TitleRow(s, song, 27.sp, 19.sp, false, onMenu)
             Spacer(Modifier.height(18.dp))

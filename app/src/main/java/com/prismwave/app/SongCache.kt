@@ -60,17 +60,54 @@ object SongCache {
     private fun download(ctx: Context, id: String, url: String): Boolean {
         val tmp = File(dir(ctx), name(id) + ".part")
         try {
-            val c = URL(url).openConnection() as HttpURLConnection
-            c.connectTimeout = 10000
-            c.readTimeout = 20000
-            c.setRequestProperty("Range", "bytes=0-")
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
-            if (c.responseCode !in 200..299) {
+            tmp.delete()
+            var total = -1L
+            var got = 0L
+            var rounds = 0
+            while (rounds < 60) {
+                rounds++
+                val c = URL(url).openConnection() as HttpURLConnection
+                c.connectTimeout = 10000
+                c.readTimeout = 20000
+                c.setRequestProperty("Range", "bytes=" + got + "-")
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
+                val code = c.responseCode
+                if (code !in 200..299 || (code == 200 && got > 0)) {
+                    c.disconnect()
+                    tmp.delete()
+                    return false
+                }
+                val cr = c.getHeaderField("Content-Range")
+                if (cr != null && cr.contains("/")) {
+                    total = cr.substringAfter("/").trim().toLongOrNull() ?: total
+                } else if (code == 200) {
+                    total = c.contentLengthLong
+                }
+                var n = 0L
+                java.io.FileOutputStream(tmp, got > 0).use { out ->
+                    c.inputStream.use { inp ->
+                        val buf = ByteArray(64 * 1024)
+                        while (true) {
+                            val r = inp.read(buf)
+                            if (r < 0) break
+                            out.write(buf, 0, r)
+                            n += r
+                        }
+                    }
+                }
                 c.disconnect()
+                got += n
+                if (total <= 0L || got >= total) break
+                if (n == 0L) {
+                    tmp.delete()
+                    return false
+                }
+            }
+            // a song that is not complete would cut off mid-way, so never keep one
+            if (total > 0L && got < total) {
+                tmp.delete()
                 return false
             }
-            c.inputStream.use { inp -> tmp.outputStream().use { out -> inp.copyTo(out, 64 * 1024) } }
-            c.disconnect()
             if (tmp.length() < 50_000) {
                 tmp.delete()
                 return false

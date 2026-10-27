@@ -82,6 +82,7 @@ class AppState(private val ctx: Context) {
     private var plJob: Job? = null
     private var endedFor: String? = null
     private var retriedId: String? = null
+    private var earlyId: String? = null
     private var failStreak = 0
     private var fadeJob: Job? = null
     private var preloadJob: Job? = null
@@ -791,11 +792,23 @@ class AppState(private val ctx: Context) {
     }
 
     private fun onEnded() {
-        val id = current?.id ?: return
+        val cur = current ?: return
+        val id = cur.id
         if (endedFor == id) return
         endedFor = id
+        if (!repeat && earlyId != id && cur.seconds > 30 && position < cur.seconds - 10f) {
+            // stopped far too early (broken file or stream): drop the cached copy and continue from a fresh link
+            earlyId = id
+            endedFor = null
+            retriedId = null
+            handleError()
+            return
+        }
         if (repeat) {
             endedFor = null
+            fading = false
+            fadeJob?.cancel()
+            controller?.volume = 1f
             controller?.seekTo(0)
             controller?.play()
         } else {
@@ -831,6 +844,8 @@ class AppState(private val ctx: Context) {
                 )
                 c.prepare()
                 c.play()
+                queuedId = null
+                queueNextItem()
             } catch (e: Exception) {
                 skipBroken()
             }
@@ -880,6 +895,7 @@ class AppState(private val ctx: Context) {
             position = c.currentPosition / 1000f
             val dur = c.duration
             if (dur > 0) fixDuration((dur / 1000).toInt())
+            if (!fading && fadeJob?.isActive != true && c.volume < 0.99f) c.volume = 1f
             if (Opts.crossfade > 0 && dur > 0 && !fading && !repeat) {
                 val left = dur / 1000f - position
                 val cf = Opts.crossfade.toFloat()

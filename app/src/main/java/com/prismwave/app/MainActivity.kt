@@ -13,6 +13,11 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
 import android.os.Build
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
@@ -92,7 +97,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { Opts.init(appCtx) }
+            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(false) }
@@ -172,6 +177,7 @@ private const val BLUR0 = 70f
 @Composable
 fun Main(s: AppState) {
     val layer = rememberGraphicsLayer()
+    val bgImg = ImageBitmap.imageResource(R.drawable.bg_gradient)
     val backdrop = remember { Backdrop(layer) }
     val blurR = s.blurRadius
     val blurActive = s.blurOn && !s.batterySaver && !Opts.lite && Build.VERSION.SDK_INT >= 31
@@ -213,7 +219,24 @@ fun Main(s: AppState) {
                             drawContent()
                         }
                     }
-                    .drawBehind { drawRect(Brush.verticalGradient(listOf(tintTop, tintBot))) }
+                    .drawBehind {
+                        if (Opts.theme == 2) {
+                            drawRect(Color.Black)
+                        } else {
+                            val sw = bgImg.width
+                            val sh = bgImg.height
+                            val sc = maxOf(size.width / sw, size.height / sh)
+                            val srcW = minOf(sw, (size.width / sc).toInt().coerceAtLeast(1))
+                            val srcH = minOf(sh, (size.height / sc).toInt().coerceAtLeast(1))
+                            drawImage(
+                                bgImg,
+                                srcOffset = IntOffset((sw - srcW) / 2, (sh - srcH) / 2),
+                                srcSize = IntSize(srcW, srcH),
+                                dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+                                filterQuality = FilterQuality.Medium
+                            )
+                        }
+                    }
             ) {
                 Box(Modifier.fillMaxSize()) {
                     AnimatedContent(
