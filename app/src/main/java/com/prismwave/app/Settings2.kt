@@ -758,6 +758,14 @@ private fun PfPlayerPage(s: AppState) {
             { Opts.crossfade = it.toInt() }, { Opts.save() }
         )
     }
+    PfLabel("Video (experiment)", a)
+    PfGroup {
+        val vctx = LocalContext.current
+        PfChoice(
+            Icons.Rounded.PlayArrow, "Video quality", VideoSync.qualityNames, VideoSync.quality, a,
+            "Higher quality uses more data"
+        ) { VideoSync.setQuality(vctx, it) }
+    }
     PfLabel("Timer", a)
     PfGroup {
         val sl = s.sleepLeft
@@ -948,7 +956,7 @@ private fun PfAboutPage(s: AppState) {
     val a = s.accent
     PfLabel("PrismWave", a)
     PfGroup {
-        PfInfo(Icons.Rounded.Info, "Version", "v24", a)
+        PfInfo(Icons.Rounded.Info, "Version", "v25", a)
         PfNote("Private build, made from scratch")
     }
 }
@@ -956,6 +964,14 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("v25", a, listOf(
+        "Video: blurred backdrop now moves with the video, high quality by default",
+        "Video quality choice in Player and audio",
+        "Song/Video pills slide",
+        "Player is full screen with rounded top corners",
+        "Liquid glass on the mini player",
+        "Media notification icon is now your P logo"
+    ))
     PfChange("v24", a, listOf(
         "New app background: navy to blue to teal to blue gradient",
         "Liquid glass menu bar (Android 13+), own switch in Appearance",

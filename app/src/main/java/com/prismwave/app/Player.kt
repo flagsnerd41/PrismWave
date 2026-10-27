@@ -239,7 +239,7 @@ fun MiniPlayer(s: AppState) {
         visible = shown,
         enter = slideInVertically(spring(dampingRatio = 0.75f, stiffness = 260f)) { it } + fadeIn(tween(250))
     ) {
-        Glass(
+        LiquidGlass(
             s.glassAlpha(),
             Modifier
                 .fillMaxWidth()
@@ -268,7 +268,7 @@ fun MiniPlayer(s: AppState) {
                         onDragEnd = { if (dx > 120f) s.prev() else if (dx < -120f) s.next() }
                     ) { _, d -> dx += d }
                 },
-            RoundedCornerShape(32.dp)
+            32.dp
         ) {
             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
@@ -447,7 +447,6 @@ fun FullPlayer(s: AppState) {
     Box(
         Modifier
             .fillMaxSize()
-            .padding(top = 8.dp)
             .offset { IntOffset(0, dragY.value.roundToInt()) }
             .draggable(
                 state = rememberDraggableState { d ->
@@ -722,7 +721,11 @@ private fun ImmersiveBody(
     BoxWithConstraints(Modifier.fillMaxSize().background(Night)) {
         val stageHeight = maxHeight * 0.64f
         // blurred backdrop that fills the whole screen
-        Cover(song, Modifier.fillMaxSize().blur(50.dp), 0.dp, 160.sp, quality = 600)
+        if (VideoSync.showVideo(song)) {
+            VideoStage(s, song, Modifier.fillMaxSize().blur(50.dp), low = true)
+        } else {
+            Cover(song, Modifier.fillMaxSize().blur(50.dp), 0.dp, 160.sp, quality = 600)
+        }
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(

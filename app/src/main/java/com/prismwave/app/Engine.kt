@@ -140,13 +140,17 @@ object Engine {
         info.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toSong() }
     }
 
-    suspend fun videoUrl(videoUrl: String): String? = withContext(Dispatchers.IO) {
+    // main = best video up to maxH, low = tiny copy for the blurred backdrop
+    suspend fun videoPair(videoUrl: String, maxH: Int): Pair<String, String>? = withContext(Dispatchers.IO) {
         init()
         val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
         val vs = info.videoOnlyStreams.filter { it.isUrl && it.height > 0 }
+        if (vs.isEmpty()) return@withContext null
         val mp4 = vs.filter { it.format == MediaFormat.MPEG_4 }
         val pool = if (mp4.isNotEmpty()) mp4 else vs
-        (pool.filter { it.height <= 480 }.maxByOrNull { it.height } ?: pool.minByOrNull { it.height })?.content
+        val main = (pool.filter { it.height <= maxH }.maxByOrNull { it.height } ?: pool.minByOrNull { it.height })?.content
+        val low = (pool.filter { it.height <= 240 }.maxByOrNull { it.height } ?: pool.minByOrNull { it.height })?.content
+        if (main == null || low == null) null else Pair(main, low)
     }
 
     suspend fun streamUrl(videoUrl: String): String = withContext(Dispatchers.IO) {

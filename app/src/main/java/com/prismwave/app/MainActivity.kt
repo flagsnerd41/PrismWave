@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx) }
+            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); VideoSync.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(false) }
