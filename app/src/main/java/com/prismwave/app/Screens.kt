@@ -115,6 +115,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1769,15 +1774,33 @@ private fun FeaturedHero(song: Song, from: List<Song>, s: AppState) {
             .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
     ) {
         Cover(song, Modifier.fillMaxSize(), 0.dp, 90.sp, quality = 800)
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(
-                    0f to Color.Black.copy(alpha = 0.72f),
-                    0.55f to Color.Black.copy(alpha = 0.25f),
-                    1f to Color.Transparent
+        if (!Opts.lite && !s.batterySaver && android.os.Build.VERSION.SDK_INT >= 31) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            Brush.horizontalGradient(0f to Color.Black, 0.55f to Color.Black, 0.85f to Color.Transparent),
+                            blendMode = BlendMode.DstIn
+                        )
+                    }
+            ) {
+                Cover(song, Modifier.fillMaxSize().blur(30.dp), 0.dp, 90.sp, quality = 400)
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.30f)))
+            }
+        } else {
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.horizontalGradient(
+                        0f to Color.Black.copy(alpha = 0.72f),
+                        0.55f to Color.Black.copy(alpha = 0.25f),
+                        1f to Color.Transparent
+                    )
                 )
             )
-        )
+        }
         Column(Modifier.align(Alignment.CenterStart).fillMaxWidth(0.62f).padding(start = 22.dp)) {
             Text("Featured", color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp)
             Spacer(Modifier.height(8.dp))

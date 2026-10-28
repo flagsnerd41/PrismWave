@@ -177,7 +177,6 @@ private const val BLUR0 = 70f
 @Composable
 fun Main(s: AppState) {
     val layer = rememberGraphicsLayer()
-    val bgImg = ImageBitmap.imageResource(R.drawable.bg_gradient)
     val backdrop = remember { Backdrop(layer) }
     val blurR = s.blurRadius
     val blurActive = s.blurOn && !s.batterySaver && !Opts.lite && Build.VERSION.SDK_INT >= 31
@@ -190,6 +189,7 @@ fun Main(s: AppState) {
     val strength = (if (cur != null && Opts.livingBg) 1f else 0.5f) * (if (Opts.theme == 2) 0.35f else 1f)
     val tintTop by animateColorAsState(lerp(Night, artC, 0.42f * strength), tween(900), label = "tintTop")
     val tintBot by animateColorAsState(lerp(Night, artC, 0.16f * strength), tween(900), label = "tintBot")
+    LaunchedEffect(artC) { if (cur != null && Opts.livingBg) s.accent = lerp(artC, Color.White, 0.35f) }
     var scrolled by remember { mutableStateOf(0f) }
     LaunchedEffect(s.screen, s.openPlaylist, s.libraryOpen) { scrolled = 0f }
     val showBar by remember { derivedStateOf { scrolled > 6f } }
@@ -219,24 +219,7 @@ fun Main(s: AppState) {
                             drawContent()
                         }
                     }
-                    .drawBehind {
-                        if (Opts.theme == 2) {
-                            drawRect(Color.Black)
-                        } else {
-                            val sw = bgImg.width
-                            val sh = bgImg.height
-                            val sc = maxOf(size.width / sw, size.height / sh)
-                            val srcW = minOf(sw, (size.width / sc).toInt().coerceAtLeast(1))
-                            val srcH = minOf(sh, (size.height / sc).toInt().coerceAtLeast(1))
-                            drawImage(
-                                bgImg,
-                                srcOffset = IntOffset((sw - srcW) / 2, (sh - srcH) / 2),
-                                srcSize = IntSize(srcW, srcH),
-                                dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-                                filterQuality = FilterQuality.Medium
-                            )
-                        }
-                    }
+                    .drawBehind { drawRect(Brush.verticalGradient(listOf(tintTop, tintBot))) }
             ) {
                 Box(Modifier.fillMaxSize()) {
                     AnimatedContent(
