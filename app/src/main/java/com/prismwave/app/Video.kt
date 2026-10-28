@@ -56,6 +56,16 @@ object VideoSync {
     private val urls = HashMap<String, String>()
     private val lows = HashMap<String, String>()
 
+    // the sharp player and the blurred backdrop player, linked together
+    var main: ExoPlayer? = null
+    var back: ExoPlayer? = null
+
+    /** both videos start only when BOTH are ready, and pause together when either one buffers */
+    fun gateOk(): Boolean {
+        val ps = listOfNotNull(main, back)
+        return ps.isNotEmpty() && ps.all { it.playbackState == Player.STATE_READY }
+    }
+
     val qualityNames = listOf("Best", "1080p", "720p", "480p", "360p")
     private val heights = listOf(4320, 1080, 720, 480, 360)
     var quality by mutableStateOf(0)
@@ -141,6 +151,7 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
     var ready by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     DisposableEffect(player) {
+        if (low) VideoSync.back = player else VideoSync.main = player
         val l = object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 vsize = IntSize(videoSize.width, videoSize.height)
@@ -148,6 +159,11 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
 
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) ready = true
+                // react at once: pause both the moment one of them buffers
+                if (state == Player.STATE_BUFFERING) {
+                    VideoSync.main?.playWhenReady = false
+                    VideoSync.back?.playWhenReady = false
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -157,6 +173,8 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
         player.addListener(l)
         onDispose {
             player.removeListener(l)
+            if (VideoSync.back === player) VideoSync.back = null
+            if (VideoSync.main === player) VideoSync.main = null
             player.release()
         }
     }
@@ -181,15 +199,21 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
                 lastAt = now
             }
             val est = lastPos + (if (s.playing) (now - lastAt) / 1000f else 0f)
-            player.playWhenReady = s.playing && !s.loading
-            if (player.playbackState != Player.STATE_IDLE && now - lastSeek > 2000) {
-                val drift = player.currentPosition / 1000f - est
-                if (abs(drift) > 0.8f) {
-                    player.seekTo((est * 1000).toLong())
+            // both videos start and pause together
+            player.playWhenReady = s.playing && !s.loading && VideoSync.gateOk()
+            if (player.playbackState != Player.STATE_IDLE && now - lastSeek > 1500) {
+                // the blurred backdrop follows the sharp video, the sharp video follows the audio
+                val master = if (low) VideoSync.main else null
+                val linked = master != null && master.playbackState != Player.STATE_IDLE
+                val target = if (linked) master!!.currentPosition / 1000f else est
+                val limit = if (linked) 0.2f else 0.8f
+                val drift = player.currentPosition / 1000f - target
+                if (abs(drift) > limit) {
+                    player.seekTo((target * 1000).toLong())
                     lastSeek = now
                 }
             }
-            delay(400)
+            delay(150)
         }
     }
     BoxWithConstraints(modifier.clipToBounds().background(Color.Black)) {
