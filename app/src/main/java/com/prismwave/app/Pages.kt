@@ -260,13 +260,23 @@ object Pages {
 
 @Composable
 fun PagesHost(s: AppState) {
+    DiscordBridge(s)
     val key = Pages.open
     var last by remember { mutableStateOf("") }
     if (key != null && key != last) last = key
+    val vert = (key ?: last) == "lyrics"
     AnimatedVisibility(
         visible = key != null,
-        enter = slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
-        exit = slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
+        enter = if (vert) {
+            androidx.compose.animation.slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(420))
+        } else {
+            slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200))
+        },
+        exit = if (vert) {
+            androidx.compose.animation.slideOutVertically(tween(380, easing = FastOutSlowInEasing)) { it / 2 } + fadeOut(tween(300))
+        } else {
+            slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
+        }
     ) {
         when (last) {
             "tempo" -> TempoPage(s)
@@ -279,7 +289,7 @@ fun PagesHost(s: AppState) {
             "name" -> NamePage(s)
             "stats" -> StatsPage(s)
             "collection" -> CollectionPage(s)
-            "lyrics" -> LyricsPage(s)
+            "lyrics" -> LyricsScreen(s)
             "eq" -> EqPage(s)
             "car" -> CarPage(s)
             else -> Box(Modifier.fillMaxSize().background(Night))

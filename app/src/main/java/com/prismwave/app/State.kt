@@ -626,6 +626,14 @@ class AppState(private val ctx: Context) {
 
     private fun skipTo(n: Song) {
         val c = controller
+        if (!Opts.offline) {
+            scope.launch {
+                try {
+                    Engine.streamUrl(n.url)
+                } catch (e: Exception) {
+                }
+            }
+        }
         if (Opts.fade && c != null && playing && c.playbackState == Player.STATE_READY) {
             fade(c.volume, 0f, 160) { play(n, queue) }
         } else {
@@ -654,7 +662,7 @@ class AppState(private val ctx: Context) {
         preloadJob?.cancel()
         if (!Opts.preload || Opts.offline) return
         preloadJob = scope.launch {
-            delay(2500)
+            delay(600)
             for (sg in upcoming()) {
                 if (DownloadStore.localUri(sg) != null || SongCache.has(ctx, sg.id)) continue
                 try {
@@ -827,6 +835,7 @@ class AppState(private val ctx: Context) {
         retriedId = cur.id
         status = "Retrying..."
         SongCache.remove(ctx, cur.id)
+        Engine.forget(cur.url)
         val resume = (position * 1000).toLong()
         scope.launch {
             try {

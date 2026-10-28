@@ -444,9 +444,18 @@ fun FullPlayer(s: AppState) {
     LaunchedEffect(song.id) { VideoSync.check(song) }
     val dragY = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val lyShift by animateFloatAsState(
+        if (Pages.open == "lyrics") 1f else 0f,
+        tween(520, easing = FastOutSlowInEasing),
+        label = "lyshift"
+    )
     Box(
         Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                translationY = lyShift * size.height * 0.18f
+                alpha = 1f - lyShift * 0.9f
+            }
             .offset { IntOffset(0, dragY.value.roundToInt()) }
             .draggable(
                 state = rememberDraggableState { d ->

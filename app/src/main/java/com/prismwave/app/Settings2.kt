@@ -559,7 +559,7 @@ fun SettingsScreen(s: AppState) {
                 ) { page = it }
                 PfMainGroup(
                     listOf(
-                        PfItem("integration", "Integration", "Last.fm, Libre.fm, and ListenBrainz", Icons.Rounded.AutoAwesome),
+                        PfItem("integration", "Integration", "Last.fm, Libre.fm, ListenBrainz and Discord", Icons.Rounded.AutoAwesome),
                         PfItem("storage", "Storage", "Cached songs and size limit", Icons.Rounded.Download)
                     ),
                     acc, 6
@@ -892,6 +892,7 @@ private fun PfIntegrationPage(s: AppState) {
     val a = s.accent
     val ctx = LocalContext.current
     Scrobbler.init(ctx.applicationContext)
+    DiscordRpc.init(ctx.applicationContext)
     val scope = rememberCoroutineScope()
     var lbInput by remember { mutableStateOf("") }
     var lbMsg by remember { mutableStateOf("") }
@@ -934,6 +935,28 @@ private fun PfIntegrationPage(s: AppState) {
         Scrobbler.librefm, a,
         "Use your Libre.fm username and password. Enter an API key and secret the same way as for Last.fm."
     )
+    PfLabel("Discord", a)
+    PfGroup {
+        PfSwitch(
+            Icons.Rounded.AutoAwesome, "Discord status",
+            if (DiscordRpc.hasToken()) "Shows the song you listen to on your Discord profile"
+            else "Sign in to Discord first. Unofficial, so an alt account is safer",
+            DiscordRpc.enabled && DiscordRpc.hasToken(), a
+        ) { on ->
+            if (on && !DiscordRpc.hasToken()) DiscordRpc.loginOpen = true
+            else DiscordRpc.setEnabled(ctx, on)
+        }
+        if (DiscordRpc.hasToken()) {
+            PfField("Discord application ID (optional, adds cover art)", DiscordRpc.appId, a, false) {
+                DiscordRpc.setAppId(ctx, it)
+            }
+            PfAction(Icons.Rounded.Lock, "Sign out of Discord", "Forget the Discord login on this phone", a) {
+                DiscordRpc.logout(ctx)
+            }
+        }
+        if (DiscordRpc.status.isNotEmpty()) PfNote(DiscordRpc.status)
+    }
+    if (DiscordRpc.loginOpen) DiscordLogin()
     PfNote("A song is scrobbled after half of it has played (or 4 minutes), and only if it is longer than 30 seconds.")
 }
 
@@ -956,7 +979,7 @@ private fun PfAboutPage(s: AppState) {
     val a = s.accent
     PfLabel("PrismWave", a)
     PfGroup {
-        PfInfo(Icons.Rounded.Info, "Version", "v25", a)
+        PfInfo(Icons.Rounded.Info, "Version", "v26", a)
         PfNote("Private build, made from scratch")
     }
 }
@@ -964,6 +987,13 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("v26", a, listOf(
+        "Video and its blurred backdrop start and pause together",
+        "Discord status: Integration, Discord",
+        "New lyrics page: blurred lines, cover-tinted background, big bold text",
+        "Opening lyrics: the player sinks down and the lyrics rise up",
+        "Faster playback: song links are remembered, quicker start, quicker preload"
+    ))
     PfChange("v25", a, listOf(
         "Video: blurred backdrop now moves with the video, high quality by default",
         "Video quality choice in Player and audio",

@@ -153,13 +153,24 @@ object Engine {
         if (main == null || low == null) null else Pair(main, low)
     }
 
+    private val urlCache = HashMap<String, Pair<String, Long>>()
+
+    fun forget(videoUrl: String) {
+        synchronized(urlCache) { urlCache.remove(videoUrl) }
+    }
+
     suspend fun streamUrl(videoUrl: String): String = withContext(Dispatchers.IO) {
+        val nowMs = System.currentTimeMillis()
+        val hit = synchronized(urlCache) { urlCache[videoUrl] }
+        if (hit != null && nowMs - hit.second < 4L * 3600 * 1000) return@withContext hit.first
         init()
         val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
         val audio = info.audioStreams.filter { it.isUrl }
         val best = audio.filter { it.format == MediaFormat.M4A }.maxByOrNull { it.averageBitrate }
             ?: audio.maxByOrNull { it.averageBitrate }
-        best?.content ?: throw IOException("No audio stream found")
+        val link = best?.content ?: throw IOException("No audio stream found")
+        synchronized(urlCache) { urlCache[videoUrl] = Pair(link, nowMs) }
+        link
     }
 }
 
