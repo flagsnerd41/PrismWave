@@ -3,6 +3,10 @@ package com.prismwave.app
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.webkit.CookieManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -298,12 +302,18 @@ private const val DISCORD_JS =
     "(function(){try{var f=document.createElement('iframe');document.body.appendChild(f);" +
         "var t=f.contentWindow.localStorage.getItem('token');f.remove();return t?t:'';}catch(e){return '';}})()"
 
+// Discord shows a "get the app" page to phone browsers, so the login page looks like a desktop browser
+private const val DISCORD_UA =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
 /** Full-screen Discord login. The token is read once you are signed in, then the page closes. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun DiscordLogin() {
     val ctx = LocalContext.current
     val holder = remember { arrayOfNulls<WebView>(1) }
+    var loading by remember { mutableStateOf(true) }
+    var err by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         while (isActive) {
             delay(1500)
@@ -324,12 +334,34 @@ fun DiscordLogin() {
                 Spacer(Modifier.width(14.dp))
                 Text("Sign in to Discord", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
+            if (err.isNotEmpty()) {
+                Text(err, color = Color(0xFFFF8A80), fontSize = 14.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp))
+            } else if (loading) {
+                Text("Loading Discord...", color = TextDim, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp))
+            }
             AndroidView(
                 factory = { c ->
                     WebView(c).also { w ->
                         w.settings.javaScriptEnabled = true
                         w.settings.domStorageEnabled = true
-                        w.webViewClient = WebViewClient()
+                        w.settings.userAgentString = DISCORD_UA
+                        w.settings.useWideViewPort = true
+                        w.settings.loadWithOverviewMode = true
+                        w.settings.javaScriptCanOpenWindowsAutomatically = true
+                        CookieManager.getInstance().setAcceptCookie(true)
+                        CookieManager.getInstance().setAcceptThirdPartyCookies(w, true)
+                        w.webChromeClient = WebChromeClient()
+                        w.webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                loading = false
+                            }
+
+                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                                if (request?.isForMainFrame == true) {
+                                    err = "Could not load Discord. Check your connection and try again."
+                                }
+                            }
+                        }
                         w.loadUrl("https://discord.com/login")
                         holder[0] = w
                     }

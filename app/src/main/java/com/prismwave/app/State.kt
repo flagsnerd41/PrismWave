@@ -662,7 +662,7 @@ class AppState(private val ctx: Context) {
         preloadJob?.cancel()
         if (!Opts.preload || Opts.offline) return
         preloadJob = scope.launch {
-            delay(600)
+            delay(2500)
             for (sg in upcoming()) {
                 if (DownloadStore.localUri(sg) != null || SongCache.has(ctx, sg.id)) continue
                 try {

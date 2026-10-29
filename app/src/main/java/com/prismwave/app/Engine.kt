@@ -142,8 +142,11 @@ object Engine {
 
     // main = best video up to maxH, low = tiny copy for the blurred backdrop
     suspend fun videoPair(videoUrl: String, maxH: Int): Pair<String, String>? = withContext(Dispatchers.IO) {
-        init()
-        val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
+        val info = infoFor(videoUrl)
+        // a "song" (auto-generated Topic upload) only has a still picture, so no video for it
+        val isSong = (info.uploaderName ?: "").endsWith(" - Topic") ||
+            (info.description?.content ?: "").startsWith("Provided to YouTube by")
+        if (isSong) return@withContext null
         val vs = info.videoOnlyStreams.filter { it.isUrl && it.height > 0 }
         if (vs.isEmpty()) return@withContext null
         val mp4 = vs.filter { it.format == MediaFormat.MPEG_4 }
@@ -155,16 +158,39 @@ object Engine {
 
     private val urlCache = HashMap<String, Pair<String, Long>>()
 
+    private val infoCache = HashMap<String, Pair<StreamInfo, Long>>()
+    private val infoLocks = HashMap<String, kotlinx.coroutines.sync.Mutex>()
+
     fun forget(videoUrl: String) {
         synchronized(urlCache) { urlCache.remove(videoUrl) }
+        synchronized(infoCache) { infoCache.remove(videoUrl) }
+    }
+
+    // the same song is only fetched once, even when several parts of the app ask at the same time
+    private suspend fun infoFor(videoUrl: String): StreamInfo {
+        val lock = synchronized(infoLocks) { infoLocks.getOrPut(videoUrl) { kotlinx.coroutines.sync.Mutex() } }
+        lock.lock()
+        try {
+            val nowMs = System.currentTimeMillis()
+            val hit = synchronized(infoCache) { infoCache[videoUrl] }
+            if (hit != null && nowMs - hit.second < 4L * 3600 * 1000) return hit.first
+            init()
+            val fresh = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
+            synchronized(infoCache) {
+                if (infoCache.size > 8) infoCache.clear()
+                infoCache[videoUrl] = Pair(fresh, nowMs)
+            }
+            return fresh
+        } finally {
+            lock.unlock()
+        }
     }
 
     suspend fun streamUrl(videoUrl: String): String = withContext(Dispatchers.IO) {
         val nowMs = System.currentTimeMillis()
         val hit = synchronized(urlCache) { urlCache[videoUrl] }
         if (hit != null && nowMs - hit.second < 4L * 3600 * 1000) return@withContext hit.first
-        init()
-        val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
+        val info = infoFor(videoUrl)
         val audio = info.audioStreams.filter { it.isUrl }
         val best = audio.filter { it.format == MediaFormat.M4A }.maxByOrNull { it.averageBitrate }
             ?: audio.maxByOrNull { it.averageBitrate }

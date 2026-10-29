@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -91,7 +93,7 @@ fun LyricsScreen(s: AppState) {
         if (active >= 0) {
             val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == active }
             if (info != null) {
-                listState.animateScrollBy(info.offset.toFloat(), tween(520, easing = FastOutSlowInEasing))
+                listState.animateScrollBy(info.offset.toFloat(), tween(650, easing = FastOutSlowInEasing))
             } else {
                 listState.animateScrollToItem(active)
             }
@@ -184,6 +186,11 @@ fun LyricsScreen(s: AppState) {
                                 tween(380),
                                 label = "lya"
                             )
+                            val sc by animateFloatAsState(
+                                if (on && synced) 1f else if (synced) 0.86f else 1f,
+                                spring(dampingRatio = 0.72f, stiffness = 260f),
+                                label = "lysc"
+                            )
                             val br by animateDpAsState(
                                 if (on || !blurOn) 0.dp else (1.5f + 1.1f * dist).coerceAtMost(7f).dp,
                                 tween(380),
@@ -214,6 +221,9 @@ fun LyricsScreen(s: AppState) {
                                     .graphicsLayer {
                                         alpha = a * enter.value
                                         translationY = (1f - enter.value) * 110f
+                                        scaleX = sc
+                                        scaleY = sc
+                                        transformOrigin = TransformOrigin(0f, 0.5f)
                                     }
                                     .then(
                                         if (br > 0.dp) Modifier.blur(br, BlurredEdgeTreatment.Unbounded) else Modifier

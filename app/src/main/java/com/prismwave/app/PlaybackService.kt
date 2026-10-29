@@ -26,7 +26,7 @@ class PlaybackService : MediaSessionService() {
         val player = ExoPlayer.Builder(this)
             .setLoadControl(
                 DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(20000, 60000, 400, 1200)
+                    .setBufferDurationsMs(20000, 60000, 700, 1800)
                     .build()
             )
             .setAudioAttributes(

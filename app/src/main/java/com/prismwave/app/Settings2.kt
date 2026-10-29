@@ -954,6 +954,16 @@ private fun PfIntegrationPage(s: AppState) {
                 DiscordRpc.logout(ctx)
             }
         }
+        if (!DiscordRpc.hasToken()) {
+            PfAction(
+                Icons.Rounded.Lock, "Use token from clipboard",
+                "If the sign-in page does not work, copy your Discord token and tap here", a
+            ) {
+                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val tok = (cm.primaryClip?.getItemAt(0)?.text?.toString() ?: "").trim().trim('"')
+                if (tok.length > 40) DiscordRpc.onToken(ctx.applicationContext, tok)
+            }
+        }
         if (DiscordRpc.status.isNotEmpty()) PfNote(DiscordRpc.status)
     }
     if (DiscordRpc.loginOpen) DiscordLogin()
@@ -979,7 +989,7 @@ private fun PfAboutPage(s: AppState) {
     val a = s.accent
     PfLabel("PrismWave", a)
     PfGroup {
-        PfInfo(Icons.Rounded.Info, "Version", "v26", a)
+        PfInfo(Icons.Rounded.Info, "Version", "v26.1", a)
         PfNote("Private build, made from scratch")
     }
 }
@@ -987,6 +997,13 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("v26.1", a, listOf(
+        "Lyrics: current line grows, others shrink, blur and fade, smooth glide",
+        "Lyrics: finds a synced version when the first one is plain text",
+        "Discord sign-in page opens as a desktop page, with a clipboard backup",
+        "Less lag when opening the player: one fetch per song, video check waits",
+        "No video button for songs, only for real videos"
+    ))
     PfChange("v26", a, listOf(
         "Video and its blurred backdrop start and pause together",
         "Discord status: Integration, Discord",

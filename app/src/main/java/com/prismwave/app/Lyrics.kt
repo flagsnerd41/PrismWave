@@ -64,15 +64,15 @@ object Lyrics {
                 (if (song.seconds > 1) "&duration=" + song.seconds else "")
             val body = get("https://lrclib.net/api/get?" + q)
             if (body != null) result = fromObj(JSONObject(body))
-            if (result.isEmpty()) {
+            if (result.isEmpty() || result[0].ms < 0) {
                 val body2 = get("https://lrclib.net/api/search?q=" + enc(artist + " " + title))
                 if (body2 != null) {
                     val arr = JSONArray(body2)
                     for (i in 0 until arr.length()) {
                         val r = fromObj(arr.getJSONObject(i))
-                        if (r.isNotEmpty()) {
+                        if (r.isNotEmpty() && (result.isEmpty() || r[0].ms >= 0)) {
                             result = r
-                            break
+                            if (r[0].ms >= 0) break
                         }
                     }
                 }

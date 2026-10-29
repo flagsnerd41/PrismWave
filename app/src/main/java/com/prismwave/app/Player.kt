@@ -441,7 +441,10 @@ fun FullPlayer(s: AppState) {
     var menuDialog by remember { mutableStateOf(false) }
     var queueDialog by remember { mutableStateOf(false) }
     BackHandler { s.showPlayer = false }
-    LaunchedEffect(song.id) { VideoSync.check(song) }
+    LaunchedEffect(song.id) {
+        delay(700)
+        VideoSync.check(song)
+    }
     val dragY = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val lyShift by animateFloatAsState(
