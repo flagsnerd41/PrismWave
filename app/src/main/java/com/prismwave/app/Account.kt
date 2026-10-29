@@ -49,6 +49,8 @@ import org.json.JSONObject
 
 class RemotePlaylist(val browseId: String, val name: String)
 
+class YtShelf(val title: String, val songs: List<Song>)
+
 object YtAccount {
     const val UA =
         "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
@@ -214,6 +216,68 @@ object YtAccount {
             }
         }
         return token
+    }
+
+    private fun cleanArtist(raw: String): String {
+        val parts = raw.split(" \u2022 ").map { it.trim() }.filter {
+            it.isNotEmpty() && it != "Song" && it != "Video" && it != "Single" && it != "Album" && it != "EP" &&
+                !it.endsWith(" plays") && !it.endsWith(" views")
+        }
+        return parts.firstOrNull() ?: "Unknown"
+    }
+
+    private fun parseTwoRowSong(r: JSONObject): Song? {
+        val vid = r.optJSONObject("navigationEndpoint")?.optJSONObject("watchEndpoint")?.optString("videoId").orEmpty()
+        if (vid.isEmpty()) return null
+        val title = firstRunText(r.optJSONObject("title"))
+        if (title.isEmpty()) return null
+        val thumb = lastThumb(
+            r.optJSONObject("thumbnailRenderer")?.optJSONObject("musicThumbnailRenderer")
+                ?.optJSONObject("thumbnail")?.optJSONArray("thumbnails")
+        )
+        val url = "https://www.youtube.com/watch?v=" + vid
+        return Song(url, title, cleanArtist(runsText(r.optJSONObject("subtitle"))), 0, url, thumb)
+    }
+
+    private fun collectShelves(json: JSONObject, out: MutableList<YtShelf>) {
+        walk(json) { key, v ->
+            if (key == "musicCarouselShelfRenderer") {
+                val title = firstRunText(
+                    v.optJSONObject("header")?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
+                        ?.optJSONObject("title")
+                )
+                val items = v.optJSONArray("contents")
+                if (title.isNotEmpty() && items != null) {
+                    val songs = ArrayList<Song>()
+                    for (i in 0 until items.length()) {
+                        val c = items.optJSONObject(i) ?: continue
+                        val row = c.optJSONObject("musicResponsiveListItemRenderer")
+                        if (row != null) {
+                            parseSong(row)?.let { songs.add(it.copy(artist = cleanArtist(it.artist))) }
+                        }
+                        val two = c.optJSONObject("musicTwoRowItemRenderer")
+                        if (two != null) parseTwoRowSong(two)?.let { songs.add(it) }
+                    }
+                    val uniq = songs.distinctBy { it.id }
+                    if (uniq.size >= 3) out.add(YtShelf(title, uniq))
+                }
+            }
+        }
+    }
+
+    /** The real YouTube Music Home of the signed-in account (Quick picks, Listen again, ...). */
+    suspend fun home(cookie: String): List<YtShelf> = withContext(Dispatchers.IO) {
+        val out = ArrayList<YtShelf>()
+        var json = browse(cookie, "FEmusic_home", null)
+        collectShelves(json, out)
+        var pages = 0
+        while (pages < 3) {
+            val token = findContinuation(json) ?: break
+            json = browse(cookie, null, token)
+            collectShelves(json, out)
+            pages++
+        }
+        out.distinctBy { it.title }
     }
 
     suspend fun profilePhoto(cookie: String): String? = withContext(Dispatchers.IO) {

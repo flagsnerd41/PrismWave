@@ -989,7 +989,7 @@ private fun PfAboutPage(s: AppState) {
     val a = s.accent
     PfLabel("PrismWave", a)
     PfGroup {
-        PfInfo(Icons.Rounded.Info, "Version", "v26.1", a)
+        PfInfo(Icons.Rounded.Info, "Version", "v27", a)
         PfNote("Private build, made from scratch")
     }
 }
@@ -997,6 +997,10 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("v27", a, listOf(
+        "Home recommendations come from your own YouTube Music Home: Quick picks, Listen again and more",
+        "Not signed in: Picked for you, based on the songs you play most"
+    ))
     PfChange("v26.1", a, listOf(
         "Lyrics: current line grows, others shrink, blur and fade, smooth glide",
         "Lyrics: finds a synced version when the first one is plain text",

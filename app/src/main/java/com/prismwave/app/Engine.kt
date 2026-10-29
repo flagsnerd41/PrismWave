@@ -129,8 +129,7 @@ object Engine {
     }
 
     suspend fun related(url: String): List<Song> = withContext(Dispatchers.IO) {
-        init()
-        org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(ServiceList.YouTube, url)
+        infoFor(url)
             .relatedItems.filterIsInstance<StreamInfoItem>().filter { it.duration > 0 }.map { it.toSong() }
     }
 

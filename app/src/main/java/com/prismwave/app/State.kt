@@ -120,6 +120,9 @@ class AppState(private val ctx: Context) {
     val liked = mutableStateListOf<Song>()
     val history = mutableStateListOf<Song>()
     val feeds = mutableStateMapOf<String, List<Song>>()
+    val ytHome = mutableStateListOf<YtShelf>()
+    private var ytHomeLoaded = false
+    private var picksLoaded = false
     var queue: List<Song> = emptyList()
     val playlists = mutableStateListOf<Playlist>()
     var libraryOpen by mutableStateOf<String?>(null)
@@ -470,6 +473,40 @@ class AppState(private val ctx: Context) {
 
     fun topPlayed(): List<Song> =
         counts.entries.sortedByDescending { it.value }.take(50).mapNotNull { known[it.key] }
+
+    // the real YouTube Music Home of the signed-in account
+    fun loadYtHome() {
+        if (!signedIn || ytHomeLoaded) return
+        ytHomeLoaded = true
+        scope.launch {
+            try {
+                val shelves = YtAccount.home(cookie)
+                ytHome.clear()
+                ytHome.addAll(shelves)
+            } catch (e: Exception) {
+                ytHomeLoaded = false
+            }
+        }
+    }
+
+    // picks based on the songs you play most (used when you are not signed in)
+    fun loadPicks() {
+        if (picksLoaded || Opts.offline) return
+        val seeds = (topPlayed().take(3) + history.take(3)).distinctBy { it.id }.take(4)
+        if (seeds.isEmpty()) return
+        picksLoaded = true
+        scope.launch {
+            try {
+                val all = ArrayList<Song>()
+                for (sd in seeds) all.addAll(Engine.related(sd.url).take(12))
+                val seen = HashSet<String>()
+                val mixed = all.filter { it.id !in counts && seen.add(it.id) }.shuffled().take(20)
+                if (mixed.size >= 4) feeds["picks"] = mixed
+            } catch (e: Exception) {
+                picksLoaded = false
+            }
+        }
+    }
 
     fun loadFeed(key: String, query: String) {
         if (feeds.containsKey(key) || !loadingFeeds.add(key)) return

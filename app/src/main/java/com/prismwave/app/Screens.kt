@@ -1896,7 +1896,16 @@ fun HomeScreen(s: AppState) {
     val forgotten = s.liked.filter { it.id !in recentIds }
     val speedDial = s.topPlayed()
     val ytPlaylists = s.playlists.filter { it.id.startsWith("yt_") }
-    val hero = quick?.firstOrNull() ?: speedDial.firstOrNull() ?: history.firstOrNull()
+    LaunchedEffect(s.signedIn, Opts.offline, history.size > 0) {
+        if (!Opts.offline) {
+            s.loadYtHome()
+            if (!s.signedIn) s.loadPicks()
+        }
+    }
+    val ytQuick = s.ytHome.firstOrNull { it.title.contains("Quick picks", true) }?.songs
+    val picks = if (s.signedIn) null else s.feeds["picks"]
+    val bestQuick = ytQuick ?: picks ?: quick
+    val hero = bestQuick?.firstOrNull() ?: speedDial.firstOrNull() ?: history.firstOrNull()
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -1939,7 +1948,7 @@ fun HomeScreen(s: AppState) {
             }
             if (hero != null) {
                 item { Spacer(Modifier.height(16.dp)) }
-                item { FeaturedHero(hero, quick ?: listOf(hero), s) }
+                item { FeaturedHero(hero, bestQuick ?: listOf(hero), s) }
             }
             if (history.isNotEmpty() && Opts.showKeep) {
                 item {
@@ -1961,9 +1970,14 @@ fun HomeScreen(s: AppState) {
                 }
                 item { HomeShelf(speedDial, s) }
             }
-            item { HomeSection("Quick picks") }
+            item { HomeSection(if (ytQuick == null && picks != null) "Picked for you" else "Quick picks") }
             item {
-                if (quick == null) LoadingRow(s) else QuickPicksGrid(quick, s)
+                if (bestQuick == null) LoadingRow(s) else QuickPicksGrid(bestQuick, s)
+            }
+            // the other shelves of your YouTube Music Home (Listen again, and so on)
+            s.ytHome.filter { !it.title.contains("Quick picks", true) }.take(6).forEach { sh ->
+                item { HomeSection(sh.title) }
+                item { HomeShelf(sh.songs, s) }
             }
             if (ytPlaylists.isNotEmpty()) {
                 item { HomeSection("Your playlists") }
