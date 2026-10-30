@@ -254,37 +254,47 @@ object DiscordRpc {
         ws?.send(JSONObject().put("op", 3).put("d", d).toString())
     }
 
+    private const val DEFAULT_APP_ID = "1565273917797564516"
+    private const val LOGO_URL = "https://raw.githubusercontent.com/flagsnerd41/PrismWave/main/discord_icon.png"
+
+    private fun effectiveId(): String = appId.trim().ifEmpty { DEFAULT_APP_ID }
+
     private fun buildActivity(sg: Song): JSONObject {
         val start = System.currentTimeMillis() - (lastPos * 1000).toLong()
         val a = JSONObject()
             .put("name", "PrismWave").put("type", 2)
             .put("details", sg.title).put("state", sg.artist)
+            .put("application_id", effectiveId())
         val ts = JSONObject().put("start", start)
         if (sg.seconds > 1) ts.put("end", start + sg.seconds * 1000L)
         a.put("timestamps", ts)
-        if (appId.isNotBlank()) {
-            a.put("application_id", appId.trim())
-            val img = resolveImage(sg)
-            if (img != null) a.put("assets", JSONObject().put("large_image", img).put("large_text", sg.title))
+        val assets = JSONObject()
+        val cover = sg.thumb?.let { resolveImage(artUrl(it, 512)) }
+        val logo = resolveImage(LOGO_URL)
+        if (cover != null) {
+            assets.put("large_image", cover).put("large_text", sg.title)
+            if (logo != null) assets.put("small_image", logo).put("small_text", "PrismWave")
+        } else if (logo != null) {
+            assets.put("large_image", logo).put("large_text", "PrismWave")
         }
+        if (assets.length() > 0) a.put("assets", assets)
         return a
     }
 
-    // Cover art needs your own Discord application id (free, discord.com/developers)
-    private fun resolveImage(sg: Song): String? {
-        val thumb = sg.thumb ?: return null
-        val url = artUrl(thumb, 512)
+    // Discord fetches the picture itself and gives back a short key we can use in the status
+    private fun resolveImage(url: String): String? {
         assetCache[url]?.let { return it }
         return try {
             val body = JSONObject().put("urls", JSONArray().put(url)).toString()
                 .toRequestBody("application/json".toMediaType())
             val req = Request.Builder()
-                .url("https://discord.com/api/v9/applications/" + appId.trim() + "/external-assets")
+                .url("https://discord.com/api/v9/applications/" + effectiveId() + "/external-assets")
                 .header("Authorization", token)
                 .post(body)
                 .build()
             client.newCall(req).execute().use { r ->
                 if (!r.isSuccessful) {
+                    status = "Picture failed (error " + r.code + ")"
                     null
                 } else {
                     val arr = JSONArray(r.body?.string() ?: "[]")

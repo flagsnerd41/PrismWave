@@ -114,6 +114,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -167,52 +168,70 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun NavBar(s: AppState) {
-    val items = listOf(
-        Triple(Screen.Home, Icons.Rounded.Explore, "Home"),
-        Triple(Screen.Search, Icons.Rounded.Search, "Search"),
-        Triple(Screen.Library, Icons.Rounded.GridView, "Library")
+    val tabs = listOf(
+        Triple(Screen.Home, Icons.Rounded.Home, "Home"),
+        Triple(Screen.Library, Icons.Rounded.LibraryMusic, "Library")
     )
-    LiquidGlass(s.glassAlpha(), Modifier.fillMaxWidth().height(78.dp), 30.dp) {
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEach { (screen, icon, label) ->
-                val sel = s.screen == screen
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .softClick {
-                            s.screen = screen
-                            s.libraryOpen = null
-                            s.openPlaylist = null
-                        },
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    val pillW by animateDpAsState(
-                        if (sel) 68.dp else 34.dp,
-                        spring(dampingRatio = 0.55f, stiffness = 380f),
-                        label = "pillw"
+    val searchSel = s.screen == Screen.Search
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LiquidGlass(s.glassAlpha(), Modifier.weight(1f).height(72.dp), 36.dp) {
+            Row(
+                Modifier.fillMaxSize().padding(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                tabs.forEach { (screen, icon, label) ->
+                    val sel = s.screen == screen
+                    val bg by animateColorAsState(
+                        if (sel) s.accent.copy(alpha = 0.24f) else Color.Transparent, tween(250), label = "navbg"
                     )
-                    val pillC by animateColorAsState(
-                        if (sel) s.accent.copy(alpha = 0.28f) else Color.Transparent,
-                        tween(250),
-                        label = "pillc"
+                    val fg by animateColorAsState(
+                        if (sel) s.accent else Color.White.copy(alpha = 0.85f), tween(250), label = "navfg"
                     )
-                    val iconC by animateColorAsState(if (sel) s.accent else TextDim, tween(250), label = "iconc")
-                    Box(
+                    Column(
                         Modifier
-                            .width(pillW)
-                            .height(34.dp)
-                            .clip(RoundedCornerShape(17.dp))
-                            .background(pillC),
-                        contentAlignment = Alignment.Center
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(31.dp))
+                            .background(bg)
+                            .softClick {
+                                s.screen = screen
+                                s.libraryOpen = null
+                                s.openPlaylist = null
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(icon, contentDescription = null, tint = iconC)
+                        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(28.dp))
+                        Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
-                    Text(label, color = iconC, fontSize = 12.sp)
                 }
+            }
+        }
+        LiquidGlass(s.glassAlpha(), Modifier.size(72.dp), 36.dp) {
+            val sbg by animateColorAsState(
+                if (searchSel) s.accent.copy(alpha = 0.24f) else Color.Transparent, tween(250), label = "snavbg"
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(sbg)
+                    .softClick {
+                        s.screen = Screen.Search
+                        s.libraryOpen = null
+                        s.openPlaylist = null
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = if (searchSel) s.accent else Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
             }
         }
     }
@@ -270,44 +289,65 @@ fun MiniPlayer(s: AppState) {
                 },
             32.dp
         ) {
-            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
-                    val ring = s.accent
-                    val total = song.seconds.coerceAtLeast(1)
-                    Canvas(Modifier.fillMaxSize()) {
-                        val progress = (s.position / total).coerceIn(0f, 1f)
-                        drawArc(
-                            color = ring,
-                            startAngle = -90f,
-                            sweepAngle = 360f * progress,
-                            useCenter = false,
-                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+            Box(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Cover(song, Modifier.size(50.dp), 12.dp, 20.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            song.title,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            if (s.status.isNotEmpty()) s.status else song.artist,
+                            color = TextDim,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Cover(song, Modifier.size(46.dp).clip(CircleShape), 23.dp)
+                    Box(Modifier.bounceClick { s.toggle() }.size(48.dp), contentAlignment = Alignment.Center) {
+                        if (s.loading) {
+                            CircularProgressIndicator(color = Color.White, strokeWidth = 2.5.dp, modifier = Modifier.size(24.dp))
+                        } else {
+                            AnimatedContent(
+                                targetState = s.playing,
+                                transitionSpec = {
+                                    (fadeIn(tween(160)) + scaleIn(initialScale = 0.5f)) togetherWith
+                                        (fadeOut(tween(100)) + scaleOut(targetScale = 0.5f))
+                                },
+                                label = "miniplay"
+                            ) { p ->
+                                Icon(
+                                    if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                    }
+                    Box(Modifier.bounceClick { s.next() }.size(48.dp), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.FastForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
                 }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        song.title,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        if (s.status.isNotEmpty()) s.status else song.artist,
-                        color = TextDim,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                RoundBtn(Icons.Rounded.SkipPrevious, 0.9f, { s.prev() }, 42.dp)
-                Spacer(Modifier.width(6.dp))
-                PlayButton(s, 52.dp, 30.dp)
-                Spacer(Modifier.width(6.dp))
-                RoundBtn(Icons.Rounded.SkipNext, 0.9f, { s.next() }, 42.dp)
+                val frac = (s.position / song.seconds.coerceAtLeast(1)).coerceIn(0f, 1f)
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 22.dp, bottom = 3.dp)
+                        .fillMaxWidth(frac)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(s.accent.copy(alpha = 0.9f))
+                )
             }
         }
     }

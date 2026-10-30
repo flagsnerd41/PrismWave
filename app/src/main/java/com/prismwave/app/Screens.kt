@@ -2022,12 +2022,25 @@ private fun ProfileAvatar(s: AppState) {
         val req = remember(url) { ImageRequest.Builder(ctx).data(artUrl(url, 200)).crossfade(300).build() }
         AsyncImage(
             model = req,
-            contentDescription = null,
+            contentDescription = "Settings",
             contentScale = ContentScale.Crop,
             modifier = Modifier
+                .bounceClick { s.screen = Screen.Settings }
                 .size(56.dp)
                 .clip(CircleShape)
                 .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
         )
+    } else {
+        Box(
+            Modifier
+                .bounceClick { s.screen = Screen.Settings }
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.12f))
+                .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Rounded.AccountCircle, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(34.dp))
+        }
     }
 }
