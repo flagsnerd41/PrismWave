@@ -91,7 +91,7 @@ private class StarSpark(
 @Composable
 fun StarStruckHost(s: AppState) {
     if (s.screen == Screen.Home && StudioPrefs.starOn && !s.batterySaver && !s.reduceMotion && !s.showPlayer) {
-        StarStruckOverlay(Modifier.fillMaxSize())
+        StarStruckOverlay2(Modifier.fillMaxSize())
     }
 }
 

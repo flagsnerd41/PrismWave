@@ -194,13 +194,13 @@ fun SkyGlow(s: AppState, modifier: Modifier = Modifier) {
             val w = size.width
             val hh = size.height
             val ang = p * 2f * PI.toFloat()
-            val c = Offset(w * 0.22f + sin(ang) * w * 0.02f, hh * sky.orbY + cos(ang) * hh * 0.008f)
+            val c = Offset(w * 0.08f + sin(ang) * w * 0.015f, hh * sky.orbY * 0.45f + cos(ang) * hh * 0.006f)
             val night = sky.night
             val sunV = (1f - night).coerceIn(0f, 1f)
             val outer = lerp(sky.outer, tint, 0.30f)
             // wide soft color, then the closer halo
-            drawRect(Brush.radialGradient(listOf(outer.copy(alpha = 0.60f), Color.Transparent), center = c, radius = w * 1.2f))
-            drawRect(Brush.radialGradient(listOf(sky.halo.copy(alpha = 0.70f), Color.Transparent), center = c, radius = w * 0.8f))
+            drawRect(Brush.radialGradient(listOf(outer.copy(alpha = 0.42f), Color.Transparent), center = c, radius = w * 1.1f))
+            drawRect(Brush.radialGradient(listOf(sky.halo.copy(alpha = 0.50f), Color.Transparent), center = c, radius = w * 0.7f))
             if (sunV > 0.03f) {
                 val pulse = 1f + 0.04f * sin(ang * 2f)
                 drawRect(
@@ -211,7 +211,7 @@ fun SkyGlow(s: AppState, modifier: Modifier = Modifier) {
                             sky.core.copy(alpha = 0f)
                         ),
                         center = c,
-                        radius = w * 0.27f * pulse
+                        radius = w * 0.22f * pulse
                     )
                 )
                 for (i in 0 until 12) {
@@ -227,7 +227,7 @@ fun SkyGlow(s: AppState, modifier: Modifier = Modifier) {
             }
             if (night > 0.03f) {
                 drawRect(Brush.radialGradient(listOf(sky.core.copy(alpha = 0.45f * night), Color.Transparent), center = c, radius = w * 0.34f))
-                drawCircle(sky.core.copy(alpha = 0.95f * night), radius = w * 0.075f, center = c)
+                drawCircle(sky.core.copy(alpha = 0.9f * night), radius = w * 0.06f, center = c)
                 drawCircle(Color(0x1A000000), radius = w * 0.018f, center = Offset(c.x - w * 0.02f, c.y - w * 0.015f))
                 drawCircle(Color(0x16000000), radius = w * 0.012f, center = Offset(c.x + w * 0.025f, c.y + w * 0.02f))
                 drawCircle(Color(0x14000000), radius = w * 0.009f, center = Offset(c.x + w * 0.02f, c.y - w * 0.03f))
