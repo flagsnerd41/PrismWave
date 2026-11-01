@@ -253,7 +253,6 @@ fun Main(s: AppState) {
                     }
                 }
             }
-            StarStruckHost(s)
             AnimatedVisibility(
                 visible = true,
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -268,7 +267,7 @@ fun Main(s: AppState) {
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                NavCat(s)
+                NavCatScene(s)
                 MiniPlayer(s)
                 NavBar(s)
             }
@@ -285,7 +284,6 @@ fun Main(s: AppState) {
                 exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))
             ) { FullPlayer(s) }
             PagesHost(s)
-            StudioHost(s)
             ScrobbleWatcher(s)
             if (s.showLogin) LoginScreen(s)
         }

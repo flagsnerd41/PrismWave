@@ -710,6 +710,32 @@ private fun PfAppearancePage(s: AppState) {
             Opts.blurDark, 0f..0.9f, a, { Opts.blurDark = it }, { Opts.save() }
         )
     }
+    PfLabel("Extras", a)
+    PfGroup {
+        PfSwitch(Icons.Rounded.AutoAwesome, "Cat on the mini player", "A smart cat with a tree and a food bowl", LookPrefs.catOn, a) {
+            LookPrefs.catOn = it
+            LookPrefs.save()
+        }
+        PfSwitch(Icons.Rounded.Palette, "Sky glow on Home", "Sun, sunset or moon that follows the time of day", LookPrefs.skyOn, a) {
+            LookPrefs.skyOn = it
+            LookPrefs.save()
+        }
+        PfChoice(
+            Icons.Rounded.Palette, "Try the sky", listOf("Auto", "Morning", "Afternoon", "Evening", "Night"),
+            when (LookPrefs.previewHour) {
+                null -> 0
+                8f -> 1
+                13f -> 2
+                18.5f -> 3
+                else -> 4
+            },
+            a, "Preview the glow for each time of day"
+        ) { LookPrefs.previewHour = listOf<Float?>(null, 8f, 13f, 18.5f, 23f)[it] }
+        PfSwitch(Icons.Rounded.AutoAwesome, "String lights", "Glowing lights around the logo on the welcome screen", StudioPrefs.lightsOn, a) {
+            StudioPrefs.lightsOn = it
+            StudioPrefs.save()
+        }
+    }
     PfLabel("Performance", a)
     PfGroup {
         PfSwitch(Icons.Rounded.Speed, "Reduce motion", "Fewer and shorter animations", s.reduceMotion, a) {
@@ -756,6 +782,15 @@ private fun PfPlayerPage(s: AppState) {
             if (Opts.crossfade == 0) "Off" else Opts.crossfade.toString() + " s",
             Opts.crossfade.toFloat(), 0f..12f, a,
             { Opts.crossfade = it.toInt() }, { Opts.save() }
+        )
+        PfSwitch(Icons.Rounded.Speed, "Muffle between songs", "The end gets muffled and quiet, the next song fades in clear", StudioPrefs.mixOn, a) {
+            StudioPrefs.mixOn = it
+            StudioPrefs.save()
+        }
+        PfSlider(
+            Icons.Rounded.Sync, "Muffle length", StudioPrefs.mixSecs.toString() + " s",
+            StudioPrefs.mixSecs.toFloat(), 5f..15f, a,
+            { StudioPrefs.mixSecs = it.toInt() }, { StudioPrefs.save() }
         )
     }
     PfLabel("Video (experiment)", a)
