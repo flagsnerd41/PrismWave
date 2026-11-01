@@ -526,6 +526,7 @@ class AppState(private val ctx: Context) {
             planned.clear()
             radio = false
         }
+        MuffleMix.clear()
         fading = false
         queuedId = null
         pausedByUnplug = false
@@ -818,7 +819,12 @@ class AppState(private val ctx: Context) {
         history.add(0, sg)
         while (history.size > 30) history.removeAt(history.size - 1)
         saveAll()
-        if (Opts.crossfade > 0) {
+        if (MuffleMix.outgoing) {
+            MuffleMix.outgoing = false
+            val ms = StudioPrefs.mixSecs * 1000L
+            MuffleMix.ramp(StudioPrefs.mixStrength, 0f, ms)
+            fade(0.3f, 1f, ms)
+        } else if (Opts.crossfade > 0) {
             fade(0f, 1f, Opts.crossfade * 1000L)
         } else {
             fadeJob?.cancel()
@@ -942,6 +948,21 @@ class AppState(private val ctx: Context) {
             val dur = c.duration
             if (dur > 0) fixDuration((dur / 1000).toInt())
             if (!fading && fadeJob?.isActive != true && c.volume < 0.99f) c.volume = 1f
+            if (StudioPrefs.mixOn && dur > 0 && !repeat) {
+                val leftM = dur / 1000f - position
+                val nM = StudioPrefs.mixSecs.toFloat()
+                if (!fading && dur / 1000f > nM * 3 && leftM >= 0.5f && leftM <= nM) {
+                    fading = true
+                    MuffleMix.outgoing = true
+                    MuffleMix.ramp(0f, StudioPrefs.mixStrength, (leftM * 1000).toLong() - 150)
+                    fade(c.volume, 0.3f, (leftM * 1000).toLong() - 150)
+                } else if (MuffleMix.outgoing && leftM > nM + 1f) {
+                    MuffleMix.clear()
+                    fading = false
+                    fadeJob?.cancel()
+                    c.volume = 1f
+                }
+            }
             if (Opts.crossfade > 0 && dur > 0 && !fading && !repeat) {
                 val left = dur / 1000f - position
                 val cf = Opts.crossfade.toFloat()

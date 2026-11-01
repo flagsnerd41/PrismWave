@@ -488,6 +488,19 @@ fun StudioPage(s: AppState, onClose: () -> Unit) {
             }
         }
 
+        StudioSection("MUFFLE TRANSITION")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Muffle between songs", color = Color.White, fontSize = 15.sp)
+                Text("The end gets muffled and quiet, the next song fades in clear", color = TextDim, fontSize = 12.sp)
+            }
+            Switch(checked = StudioPrefs.mixOn, onCheckedChange = { StudioPrefs.mixOn = it; StudioPrefs.save() })
+        }
+        StudioSlider("Length", StudioPrefs.mixSecs.toFloat(), 5f..15f, acc, StudioPrefs.mixSecs.toString() + "s",
+            { StudioPrefs.mixSecs = it.toInt() }, { StudioPrefs.save() })
+        StudioSlider("Muffle strength", StudioPrefs.mixStrength, 0.3f..1f, acc, (StudioPrefs.mixStrength * 100).toInt().toString() + "%",
+            { StudioPrefs.mixStrength = it }, { StudioPrefs.save() })
+
         StudioSection("LOOKS")
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

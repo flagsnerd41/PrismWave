@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -70,6 +72,9 @@ object StudioPrefs {
     var apiKey by mutableStateOf("")
     var model by mutableStateOf("claude-haiku-5-5")
     var presets by mutableStateOf<List<FxSettings>>(emptyList())
+    var mixOn by mutableStateOf(false)
+    var mixSecs by mutableStateOf(10)
+    var mixStrength by mutableStateOf(0.9f)
     var lastStar = 0L
 
     fun init(ctx: Context) {
@@ -78,6 +83,9 @@ object StudioPrefs {
         p = sp
         starOn = sp.getBoolean("starOn", true)
         lightsOn = sp.getBoolean("lightsOn", true)
+        mixOn = sp.getBoolean("mixOn", false)
+        mixSecs = sp.getInt("mixSecs", 10).coerceIn(5, 15)
+        mixStrength = sp.getFloat("mixStrength", 0.9f).coerceIn(0.3f, 1f)
         apiKey = sp.getString("apiKey", "") ?: ""
         model = sp.getString("model", "claude-haiku-5-5") ?: "claude-haiku-5-5"
         try {
@@ -92,6 +100,9 @@ object StudioPrefs {
         p?.edit()
             ?.putBoolean("starOn", starOn)
             ?.putBoolean("lightsOn", lightsOn)
+            ?.putBoolean("mixOn", mixOn)
+            ?.putInt("mixSecs", mixSecs)
+            ?.putFloat("mixStrength", mixStrength)
             ?.putString("apiKey", apiKey.trim())
             ?.putString("model", model.trim().ifEmpty { "claude-haiku-5-5" })
             ?.apply()
@@ -126,6 +137,8 @@ object SoundFx {
     var ocean by mutableStateOf(0f)
     var wind by mutableStateOf(0f)
     var lastName by mutableStateOf("")
+    // used by the muffle transition between songs, not shown in the sliders
+    var autoMuffle = 0f
     private var muffleOn = false
     private var bassOn = false
 
@@ -169,11 +182,12 @@ object SoundFx {
                 val lo = rng[0].toInt()
                 val hi = rng[1].toInt()
                 val saved = Opts.eqLevels.split(",").mapNotNull { it.toIntOrNull() }
-                if (muffle > 0.01f) {
+                val mf = maxOf(muffle, autoMuffle)
+                if (mf > 0.01f) {
                     for (b in 0 until n) {
                         val f = if (n > 1) b / (n - 1f) else 0f
                         val base = if (b < saved.size) saved[b] else 0
-                        val cut = (muffle * (0.15f + 0.95f * f * f)).coerceIn(0f, 1f)
+                        val cut = (mf * (0.15f + 0.95f * f * f)).coerceIn(0f, 1f)
                         val lv = (base + (lo - base) * cut).toInt().coerceIn(lo, hi)
                         try { e.setBandLevel(b.toShort(), lv.toShort()) } catch (ex: Exception) { }
                     }
@@ -213,6 +227,45 @@ object SoundFx {
                 }
             }
         } catch (ex: Exception) { }
+    }
+}
+
+// ---------------------------------------------------------------- muffle transition between songs
+
+object MuffleMix {
+    private val handler = Handler(Looper.getMainLooper())
+    private var job: Runnable? = null
+    var outgoing = false
+
+    private fun cancel() {
+        job?.let { handler.removeCallbacks(it) }
+        job = null
+    }
+
+    // moves the muffle smoothly from a to b over ms milliseconds
+    fun ramp(a: Float, b: Float, ms: Long) {
+        cancel()
+        val steps = 20
+        var k = 0
+        val r = object : Runnable {
+            override fun run() {
+                k++
+                SoundFx.autoMuffle = a + (b - a) * k / steps
+                SoundFx.reapply()
+                if (k < steps) handler.postDelayed(this, (ms / steps).coerceAtLeast(20L)) else job = null
+            }
+        }
+        job = r
+        handler.post(r)
+    }
+
+    fun clear() {
+        cancel()
+        outgoing = false
+        if (SoundFx.autoMuffle != 0f) {
+            SoundFx.autoMuffle = 0f
+            SoundFx.reapply()
+        }
     }
 }
 
