@@ -517,6 +517,30 @@ fun StudioPage(s: AppState, onClose: () -> Unit) {
             }
             Switch(checked = StudioPrefs.lightsOn, onCheckedChange = { StudioPrefs.lightsOn = it; StudioPrefs.save() })
         }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Cat on the bottom bar", color = Color.White, fontSize = 15.sp)
+                Text("A cat that cleans itself above the bar", color = TextDim, fontSize = 12.sp)
+            }
+            Switch(checked = LookPrefs.catOn, onCheckedChange = { LookPrefs.catOn = it; LookPrefs.save() })
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Sky glow on Home", color = Color.White, fontSize = 15.sp)
+                Text("Sun, sunset or moon that follows the time of day", color = TextDim, fontSize = 12.sp)
+            }
+            Switch(checked = LookPrefs.skyOn, onCheckedChange = { LookPrefs.skyOn = it; LookPrefs.save() })
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Try the sky", color = TextDim, fontSize = 12.sp)
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState())) {
+            listOf("Auto" to null, "Morning" to 8f, "Afternoon" to 13f, "Evening" to 18.5f, "Night" to 23f).forEach { (n, hr) ->
+                StudioChip(n, LookPrefs.previewHour == hr, acc) { LookPrefs.previewHour = hr }
+            }
+        }
         Spacer(Modifier.height(14.dp))
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             StringLightsFrame(96.dp) { AppLogo(80.dp) }

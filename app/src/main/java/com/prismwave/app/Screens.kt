@@ -1739,22 +1739,25 @@ private fun greetingText(): String {
 
 @Composable
 private fun HomeHeader2(s: AppState) {
-    val day = hourNow() in 5..17
+    val name = ProfilePic.name
     Row(
         Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 14.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Home", color = Color.White, fontFamily = PrismFont, fontSize = 40.sp, fontWeight = FontWeight.Bold)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(greetingText(), color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp)
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    if (day) Icons.Rounded.WbSunny else Icons.Rounded.NightsStay,
-                    contentDescription = null,
-                    tint = s.accent,
-                    modifier = Modifier.size(20.dp)
+            if (s.signedIn && !name.isNullOrBlank()) {
+                Text(skyGreeting(), color = Color.White.copy(alpha = 0.75f), fontSize = 18.sp)
+                Text(
+                    name,
+                    color = Color.White,
+                    fontFamily = PrismFont,
+                    fontSize = 36.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
+            } else {
+                Text(skyGreeting(), color = Color.White, fontFamily = PrismFont, fontSize = 36.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             }
         }
         ProfileAvatar(s)
@@ -1907,19 +1910,7 @@ fun HomeScreen(s: AppState) {
     val bestQuick = ytQuick ?: picks ?: quick
     val hero = bestQuick?.firstOrNull() ?: speedDial.firstOrNull() ?: history.firstOrNull()
     Box(Modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(430.dp)
-                .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        0f to s.accent.copy(alpha = 0.30f),
-                        0.42f to s.accent.copy(alpha = 0.12f),
-                        1f to Color.Transparent
-                    )
-                )
-        )
+        HomeTopGlow(s, Modifier.align(Alignment.TopCenter))
         LazyColumn(
             contentPadding = PaddingValues(
                 top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
@@ -2005,6 +1996,7 @@ fun HomeScreen(s: AppState) {
 
 object ProfilePic {
     var url by mutableStateOf<String?>(null)
+    var name by mutableStateOf<String?>(null)
 }
 
 @Composable
@@ -2015,6 +2007,7 @@ private fun ProfileAvatar(s: AppState) {
             if (ProfilePic.url == null) ProfilePic.url = YtAccount.profilePhoto(s.cookie)
         } else {
             ProfilePic.url = null
+            ProfilePic.name = null
         }
     }
     val url = ProfilePic.url

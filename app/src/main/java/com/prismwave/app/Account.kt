@@ -307,6 +307,10 @@ object YtAccount {
             var found: String? = null
             walk(JSONObject(text)) { key, v ->
                 if (found == null && key == "accountPhoto") found = lastThumb(v.optJSONArray("thumbnails"))
+                if (key == "accountName" && ProfilePic.name == null) {
+                    val nm = firstRunText(v).trim()
+                    if (nm.isNotEmpty()) ProfilePic.name = nm
+                }
             }
             found
         } catch (e: Exception) {

@@ -268,6 +268,7 @@ fun Main(s: AppState) {
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                NavCat(s)
                 MiniPlayer(s)
                 NavBar(s)
             }
