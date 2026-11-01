@@ -2,6 +2,7 @@ package com.prismwave.app
 
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
+import android.media.audiofx.PresetReverb
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -9,13 +10,16 @@ import kotlin.math.sin
 object EqHolder {
     var eq: Equalizer? = null
     var bass: BassBoost? = null
+    var reverb: PresetReverb? = null
 
     fun attach(id: Int) {
         if (id == 0) return
         try { eq?.release() } catch (e: Exception) { }
         try { bass?.release() } catch (e: Exception) { }
+        try { reverb?.release() } catch (e: Exception) { }
         eq = try { Equalizer(0, id) } catch (e: Exception) { null }
         bass = try { BassBoost(0, id) } catch (e: Exception) { null }
+        reverb = try { PresetReverb(0, id) } catch (e: Exception) { null }
         val e = eq
         if (e != null) {
             val saved = Opts.eqLevels.split(",").mapNotNull { it.toIntOrNull() }
@@ -32,6 +36,8 @@ object EqHolder {
                 it.enabled = Opts.bassBoost > 0
             } catch (ex: Exception) { }
         }
+        // AI Sound Studio settings survive a new audio session
+        try { SoundFx.reapply() } catch (ex: Exception) { }
     }
 
     fun setEnabled(on: Boolean) {

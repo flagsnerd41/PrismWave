@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); VideoSync.init(appCtx) }
+            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(false) }
@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
                                     Modifier.graphicsLayer {
                                         translationY = (1f - logoIn.value) * 260f
                                     }
-                                ) { AppLogo(112.dp) }
+                                ) { StringLightsFrame(112.dp) { AppLogo(112.dp) } }
                                 Spacer(Modifier.height(18.dp))
                                 Text(
                                     "PrismWave",
@@ -253,6 +253,7 @@ fun Main(s: AppState) {
                     }
                 }
             }
+            StarStruckHost(s)
             AnimatedVisibility(
                 visible = true,
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -283,6 +284,7 @@ fun Main(s: AppState) {
                 exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))
             ) { FullPlayer(s) }
             PagesHost(s)
+            StudioHost(s)
             ScrobbleWatcher(s)
             if (s.showLogin) LoginScreen(s)
         }
