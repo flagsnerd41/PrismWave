@@ -284,6 +284,7 @@ fun Main(s: AppState) {
                 exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))
             ) { FullPlayer(s) }
             PagesHost(s)
+            VideoWarmup(s)
             ScrobbleWatcher(s)
             if (s.showLogin) LoginScreen(s)
         }

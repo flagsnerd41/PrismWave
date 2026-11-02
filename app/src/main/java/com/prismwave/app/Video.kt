@@ -74,12 +74,12 @@ object VideoSync {
     fun init(ctx: Context) {
         if (loaded) return
         loaded = true
-        quality = ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).getInt("videoQuality", 0)
+        quality = ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).getInt("videoQuality2", 2)
     }
 
     fun setQuality(ctx: Context, q: Int) {
         quality = q
-        ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).edit().putInt("videoQuality", q).apply()
+        ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).edit().putInt("videoQuality2", q).apply()
         has.clear()
         urls.clear()
         lows.clear()
@@ -146,11 +146,12 @@ fun ModePills() {
 @Composable
 fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Boolean = false) {
     val ctx = LocalContext.current
-    val player = remember { ExoPlayer.Builder(ctx).build().apply { volume = 0f } }
+    val player = remember { VideoWarm.take(song, low) ?: VideoWarm.newPlayer(ctx, low) }
     var vsize by remember { mutableStateOf(IntSize.Zero) }
     var ready by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     DisposableEffect(player) {
+        VideoWarm.markUsed(ctx)
         if (low) VideoSync.back = player else VideoSync.main = player
         val l = object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -171,6 +172,9 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
             }
         }
         player.addListener(l)
+        if (player.playbackState == Player.STATE_READY) ready = true
+        val vs0 = player.videoSize
+        if (vs0.width > 0) vsize = IntSize(vs0.width, vs0.height)
         onDispose {
             player.removeListener(l)
             if (VideoSync.back === player) VideoSync.back = null
@@ -186,9 +190,12 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
             failed = true
             return@LaunchedEffect
         }
-        player.setMediaItem(MediaItem.fromUri(url))
-        player.prepare()
+        if (player.currentMediaItem?.mediaId != song.id) {
+            player.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).build())
+            player.prepare()
+        }
         player.seekTo((s.position * 1000).toLong())
+        if (player.playbackState == Player.STATE_READY) ready = true
         var lastPos = -1f
         var lastAt = 0L
         var lastSeek = 0L
