@@ -46,7 +46,7 @@ class PlaybackService : MediaSessionService() {
                 EqHolder.attach(audioSessionId)
             }
         })
-        session = MediaSession.Builder(this, player).build()
+        session = MediaSession.Builder(this, PrismPlayer(player)).build()
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider(this).apply { setSmallIcon(R.drawable.ic_notif_p) }
         )
