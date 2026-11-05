@@ -11,8 +11,10 @@ android {
         applicationId = "com.prismwave.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.6.1"
+        // every GitHub build gets a higher number, so the in-app updater knows when a newer one exists
+        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        versionCode = run + 100
+        versionName = "0.7." + run
     }
 
     signingConfigs {

@@ -87,6 +87,7 @@ object VideoWarm {
 @Composable
 fun VideoWarmup(s: AppState) {
     PlayerBridgeHook(s)
+    UpdateHost(s.accent)
     val ctx = LocalContext.current
     val song = s.current
     val open = s.showPlayer

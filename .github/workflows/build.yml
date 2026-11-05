@@ -2,7 +2,13 @@ name: Build APK
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'news.json'
+      - 'notes/**'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,3 +28,11 @@ jobs:
         with:
           name: PrismWave
           path: app/build/outputs/apk/release/app-release.apk
+      - name: Publish release (the app reads this to offer updates)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: PrismWave build ${{ github.run_number }}
+          body: ${{ github.event.head_commit.message }}
+          files: app/build/outputs/apk/release/app-release.apk
+          make_latest: true
