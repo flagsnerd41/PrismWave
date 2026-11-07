@@ -576,6 +576,7 @@ class AppState(private val ctx: Context) {
                 preload()
                 queueNextItem()
                 cacheCurrent(song, url)
+                scope.launch { AutoMix.analyze(ctx, song.id) }
             } catch (e: Exception) {
                 status = "Can't play this one: " + (e.message ?: "error").take(50)
                 loading = false
@@ -705,7 +706,10 @@ class AppState(private val ctx: Context) {
                 if (DownloadStore.localUri(sg) != null || SongCache.has(ctx, sg.id)) continue
                 try {
                     val url = Engine.streamUrl(sg.url)
-                    if (SongCache.fetch(ctx, sg.id, url) && queuedId == sg.id) refreshQueued()
+                    if (SongCache.fetch(ctx, sg.id, url)) {
+                        AutoMix.analyze(ctx, sg.id)
+                        if (queuedId == sg.id) refreshQueued()
+                    }
                 } catch (e: Exception) {
                 }
             }
@@ -719,6 +723,7 @@ class AppState(private val ctx: Context) {
             delay(1500)
             try {
                 SongCache.fetch(ctx, song.id, url)
+                AutoMix.analyze(ctx, song.id)
             } catch (e: Exception) {
             }
         }
@@ -803,6 +808,7 @@ class AppState(private val ctx: Context) {
     }
 
     private fun onAutoAdvance(sg: Song) {
+        val prevLead = if (AutoMix.on && fading) AutoMix.leadFor(current?.id ?: "") else null
         planned.removeAll { it.id == sg.id }
         fading = false
         current = sg
@@ -821,11 +827,11 @@ class AppState(private val ctx: Context) {
         saveAll()
         if (MuffleMix.outgoing) {
             MuffleMix.outgoing = false
-            val ms = StudioPrefs.mixSecs * 1000L
+            val ms = ((prevLead ?: StudioPrefs.mixSecs.toFloat()) * 1000f).toLong()
             MuffleMix.ramp(StudioPrefs.mixStrength, 0f, ms)
             fade(0.3f, 1f, ms)
-        } else if (Opts.crossfade > 0) {
-            fade(0f, 1f, Opts.crossfade * 1000L)
+        } else if (Opts.crossfade > 0 || prevLead != null) {
+            fade(0f, 1f, ((prevLead ?: Opts.crossfade.toFloat()) * 1000f).toLong())
         } else {
             fadeJob?.cancel()
             controller?.volume = 1f
@@ -950,7 +956,7 @@ class AppState(private val ctx: Context) {
             if (!fading && fadeJob?.isActive != true && c.volume < 0.99f) c.volume = 1f
             if (StudioPrefs.mixOn && dur > 0 && !repeat) {
                 val leftM = dur / 1000f - position
-                val nM = StudioPrefs.mixSecs.toFloat()
+                val nM = (if (AutoMix.on) AutoMix.leadFor(current?.id ?: "") else null) ?: StudioPrefs.mixSecs.toFloat()
                 if (!fading && dur / 1000f > nM * 3 && leftM >= 0.5f && leftM <= nM) {
                     fading = true
                     MuffleMix.outgoing = true
@@ -963,9 +969,9 @@ class AppState(private val ctx: Context) {
                     c.volume = 1f
                 }
             }
-            if (Opts.crossfade > 0 && dur > 0 && !fading && !repeat) {
+            if ((Opts.crossfade > 0 || AutoMix.smart(current?.id)) && dur > 0 && !fading && !repeat) {
                 val left = dur / 1000f - position
-                val cf = Opts.crossfade.toFloat()
+                val cf = (if (AutoMix.on) AutoMix.leadFor(current?.id ?: "") else null) ?: Opts.crossfade.toFloat()
                 if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
                     fading = true
                     fade(c.volume, 0f, (left * 1000).toLong() - 150)

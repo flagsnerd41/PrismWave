@@ -3,9 +3,15 @@ private fun PfTransitionsPage(s: AppState) {
     val a = s.accent
     val tctx = LocalContext.current.applicationContext
     EightD.init(tctx)
+    AutoMix.init(tctx)
     TransitionPrefs.init(tctx)
     PfLabel("Between songs", a)
     PfGroup {
+        PfSwitch(
+            Icons.Rounded.AutoAwesome, "AutoMix: smart mix point",
+            "Finds where each song's outro starts and begins the transition there. Works on cached songs",
+            AutoMix.on, a
+        ) { AutoMix.turn(it) }
         PfSwitch(Icons.Rounded.PlayArrow, "Fade in and out", "Soft volume fade on play, pause and skip", Opts.fade, a) {
             Opts.fade = it
             Opts.save()

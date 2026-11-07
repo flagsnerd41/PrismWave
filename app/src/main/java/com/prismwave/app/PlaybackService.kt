@@ -23,6 +23,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         EightD.init(this)
+        AutoMix.init(this)
         // the default audio output plus the 8D processor
         val factory = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(

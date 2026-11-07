@@ -1006,6 +1006,10 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added AutoMix smart mix point", a, listOf(
+        "AutoMix listens to the end of a cached song and starts the transition where the outro begins",
+        "Uses your crossfade or blur-out style, with a smart length for every song"
+    ))
     PfChange("Added cover blur-out, cover flip and Material 3 settings", a, listOf(
         "Cover blur-out: the album cover slowly blurs as the song ends",
         "Cover flip: the cover square flips over to the next song",
@@ -1105,9 +1109,15 @@ private fun PfTransitionsPage(s: AppState) {
     val a = s.accent
     val tctx = LocalContext.current.applicationContext
     EightD.init(tctx)
+    AutoMix.init(tctx)
     TransitionPrefs.init(tctx)
     PfLabel("Between songs", a)
     PfGroup {
+        PfSwitch(
+            Icons.Rounded.AutoAwesome, "AutoMix: smart mix point",
+            "Finds where each song's outro starts and begins the transition there. Works on cached songs",
+            AutoMix.on, a
+        ) { AutoMix.turn(it) }
         PfSwitch(Icons.Rounded.PlayArrow, "Fade in and out", "Soft volume fade on play, pause and skip", Opts.fade, a) {
             Opts.fade = it
             Opts.save()
