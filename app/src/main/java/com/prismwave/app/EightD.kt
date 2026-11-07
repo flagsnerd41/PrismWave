@@ -35,13 +35,13 @@ object EightD {
         liveSpeed = speed
     }
 
-    fun setOn(v: Boolean) {
+    fun turn(v: Boolean) {
         on = v
         liveOn = v
         save()
     }
 
-    fun setSpeed(v: Float) {
+    fun changeSpeed(v: Float) {
         speed = v
         liveSpeed = v
     }

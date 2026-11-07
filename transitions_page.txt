@@ -51,13 +51,13 @@ private fun PfTransitionsPage(s: AppState) {
     PfLabel("8D audio", a)
     PfGroup {
         PfSwitch(Icons.Rounded.AutoAwesome, "8D audio", "The sound circles around your head. Best with headphones", EightD.on, a) {
-            EightD.setOn(it)
+            EightD.turn(it)
         }
         PfSlider(
             Icons.Rounded.Speed, "Circle speed",
             "One turn every " + (1f / EightD.speed).toInt().toString() + " s",
             EightD.speed, 0.04f..0.4f, a,
-            { EightD.setSpeed(it) }, { EightD.save() }
+            { EightD.changeSpeed(it) }, { EightD.save() }
         )
         PfNote("8D works on stereo songs. Higher speed means faster circles.")
     }
