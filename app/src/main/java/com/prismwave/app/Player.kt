@@ -714,7 +714,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
             if (VideoSync.showVideo(song)) {
                 VideoStage(s, song, Modifier.fillMaxSize().clip(coverShape))
             } else {
-                Cover(song, Modifier.fillMaxSize(), 20.dp, 96.sp, quality = 1000)
+                TransitionCover(s, song, Modifier.fillMaxSize(), 20.dp, 96.sp, 1000)
             }
         }
         Spacer(Modifier.height(26.dp))
@@ -801,7 +801,7 @@ private fun ImmersiveBody(
             if (VideoSync.showVideo(song)) {
                 VideoStage(s, song, Modifier.fillMaxSize())
             } else {
-                Cover(song, Modifier.fillMaxSize(), 0.dp, 160.sp, quality = 1200)
+                TransitionCover(s, song, Modifier.fillMaxSize(), 0.dp, 160.sp, 1200)
             }
             Box(
                 Modifier.fillMaxSize().background(

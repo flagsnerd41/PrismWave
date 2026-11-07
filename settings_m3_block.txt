@@ -1,0 +1,484 @@
+// M3-SETTINGS ------------------------------------------------------------ building blocks (Material 3)
+
+@Composable
+private fun PfLabel(text: String, accent: Color) {
+    Text(
+        text,
+        color = accent,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.5.sp,
+        modifier = Modifier.padding(start = 32.dp, end = 20.dp, top = 24.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun PfGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 2.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp)),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        content = content
+    )
+}
+
+@Composable
+private fun PfRow(
+    icon: ImageVector?,
+    title: String,
+    sub: String?,
+    accent: Color,
+    onClick: (() -> Unit)?,
+    trailing: @Composable () -> Unit = {},
+    below: @Composable () -> Unit = {}
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(CardBg)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Box(
+                    Modifier.size(44.dp).clip(CircleShape).background(accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
+                }
+                Spacer(Modifier.width(16.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                if (sub != null) {
+                    Text(sub, color = TextDim, fontSize = 14.sp, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+            trailing()
+        }
+        below()
+    }
+}
+
+@Composable
+private fun PfSwitch(
+    icon: ImageVector?,
+    title: String,
+    sub: String?,
+    checked: Boolean,
+    accent: Color,
+    onChange: (Boolean) -> Unit
+) {
+    PfRow(
+        icon, title, sub, accent, { onChange(!checked) },
+        trailing = {
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onChange,
+                thumbContent = {
+                    Icon(
+                        if (checked) Icons.Rounded.Check else Icons.Rounded.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Night,
+                    checkedTrackColor = accent,
+                    checkedIconColor = accent,
+                    uncheckedThumbColor = Color.White.copy(alpha = 0.85f),
+                    uncheckedTrackColor = Color.White.copy(alpha = 0.12f),
+                    uncheckedBorderColor = Color.White.copy(alpha = 0.5f),
+                    uncheckedIconColor = Night
+                )
+            )
+        }
+    )
+}
+
+@Composable
+private fun PfSlider(
+    icon: ImageVector?,
+    title: String,
+    valueText: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    accent: Color,
+    onChange: (Float) -> Unit,
+    onFinish: () -> Unit = {}
+) {
+    PfRow(
+        icon, title, valueText, accent, null,
+        below = {
+            Slider(
+                value = value.coerceIn(range.start, range.endInclusive),
+                onValueChange = onChange,
+                onValueChangeFinished = onFinish,
+                valueRange = range,
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent,
+                    inactiveTrackColor = accent.copy(alpha = 0.24f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    )
+}
+
+@Composable
+private fun PfChoice(
+    icon: ImageVector?,
+    title: String,
+    options: List<String>,
+    selected: Int,
+    accent: Color,
+    sub: String? = null,
+    onSelect: (Int) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    PfRow(
+        icon, title, sub, accent, { open = true },
+        trailing = { Icon(Icons.Rounded.ArrowForward, contentDescription = null, tint = Color.White.copy(alpha = 0.7f)) },
+        below = {
+            Spacer(Modifier.height(10.dp))
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(accent.copy(alpha = 0.16f))
+                    .padding(horizontal = 18.dp, vertical = 8.dp)
+            ) {
+                Text(options.getOrElse(selected) { "" }, color = accent, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    )
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            containerColor = CardBg2,
+            shape = RoundedCornerShape(28.dp),
+            title = { Text(title, color = Color.White) },
+            text = {
+                Column {
+                    options.forEachIndexed { i, o ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    onSelect(i)
+                                    open = false
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = i == selected,
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(selectedColor = accent)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(o, color = Color.White, fontSize = 17.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { open = false }) { Text("Close", color = accent) } }
+        )
+    }
+}
+
+@Composable
+private fun PfAction(
+    icon: ImageVector?,
+    title: String,
+    sub: String?,
+    accent: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    PfRow(
+        icon, title, sub, if (enabled) accent else TextDim,
+        if (enabled) onClick else null
+    )
+}
+
+@Composable
+private fun PfInfo(icon: ImageVector?, title: String, value: String, accent: Color) {
+    PfRow(
+        icon, title, null, accent, null,
+        trailing = { Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium) }
+    )
+}
+
+@Composable
+private fun PfNote(text: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(CardBg)
+            .padding(horizontal = 20.dp, vertical = 14.dp)
+    ) { Text(text, color = TextDim, fontSize = 14.sp) }
+}
+
+@Composable
+private fun PfField(label: String, value: String, accent: Color, password: Boolean, onChange: (String) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(CardBg)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+            label = { Text(label, color = TextDim) },
+            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = accent,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                cursorColor = accent
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun PfAccent(s: AppState) {
+    PfRow(
+        Icons.Rounded.AutoAwesome, "Accent color", "Buttons and highlights", s.accent, null,
+        below = {
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(
+                    Gold, Color(0xFF4DB6AC), Color(0xFFE57A8A), Color(0xFF8AB4F8), Color(0xFFB39DDB), Color(0xFFFFA45C)
+                ).forEach { c ->
+                    Box(
+                        Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(c)
+                            .then(if (c == s.accent) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
+                            .clickable {
+                                s.accent = c
+                                s.saveSettings()
+                            }
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun PfChange(version: String, accent: Color, lines: List<String>) {
+    PfLabel(version, accent)
+    PfGroup {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(CardBg)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            lines.forEach { Text("•  " + it, color = Color.White, fontSize = 15.sp) }
+        }
+    }
+}
+
+// ------------------------------------------------------------ main list (Material 3)
+
+private class PfItem(val key: String, val title: String, val sub: String, val icon: ImageVector)
+
+@Composable
+private fun PfMainGroup(items: List<PfItem>, accent: Color, base: Int, onOpen: (String) -> Unit) {
+    Column(
+        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        items.forEachIndexed { i, item ->
+            val big = 28.dp
+            val small = 6.dp
+            val top = if (i == 0) big else small
+            val bottom = if (i == items.lastIndex) big else small
+            Row(
+                Modifier
+                    .appear(base + i)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom))
+                    .background(CardBg)
+                    .softClick { onOpen(item.key) }
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier.size(48.dp).clip(CircleShape).background(accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(item.icon, contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(item.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    Text(item.sub, color = TextDim, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Icon(Icons.Rounded.ArrowForward, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------ the screen (Material 3 large top bar)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(s: AppState) {
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) s.exportTo(uri) }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) s.importFrom(uri) }
+    var page by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = page != null) { page = null }
+    val acc = s.accent
+    val titles = mapOf(
+        "account" to "Account",
+        "stats" to "Listening Stats",
+        "appearance" to "Appearance",
+        "player" to "Player and audio",
+        "transitions" to "Transitions",
+        "content" to "Content",
+        "behavior" to "Behavior",
+        "integration" to "Integration",
+        "storage" to "Storage",
+        "backup" to "Backup and restore",
+        "changelog" to "What's new",
+        "about" to "About"
+    )
+    AnimatedContent(
+        targetState = page,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            val forward = targetState != null
+            if (s.reduceMotion) {
+                fadeIn(tween(120)) togetherWith fadeOut(tween(80))
+            } else {
+                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> if (forward) w / 4 else -w / 4 } +
+                    fadeIn(tween(260))) togetherWith
+                    (slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> if (forward) -w / 4 else w / 4 } +
+                        fadeOut(tween(160)))
+            }
+        },
+        label = "settingsPage2"
+    ) { pg ->
+        val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+        Column(
+            Modifier
+                .fillMaxSize()
+                .nestedScroll(bar.nestedScrollConnection)
+                .padding(top = statusTop())
+        ) {
+            LargeTopAppBar(
+                title = {
+                    Text(
+                        if (pg == null) "Settings" else (titles[pg] ?: "Settings"),
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                navigationIcon = {
+                    FilledTonalIconButton(
+                        onClick = { if (pg == null) s.screen = Screen.Home else page = null },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.12f),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = null)
+                    }
+                },
+                windowInsets = WindowInsets(0.dp),
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                ),
+                scrollBehavior = bar
+            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 220.dp)
+            ) {
+                if (pg == null) {
+                    PfMainGroup(
+                        listOf(
+                            PfItem("account", "Account", "Sign in and manage account sync", Icons.Rounded.AccountCircle),
+                            PfItem("stats", "Listening Stats", "Your songs played and listening time", Icons.Rounded.BarChart)
+                        ),
+                        acc, 0
+                    ) { page = it }
+                    PfMainGroup(
+                        listOf(
+                            PfItem("appearance", "Appearance", "Themes, blur, and player styles", Icons.Rounded.Palette),
+                            PfItem("player", "Player and audio", "Fades, headphones and video", Icons.Rounded.MusicNote),
+                            PfItem("transitions", "Transitions", "Crossfade, blur-out, 8D and cover flip", Icons.Rounded.Sync),
+                            PfItem("content", "Content", "Choose what shows on Home", Icons.Rounded.Home),
+                            PfItem("behavior", "Behavior", "Haptics and tap feel", Icons.Rounded.TouchApp)
+                        ),
+                        acc, 2
+                    ) { page = it }
+                    PfMainGroup(
+                        listOf(
+                            PfItem("integration", "Integration", "Last.fm, Libre.fm, ListenBrainz and Discord", Icons.Rounded.AutoAwesome),
+                            PfItem("storage", "Storage", "Cached songs and size limit", Icons.Rounded.Download)
+                        ),
+                        acc, 7
+                    ) { page = it }
+                    PfMainGroup(
+                        listOf(
+                            PfItem("backup", "Backup and restore", "Save or bring back your library", Icons.Rounded.Folder),
+                            PfItem("changelog", "What's new", "Changes in each version", Icons.Rounded.History),
+                            PfItem("about", "About", "Version and build info", Icons.Rounded.Info)
+                        ),
+                        acc, 9
+                    ) { page = it }
+                } else {
+                    when (pg) {
+                        "account" -> PfAccountPage(s)
+                        "stats" -> PfStatsPage(s)
+                        "appearance" -> PfAppearancePage(s)
+                        "player" -> PfPlayerPage(s)
+                        "transitions" -> PfTransitionsPage(s)
+                        "content" -> PfContentPage(s)
+                        "behavior" -> PfBehaviorPage(s)
+                        "integration" -> PfIntegrationPage(s)
+                        "storage" -> PfStoragePage(s)
+                        "backup" -> PfBackupPage(
+                            s,
+                            { exportLauncher.launch("PrismWave-backup.json") },
+                            { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }
+                        )
+                        "changelog" -> PfChangelogPage(s)
+                        "about" -> PfAboutPage(s)
+                    }
+                }
+            }
+        }
+    }
+}
+

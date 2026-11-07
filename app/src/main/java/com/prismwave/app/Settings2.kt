@@ -1,6 +1,15 @@
 package com.prismwave.app
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -89,16 +98,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-// ------------------------------------------------------------ building blocks (ArchiveTune style)
+// M3-SETTINGS ------------------------------------------------------------ building blocks (Material 3)
 
 @Composable
 private fun PfLabel(text: String, accent: Color) {
     Text(
         text,
         color = accent,
-        fontSize = 17.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(start = 36.dp, end = 20.dp, top = 22.dp, bottom = 6.dp)
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.5.sp,
+        modifier = Modifier.padding(start = 32.dp, end = 20.dp, top = 24.dp, bottom = 8.dp)
     )
 }
 
@@ -106,10 +116,10 @@ private fun PfLabel(text: String, accent: Color) {
 private fun PfGroup(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
-            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 2.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp)),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         content = content
     )
 }
@@ -129,17 +139,22 @@ private fun PfRow(
             .fillMaxWidth()
             .background(CardBg)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 20.dp, vertical = 18.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
-                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(22.dp))
+                Box(
+                    Modifier.size(44.dp).clip(CircleShape).background(accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
+                }
+                Spacer(Modifier.width(16.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(title, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Medium)
+                Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
                 if (sub != null) {
-                    Text(sub, color = TextDim, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text(sub, color = TextDim, fontSize = 14.sp, modifier = Modifier.padding(top = 2.dp))
                 }
             }
             trailing()
@@ -186,82 +201,6 @@ private fun PfSwitch(
 }
 
 @Composable
-private fun PfDotSlider(
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    accent: Color,
-    onChange: (Float) -> Unit,
-    onFinish: () -> Unit
-) {
-    val span = range.endInclusive - range.start
-    val frac = ((value - range.start) / span).coerceIn(0f, 1f)
-    val change = rememberUpdatedState(onChange)
-    val finish = rememberUpdatedState(onFinish)
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(40.dp)
-            .pointerInput(range) {
-                detectTapGestures { o ->
-                    change.value(range.start + (o.x / size.width).coerceIn(0f, 1f) * span)
-                    finish.value()
-                }
-            }
-            .pointerInput(range) {
-                detectHorizontalDragGestures(
-                    onDragEnd = { finish.value() },
-                    onDragCancel = { finish.value() }
-                ) { c, _ ->
-                    c.consume()
-                    change.value(range.start + (c.position.x / size.width).coerceIn(0f, 1f) * span)
-                }
-            }
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val h = 22.dp.toPx()
-            val top = (size.height - h) / 2f
-            val gap = 6.dp.toPx()
-            val x = frac * size.width
-            val left = (x - gap).coerceAtLeast(0f)
-            val rightStart = (x + gap).coerceAtMost(size.width)
-            if (left > 0f) {
-                drawRoundRect(
-                    color = accent,
-                    topLeft = Offset(0f, top),
-                    size = Size(left, h),
-                    cornerRadius = CornerRadius(h / 2f)
-                )
-            }
-            if (rightStart < size.width) {
-                drawRoundRect(
-                    color = accent.copy(alpha = 0.28f),
-                    topLeft = Offset(rightStart, top),
-                    size = Size(size.width - rightStart, h),
-                    cornerRadius = CornerRadius(h / 2f)
-                )
-            }
-            val dotR = 2.dp.toPx()
-            val step = 14.dp.toPx()
-            var dx = h / 2f
-            while (dx < size.width - h / 2f) {
-                if (dx < left - 4.dp.toPx()) {
-                    drawCircle(Night.copy(alpha = 0.55f), dotR, Offset(dx, size.height / 2f))
-                } else if (dx > rightStart + 4.dp.toPx()) {
-                    drawCircle(accent, dotR, Offset(dx, size.height / 2f))
-                }
-                dx += step
-            }
-            drawRoundRect(
-                color = accent,
-                topLeft = Offset((x - 2.dp.toPx()).coerceAtLeast(0f), 0f),
-                size = Size(4.dp.toPx(), size.height),
-                cornerRadius = CornerRadius(2.dp.toPx())
-            )
-        }
-    }
-}
-
-@Composable
 private fun PfSlider(
     icon: ImageVector?,
     title: String,
@@ -275,8 +214,18 @@ private fun PfSlider(
     PfRow(
         icon, title, valueText, accent, null,
         below = {
-            Spacer(Modifier.height(14.dp))
-            PfDotSlider(value, range, accent, onChange, onFinish)
+            Slider(
+                value = value.coerceIn(range.start, range.endInclusive),
+                onValueChange = onChange,
+                onValueChangeFinished = onFinish,
+                valueRange = range,
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent,
+                    inactiveTrackColor = accent.copy(alpha = 0.24f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     )
 }
@@ -300,10 +249,10 @@ private fun PfChoice(
             Box(
                 Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(Color.White.copy(alpha = 0.10f))
-                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                    .background(accent.copy(alpha = 0.16f))
+                    .padding(horizontal = 18.dp, vertical = 8.dp)
             ) {
-                Text(options.getOrElse(selected) { "" }, color = accent, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                Text(options.getOrElse(selected) { "" }, color = accent, fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
         }
     )
@@ -311,6 +260,7 @@ private fun PfChoice(
         AlertDialog(
             onDismissRequest = { open = false },
             containerColor = CardBg2,
+            shape = RoundedCornerShape(28.dp),
             title = { Text(title, color = Color.White) },
             text = {
                 Column {
@@ -318,7 +268,7 @@ private fun PfChoice(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .clickable {
                                     onSelect(i)
                                     open = false
@@ -362,7 +312,7 @@ private fun PfAction(
 private fun PfInfo(icon: ImageVector?, title: String, value: String, accent: Color) {
     PfRow(
         icon, title, null, accent, null,
-        trailing = { Text(value, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Medium) }
+        trailing = { Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium) }
     )
 }
 
@@ -390,7 +340,7 @@ private fun PfField(label: String, value: String, accent: Color, password: Boole
             singleLine = true,
             label = { Text(label, color = TextDim) },
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
@@ -446,7 +396,7 @@ private fun PfChange(version: String, accent: Color, lines: List<String>) {
     }
 }
 
-// ------------------------------------------------------------ main list
+// ------------------------------------------------------------ main list (Material 3)
 
 private class PfItem(val key: String, val title: String, val sub: String, val icon: ImageVector)
 
@@ -454,7 +404,7 @@ private class PfItem(val key: String, val title: String, val sub: String, val ic
 private fun PfMainGroup(items: List<PfItem>, accent: Color, base: Int, onOpen: (String) -> Unit) {
     Column(
         Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         items.forEachIndexed { i, item ->
             val big = 28.dp
@@ -468,27 +418,29 @@ private fun PfMainGroup(items: List<PfItem>, accent: Color, base: Int, onOpen: (
                     .clip(RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom))
                     .background(CardBg)
                     .softClick { onOpen(item.key) }
-                    .padding(horizontal = 18.dp, vertical = 20.dp),
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    Modifier.size(56.dp).clip(CircleShape).background(accent),
+                    Modifier.size(48.dp).clip(CircleShape).background(accent.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(item.icon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(28.dp))
+                    Icon(item.icon, contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
                 }
-                Spacer(Modifier.width(18.dp))
+                Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(item.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                    Text(item.sub, color = TextDim, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(item.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    Text(item.sub, color = TextDim, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+                Icon(Icons.Rounded.ArrowForward, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
             }
         }
     }
 }
 
-// ------------------------------------------------------------ the screen
+// ------------------------------------------------------------ the screen (Material 3 large top bar)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(s: AppState) {
     val exportLauncher = rememberLauncherForActivityResult(
@@ -505,6 +457,7 @@ fun SettingsScreen(s: AppState) {
         "stats" to "Listening Stats",
         "appearance" to "Appearance",
         "player" to "Player and audio",
+        "transitions" to "Transitions",
         "content" to "Content",
         "behavior" to "Behavior",
         "integration" to "Integration",
@@ -529,79 +482,100 @@ fun SettingsScreen(s: AppState) {
         },
         label = "settingsPage2"
     ) { pg ->
+        val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(top = statusTop(), bottom = 220.dp)
+                .nestedScroll(bar.nestedScrollConnection)
+                .padding(top = statusTop())
         ) {
-            if (pg == null) {
-                Column(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 8.dp)) {
-                    RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { s.screen = Screen.Home })
-                    Spacer(Modifier.height(26.dp))
-                    Text("Settings", color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.Medium)
-                }
-                PfMainGroup(
-                    listOf(
-                        PfItem("account", "Account", "Sign in and manage account sync", Icons.Rounded.AccountCircle),
-                        PfItem("stats", "Listening Stats", "Your songs played and listening time", Icons.Rounded.BarChart)
-                    ),
-                    acc, 0
-                ) { page = it }
-                PfMainGroup(
-                    listOf(
-                        PfItem("appearance", "Appearance", "Themes, blur, and player styles", Icons.Rounded.Palette),
-                        PfItem("player", "Player and audio", "Crossfade, fades, and headphones", Icons.Rounded.MusicNote),
-                        PfItem("content", "Content", "Choose what shows on Home", Icons.Rounded.Home),
-                        PfItem("behavior", "Behavior", "Haptics and tap feel", Icons.Rounded.TouchApp)
-                    ),
-                    acc, 2
-                ) { page = it }
-                PfMainGroup(
-                    listOf(
-                        PfItem("integration", "Integration", "Last.fm, Libre.fm, ListenBrainz and Discord", Icons.Rounded.AutoAwesome),
-                        PfItem("storage", "Storage", "Cached songs and size limit", Icons.Rounded.Download)
-                    ),
-                    acc, 6
-                ) { page = it }
-                PfMainGroup(
-                    listOf(
-                        PfItem("backup", "Backup and restore", "Save or bring back your library", Icons.Rounded.Folder),
-                        PfItem("changelog", "What's new", "Changes in each version", Icons.Rounded.History),
-                        PfItem("about", "About", "Version and build info", Icons.Rounded.Info)
-                    ),
-                    acc, 8
-                ) { page = it }
-            } else {
-                Row(
-                    Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RoundBtn(Icons.Rounded.ArrowBack, 0.9f, { page = null })
-                    Spacer(Modifier.width(16.dp))
+            LargeTopAppBar(
+                title = {
                     Text(
-                        titles[pg] ?: "Settings",
+                        if (pg == null) "Settings" else (titles[pg] ?: "Settings"),
                         color = Color.White,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                }
-                when (pg) {
-                    "account" -> PfAccountPage(s)
-                    "stats" -> PfStatsPage(s)
-                    "appearance" -> PfAppearancePage(s)
-                    "player" -> PfPlayerPage(s)
-                    "content" -> PfContentPage(s)
-                    "behavior" -> PfBehaviorPage(s)
-                    "integration" -> PfIntegrationPage(s)
-                    "storage" -> PfStoragePage(s)
-                    "backup" -> PfBackupPage(
-                        s,
-                        { exportLauncher.launch("PrismWave-backup.json") },
-                        { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }
-                    )
-                    "changelog" -> PfChangelogPage(s)
-                    "about" -> PfAboutPage(s)
+                },
+                navigationIcon = {
+                    FilledTonalIconButton(
+                        onClick = { if (pg == null) s.screen = Screen.Home else page = null },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.12f),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = null)
+                    }
+                },
+                windowInsets = WindowInsets(0.dp),
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                ),
+                scrollBehavior = bar
+            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 220.dp)
+            ) {
+                if (pg == null) {
+                    PfMainGroup(
+                        listOf(
+                            PfItem("account", "Account", "Sign in and manage account sync", Icons.Rounded.AccountCircle),
+                            PfItem("stats", "Listening Stats", "Your songs played and listening time", Icons.Rounded.BarChart)
+                        ),
+                        acc, 0
+                    ) { page = it }
+                    PfMainGroup(
+                        listOf(
+                            PfItem("appearance", "Appearance", "Themes, blur, and player styles", Icons.Rounded.Palette),
+                            PfItem("player", "Player and audio", "Fades, headphones and video", Icons.Rounded.MusicNote),
+                            PfItem("transitions", "Transitions", "Crossfade, blur-out, 8D and cover flip", Icons.Rounded.Sync),
+                            PfItem("content", "Content", "Choose what shows on Home", Icons.Rounded.Home),
+                            PfItem("behavior", "Behavior", "Haptics and tap feel", Icons.Rounded.TouchApp)
+                        ),
+                        acc, 2
+                    ) { page = it }
+                    PfMainGroup(
+                        listOf(
+                            PfItem("integration", "Integration", "Last.fm, Libre.fm, ListenBrainz and Discord", Icons.Rounded.AutoAwesome),
+                            PfItem("storage", "Storage", "Cached songs and size limit", Icons.Rounded.Download)
+                        ),
+                        acc, 7
+                    ) { page = it }
+                    PfMainGroup(
+                        listOf(
+                            PfItem("backup", "Backup and restore", "Save or bring back your library", Icons.Rounded.Folder),
+                            PfItem("changelog", "What's new", "Changes in each version", Icons.Rounded.History),
+                            PfItem("about", "About", "Version and build info", Icons.Rounded.Info)
+                        ),
+                        acc, 9
+                    ) { page = it }
+                } else {
+                    when (pg) {
+                        "account" -> PfAccountPage(s)
+                        "stats" -> PfStatsPage(s)
+                        "appearance" -> PfAppearancePage(s)
+                        "player" -> PfPlayerPage(s)
+                        "transitions" -> PfTransitionsPage(s)
+                        "content" -> PfContentPage(s)
+                        "behavior" -> PfBehaviorPage(s)
+                        "integration" -> PfIntegrationPage(s)
+                        "storage" -> PfStoragePage(s)
+                        "backup" -> PfBackupPage(
+                            s,
+                            { exportLauncher.launch("PrismWave-backup.json") },
+                            { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }
+                        )
+                        "changelog" -> PfChangelogPage(s)
+                        "about" -> PfAboutPage(s)
+                    }
                 }
             }
         }
@@ -1032,6 +1006,15 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added cover blur-out, cover flip and Material 3 settings", a, listOf(
+        "Cover blur-out: the album cover slowly blurs as the song ends",
+        "Cover flip: the cover square flips over to the next song",
+        "Settings rebuilt in Material 3: large collapsing title, tonal icons, Material sliders"
+    ))
+    PfChange("Added 8D audio and Transitions", a, listOf(
+        "8D audio: the sound slowly circles around your head, speed slider",
+        "New Transitions page: crossfade, audio blur-out and 8D in one place"
+    ))
     PfChange("v27", a, listOf(
         "Home recommendations come from your own YouTube Music Home: Quick picks, Listen again and more",
         "Not signed in: Picked for you, based on the songs you play most"
@@ -1115,4 +1098,69 @@ private fun PfChangelogPage(s: AppState) {
         "Tempo and Pitch, downloads, Apple Music style playlist page",
         "YouTube Music search, streaming, backup and sign-in"
     ))
+}
+
+@Composable
+private fun PfTransitionsPage(s: AppState) {
+    val a = s.accent
+    val tctx = LocalContext.current.applicationContext
+    EightD.init(tctx)
+    TransitionPrefs.init(tctx)
+    PfLabel("Between songs", a)
+    PfGroup {
+        PfSwitch(Icons.Rounded.PlayArrow, "Fade in and out", "Soft volume fade on play, pause and skip", Opts.fade, a) {
+            Opts.fade = it
+            Opts.save()
+        }
+        PfSlider(
+            Icons.Rounded.Sync, "Crossfade",
+            if (Opts.crossfade == 0) "Off" else Opts.crossfade.toString() + " s",
+            Opts.crossfade.toFloat(), 0f..12f, a,
+            { Opts.crossfade = it.toInt() }, { Opts.save() }
+        )
+        PfSwitch(Icons.Rounded.Speed, "Audio blur-out", "The end gets muffled and quiet, the next song comes in clear", StudioPrefs.mixOn, a) {
+            StudioPrefs.mixOn = it
+            StudioPrefs.save()
+        }
+        PfSlider(
+            Icons.Rounded.Sync, "Blur-out length", StudioPrefs.mixSecs.toString() + " s",
+            StudioPrefs.mixSecs.toFloat(), 5f..15f, a,
+            { StudioPrefs.mixSecs = it.toInt() }, { StudioPrefs.save() }
+        )
+        PfSlider(
+            Icons.Rounded.Speed, "Blur-out strength", (StudioPrefs.mixStrength * 100).toInt().toString() + "%",
+            StudioPrefs.mixStrength, 0.3f..1f, a,
+            { StudioPrefs.mixStrength = it }, { StudioPrefs.save() }
+        )
+    }
+    PfLabel("Album cover", a)
+    PfGroup {
+        PfSwitch(Icons.Rounded.AutoAwesome, "Cover blur-out", "The cover slowly blurs as the song ends", TransitionPrefs.blur, a) {
+            TransitionPrefs.blur = it
+            TransitionPrefs.save()
+        }
+        PfSlider(
+            Icons.Rounded.Sync, "Cover blur starts", "Last " + TransitionPrefs.blurSecs.toString() + " s of the song",
+            TransitionPrefs.blurSecs.toFloat(), 3f..12f, a,
+            { TransitionPrefs.blurSecs = it.toInt() }, { TransitionPrefs.save() }
+        )
+        PfSwitch(Icons.Rounded.Palette, "Cover flip", "The cover square flips over to the next song's cover", TransitionPrefs.flip, a) {
+            TransitionPrefs.flip = it
+            TransitionPrefs.save()
+        }
+        PfNote("Cover effects show in the full player. Lite mode and Reduce motion turn them off.")
+    }
+    PfLabel("8D audio", a)
+    PfGroup {
+        PfSwitch(Icons.Rounded.AutoAwesome, "8D audio", "The sound circles around your head. Best with headphones", EightD.on, a) {
+            EightD.setOn(it)
+        }
+        PfSlider(
+            Icons.Rounded.Speed, "Circle speed",
+            "One turn every " + (1f / EightD.speed).toInt().toString() + " s",
+            EightD.speed, 0.04f..0.4f, a,
+            { EightD.setSpeed(it) }, { EightD.save() }
+        )
+        PfNote("8D works on stereo songs. Higher speed means faster circles.")
+    }
 }
