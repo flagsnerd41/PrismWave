@@ -62,8 +62,8 @@ object VideoSync {
 
     /** both videos start only when BOTH are ready, and pause together when either one buffers */
     fun gateOk(): Boolean {
-        val ps = listOfNotNull(main, back)
-        return ps.isNotEmpty() && ps.all { it.playbackState == Player.STATE_READY }
+        val m = main
+        return m != null && m.playbackState == Player.STATE_READY
     }
 
     val qualityNames = listOf("Best", "1080p", "720p", "480p", "360p")
@@ -161,8 +161,7 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) ready = true
                 // react at once: pause both the moment one of them buffers
-                if (state == Player.STATE_BUFFERING) {
-                    VideoSync.main?.playWhenReady = false
+                if (state == Player.STATE_BUFFERING && !low) {
                     VideoSync.back?.playWhenReady = false
                 }
             }
@@ -208,16 +207,25 @@ fun VideoStage(s: AppState, song: Song, modifier: Modifier = Modifier, low: Bool
             val est = lastPos + (if (s.playing) (now - lastAt) / 1000f else 0f)
             // both videos start and pause together
             player.playWhenReady = s.playing && !s.loading && VideoSync.gateOk()
-            if (player.playbackState != Player.STATE_IDLE && now - lastSeek > 1500) {
+            if (player.playbackState != Player.STATE_IDLE && now - lastSeek > 4000) {
                 // the blurred backdrop follows the sharp video, the sharp video follows the audio
                 val master = if (low) VideoSync.main else null
                 val linked = master != null && master.playbackState != Player.STATE_IDLE
                 val target = if (linked) master!!.currentPosition / 1000f else est
-                val limit = if (linked) 0.2f else 0.8f
+                val limit = if (linked) 0.9f else 1.5f
                 val drift = player.currentPosition / 1000f - target
                 if (abs(drift) > limit) {
                     player.seekTo((target * 1000).toLong())
+                    player.setPlaybackSpeed(1f)
                     lastSeek = now
+                } else {
+                    // small differences are fixed by playing a little faster or slower, no jump
+                    val sp = when {
+                        drift < -0.25f -> 1.06f
+                        drift > 0.25f -> 0.94f
+                        else -> 1f
+                    }
+                    if (player.playbackParameters.speed != sp) player.setPlaybackSpeed(sp)
                 }
             }
             delay(150)

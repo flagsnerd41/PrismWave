@@ -773,7 +773,7 @@ private fun ImmersiveBody(
     BoxWithConstraints(Modifier.fillMaxSize().background(Night)) {
         val stageHeight = maxHeight * 0.64f
         // blurred backdrop that fills the whole screen
-        if (VideoSync.showVideo(song)) {
+        if (VideoSync.showVideo(song) && VideoPrefs.liveBackdrop) {
             VideoStage(s, song, Modifier.fillMaxSize().blur(50.dp), low = true)
         } else {
             Cover(song, Modifier.fillMaxSize().blur(50.dp), 0.dp, 160.sp, quality = 600)
@@ -792,14 +792,28 @@ private fun ImmersiveBody(
             Modifier
                 .fillMaxWidth()
                 .height(stageHeight)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(brush = stageFade, blendMode = BlendMode.DstIn)
-                }
+                .then(
+                    if (VideoSync.showVideo(song)) Modifier else Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(brush = stageFade, blendMode = BlendMode.DstIn)
+                        }
+                )
         ) {
             if (VideoSync.showVideo(song)) {
                 VideoStage(s, song, Modifier.fillMaxSize())
+                // a plain gradient on top instead of cutting the video with a mask every frame
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0.44f to Color.Transparent,
+                            0.60f to bottom.copy(alpha = 0.30f),
+                            0.80f to bottom.copy(alpha = 0.80f),
+                            1f to bottom
+                        )
+                    )
+                )
             } else {
                 TransitionCover(s, song, Modifier.fillMaxSize(), 0.dp, 160.sp, 1200)
             }

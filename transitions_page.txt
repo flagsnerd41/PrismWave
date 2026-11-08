@@ -4,6 +4,7 @@ private fun PfTransitionsPage(s: AppState) {
     val tctx = LocalContext.current.applicationContext
     EightD.init(tctx)
     AutoMix.init(tctx)
+    VideoPrefs.init(tctx)
     TransitionPrefs.init(tctx)
     PfLabel("Between songs", a)
     PfGroup {
@@ -70,5 +71,13 @@ private fun PfTransitionsPage(s: AppState) {
             { EightD.changeSpeed(it) }, { EightD.save() }
         )
         PfNote("8D works on stereo songs. Higher speed means faster circles.")
+    }
+    PfLabel("Video", a)
+    PfGroup {
+        PfSwitch(
+            Icons.Rounded.PlayArrow, "Live video backdrop",
+            "Blurred video behind the player. Looks great, but can make video stutter on some phones",
+            VideoPrefs.liveBackdrop, a
+        ) { VideoPrefs.set(it) }
     }
 }

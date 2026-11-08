@@ -449,7 +449,7 @@ fun SettingsScreen(s: AppState) {
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) s.importFrom(uri) }
-    var page by remember { mutableStateOf<String?>(null) }
+    var page by remember { mutableStateOf<String?>(SettingsNav.take()) }
     BackHandler(enabled = page != null) { page = null }
     val acc = s.accent
     val titles = mapOf(
@@ -1006,6 +1006,15 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added lyrics upgrade, fixed video stutter, added UI extras", a, listOf(
+        "Lyrics: the playing line fills word by word, pause dots, moving background, sync fix, text size and alignment",
+        "Lyrics: better song matching, and lyrics are saved on the phone",
+        "Fixed video stutter: no more blur and mask on the video every frame",
+        "The status bar hides in the full player",
+        "What's new button in the Home header",
+        "Playlist covers show a 2 by 2 collage",
+        "Search: recent searches, live suggestions and chips that stay at the top"
+    ))
     PfChange("Added Home layout, cover preload and removed start fade", a, listOf(
         "Home: big Quick picks carousel, mood chips and From the community, like ArchiveTune",
         "Covers load 30 seconds before the song ends, so the cover shuffle is instant",
@@ -1115,6 +1124,7 @@ private fun PfTransitionsPage(s: AppState) {
     val tctx = LocalContext.current.applicationContext
     EightD.init(tctx)
     AutoMix.init(tctx)
+    VideoPrefs.init(tctx)
     TransitionPrefs.init(tctx)
     PfLabel("Between songs", a)
     PfGroup {
@@ -1181,5 +1191,13 @@ private fun PfTransitionsPage(s: AppState) {
             { EightD.changeSpeed(it) }, { EightD.save() }
         )
         PfNote("8D works on stereo songs. Higher speed means faster circles.")
+    }
+    PfLabel("Video", a)
+    PfGroup {
+        PfSwitch(
+            Icons.Rounded.PlayArrow, "Live video backdrop",
+            "Blurred video behind the player. Looks great, but can make video stutter on some phones",
+            VideoPrefs.liveBackdrop, a
+        ) { VideoPrefs.set(it) }
     }
 }

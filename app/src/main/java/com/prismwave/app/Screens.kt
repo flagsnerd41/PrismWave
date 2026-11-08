@@ -1,5 +1,8 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.lazy.stickyHeader
+import androidx.compose.material.icons.rounded.Close
+
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -162,6 +165,8 @@ fun Header(s: AppState) {
         }, 46.dp)
         Spacer(Modifier.width(8.dp))
         RoundBtn(Icons.Rounded.BarChart, 0.9f, { stats = true }, 46.dp)
+        Spacer(Modifier.width(8.dp))
+        WhatsNewButton(s)
         Spacer(Modifier.width(8.dp))
         RoundBtn(Icons.Rounded.Settings, 0.9f, { s.screen = Screen.Settings }, 46.dp)
     }
@@ -470,6 +475,7 @@ private fun MoodTile(m: Mood, s: AppState, modifier: Modifier) {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SearchScreen(s: AppState) {
     var hits by remember { mutableStateOf<List<Hit>>(emptyList()) }
@@ -477,6 +483,20 @@ fun SearchScreen(s: AppState) {
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf("") }
     var tab by remember { mutableStateOf(0) }
+    val searchCtx = LocalContext.current
+    SearchHistory.init(searchCtx)
+    var sugg by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(s.searchQuery) {
+        val sq = s.searchQuery.trim()
+        if (sq.length < 2 || Opts.offline) {
+            sugg = emptyList()
+            return@LaunchedEffect
+        }
+        delay(250)
+        sugg = Suggest.fetch(sq)
+        delay(1300)
+        SearchHistory.add(sq)
+    }
     LaunchedEffect(s.searchQuery, kind) {
         err = ""
         val q = s.searchQuery.trim()
@@ -525,6 +545,26 @@ fun SearchScreen(s: AppState) {
             )
         }
         if (!searching) {
+            if (SearchHistory.items.isNotEmpty() && s.searchQuery.isBlank()) {
+                item { SectionTitle("Recent searches", "Clear") { SearchHistory.clear() } }
+                items(SearchHistory.items.take(6)) { rq ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { s.searchQuery = rq }
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.History, contentDescription = null, tint = TextDim, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Text(rq, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Icon(
+                            Icons.Rounded.Close, contentDescription = "Remove", tint = TextDim,
+                            modifier = Modifier.size(22.dp).clickable { SearchHistory.remove(rq) }
+                        )
+                    }
+                }
+            }
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     listOf("Explore" to Icons.Rounded.Explore, "Suggestions" to Icons.Rounded.AutoAwesome)
@@ -571,13 +611,38 @@ fun SearchScreen(s: AppState) {
                 }
             }
         } else {
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    itemsIndexed(listOf("All", "Songs", "Videos", "Albums", "Artists", "Playlists")) { i, label ->
-                        Chip(label, kind == i, s.accent) { kind = i }
+            if (sugg.isNotEmpty()) {
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(sugg.take(8)) { sq ->
+                            Row(
+                                Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(50))
+                                    .clickable { s.searchQuery = sq }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Rounded.Search, contentDescription = null, tint = TextDim, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(sq, color = Color.White, fontSize = 14.sp, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+            stickyHeader {
+                Box(Modifier.fillMaxWidth().background(Night.copy(alpha = 0.94f))) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(listOf("All", "Songs", "Videos", "Albums", "Artists", "Playlists")) { i, label ->
+                            Chip(label, kind == i, s.accent) { kind = i }
+                        }
                     }
                 }
             }
@@ -638,7 +703,7 @@ private fun PlaylistCard(p: Playlist, s: AppState) {
         val first = p.songs.firstOrNull()
         Box {
             if (first != null) {
-                Cover(first, Modifier.size(144.dp), 20.dp, 44.sp)
+                PlaylistArt(p, first, 144.dp, 20.dp)
             } else {
                 Box(Modifier.size(144.dp).clip(RoundedCornerShape(20.dp)).background(CardBg2))
             }
@@ -742,7 +807,7 @@ private fun LibraryMain(s: AppState) {
                 ) {
                     val first = p.songs.firstOrNull()
                     if (first != null) {
-                        Cover(first, Modifier.size(60.dp), 14.dp)
+                        PlaylistArt(p, first, 60.dp, 14.dp)
                     } else {
                         Box(Modifier.size(60.dp).clip(RoundedCornerShape(14.dp)).background(CardBg2))
                     }

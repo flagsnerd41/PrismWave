@@ -91,6 +91,8 @@ fun VideoWarmup(s: AppState) {
     val ctx = LocalContext.current
     val song = s.current
     val open = s.showPlayer
+    VideoPrefs.init(ctx)
+    StatusBarHider(open)
     LaunchedEffect(song?.id, open, VideoSync.wantVideo, VideoSync.quality) {
         if (song == null || !open || VideoSync.wantVideo) {
             VideoWarm.drop()
