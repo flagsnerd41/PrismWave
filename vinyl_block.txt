@@ -1,0 +1,243 @@
+// ------------------------------------------------------------ Vinyl style: a spinning record on a swirling background
+
+private fun hueShift(c: Color, deg: Float): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(c.toArgb(), hsv)
+    hsv[0] = (hsv[0] + deg + 360f) % 360f
+    if (hsv[1] < 0.35f) hsv[1] = 0.35f
+    if (hsv[2] < 0.55f) hsv[2] = 0.55f
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
+// soft blobs of the cover colors that slowly swirl around, like the background of the vinyl player
+@Composable
+fun SwirlBackground(art: Color, still: Boolean) {
+    val c2 = remember(art) { hueShift(art, 55f) }
+    val c3 = remember(art) { hueShift(art, -45f) }
+    val base by animateColorAsState(lerp(art, Color.Black, 0.60f), tween(700), label = "swirlBase")
+    val tr = rememberInfiniteTransition(label = "swirl")
+    val t by tr.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(tween(28000, easing = LinearEasing), RepeatMode.Restart),
+        label = "swirlT"
+    )
+    Canvas(Modifier.fillMaxSize().background(base)) {
+        val w = size.width
+        val h = size.height
+        val a = if (still) 0f else t * 2f * PI.toFloat()
+        fun blob(cx: Float, cy: Float, r: Float, c: Color, al: Float) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(c.copy(alpha = al), Color.Transparent),
+                    center = Offset(cx, cy),
+                    radius = r
+                ),
+                radius = r,
+                center = Offset(cx, cy)
+            )
+        }
+        blob(w * (0.20f + 0.25f * sin(a)), h * (0.18f + 0.10f * cos(a * 1.3f)), w * 1.05f, art, 0.70f)
+        blob(w * (0.85f + 0.15f * cos(a + 1f)), h * (0.45f + 0.20f * sin(a + 2f)), w * 1.10f, c2, 0.60f)
+        blob(w * (0.30f + 0.30f * sin(a + 3f)), h * (0.85f + 0.10f * cos(a)), w * 1.20f, c3, 0.55f)
+        blob(w * (0.70f + 0.20f * cos(a * 1.7f + 4f)), h * (0.12f + 0.10f * sin(a)), w * 0.80f, lerp(art, Color.White, 0.35f), 0.35f)
+    }
+}
+
+// the record: colored wedges, grooves, a shine that stays still, and the cover as the label
+@Composable
+private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
+    val c2 = remember(art) { hueShift(art, 55f) }
+    val rot = remember { Animatable(0f) }
+    LaunchedEffect(s.playing, s.reduceMotion) {
+        if (s.playing && !s.reduceMotion) {
+            while (true) {
+                rot.animateTo(rot.value + 360f, tween(9000, easing = LinearEasing))
+                rot.snapTo(rot.value % 360f)
+            }
+        }
+    }
+    val sc by animateFloatAsState(
+        if (s.playing) 1f else 0.93f,
+        spring(dampingRatio = 0.6f, stiffness = 220f),
+        label = "vinylScale"
+    )
+    Box(
+        modifier
+            .aspectRatio(1f)
+            .graphicsLayer {
+                scaleX = sc
+                scaleY = sc
+            }
+            .shadow(26.dp, CircleShape, ambientColor = art, spotColor = art)
+    ) {
+        Canvas(Modifier.fillMaxSize().graphicsLayer { rotationZ = rot.value }) {
+            val r = size.minDimension / 2f
+            val ctr = center
+            drawCircle(color = Color.Black.copy(alpha = 0.55f), radius = r, center = ctr)
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0f to art, 0.10f to art, 0.25f to c2, 0.35f to c2,
+                    0.50f to art, 0.60f to art, 0.75f to c2, 0.85f to c2, 1f to art,
+                    center = ctr
+                ),
+                radius = r,
+                center = ctr,
+                alpha = 0.78f
+            )
+            for (i in 0..22) {
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.16f),
+                    radius = r * (0.36f + i * 0.027f),
+                    center = ctr,
+                    style = Stroke(1.2f)
+                )
+            }
+            drawCircle(color = Color.Black.copy(alpha = 0.7f), radius = r * 0.33f, center = ctr)
+            drawCircle(color = Color.White.copy(alpha = 0.35f), radius = r - 1.5f, center = ctr, style = Stroke(3f))
+        }
+        // the shine does not turn with the record
+        Canvas(Modifier.fillMaxSize()) {
+            val r = size.minDimension / 2f
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0f to Color.Transparent, 0.07f to Color.White.copy(alpha = 0.22f), 0.15f to Color.Transparent,
+                    0.50f to Color.Transparent, 0.57f to Color.White.copy(alpha = 0.22f), 0.65f to Color.Transparent,
+                    1f to Color.Transparent,
+                    center = center
+                ),
+                radius = r,
+                center = center
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize(0.30f)
+                .align(Alignment.Center)
+                .graphicsLayer { rotationZ = rot.value }
+                .clip(CircleShape)
+        ) {
+            Crossfade(targetState = song, animationSpec = tween(450), label = "vinylLabel") { sg ->
+                Cover(sg, Modifier.fillMaxSize(), 0.dp, 40.sp, quality = 600)
+            }
+        }
+        Box(
+            Modifier
+                .size(12.dp)
+                .align(Alignment.Center)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.85f))
+        )
+    }
+}
+
+@Composable
+private fun VinylBody(
+    s: AppState,
+    song: Song,
+    onMenu: () -> Unit,
+    onAdd: () -> Unit,
+    onSleep: () -> Unit,
+    onQueue: () -> Unit
+) {
+    val ctx = LocalContext.current
+    Lyrics.init(ctx)
+    val artRaw = rememberArtColor(song)
+    val art by animateColorAsState(artRaw, tween(700), label = "vinylArt")
+    val total = song.seconds.coerceAtLeast(1).toFloat()
+    var lines by remember(song.id) { mutableStateOf<List<LyricLine>>(emptyList()) }
+    LaunchedEffect(song.id) { lines = Lyrics.fetch(song) }
+    val synced = lines.isNotEmpty() && lines[0].ms >= 0
+    val posMs = (s.position * 1000).toLong()
+    val idx = if (synced) lines.indexOfLast { it.ms <= posMs + 250 } else -1
+    val line1 = if (idx >= 0) lines[idx].text.ifEmpty { "..." } else song.title
+    val line2 = if (idx >= 0) (lines.getOrNull(idx + 1)?.text ?: song.artist) else song.artist
+    Box(Modifier.fillMaxSize()) {
+        SwirlBackground(art, s.reduceMotion || Opts.lite)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier
+                    .padding(top = 10.dp)
+                    .width(44.dp)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.45f))
+                    .clickable { s.showPlayer = false }
+            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                PlayerIcon(Icons.Rounded.Layers, Color.White) { Pages.show("stack") }
+                PlayerIcon(Icons.Rounded.Subtitles, Color.White) { Pages.show("lyrics") }
+                Spacer(Modifier.weight(1f))
+                PlayerIcon(Icons.Rounded.FormatListBulleted, Color.White) { onQueue() }
+                PlayerIcon(Icons.Rounded.MoreHoriz, Color.White) { onMenu() }
+            }
+            Spacer(Modifier.weight(1f))
+            VinylDisc(
+                s, song, art,
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                        Pages.show("lyrics")
+                    }
+            )
+            Spacer(Modifier.weight(1f))
+            Column(Modifier.fillMaxWidth()) {
+                AnimatedContent(
+                    targetState = line1,
+                    transitionSpec = {
+                        (slideInVertically(tween(320)) { it / 2 } + fadeIn(tween(320))) togetherWith
+                            (slideOutVertically(tween(220)) { -it / 2 } + fadeOut(tween(160)))
+                    },
+                    label = "vinylLine1"
+                ) { t ->
+                    Text(t, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                AnimatedContent(
+                    targetState = line2,
+                    transitionSpec = { fadeIn(tween(320)) togetherWith fadeOut(tween(160)) },
+                    label = "vinylLine2"
+                ) { t ->
+                    Text(
+                        t,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            GlowSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth())
+            TimeLabels(s, total)
+            Spacer(Modifier.height(4.dp))
+            TransportRow(s, 44.dp, 66.dp, true)
+            Spacer(Modifier.height(6.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.7f)) {
+                    s.shuffle = !s.shuffle
+                }
+                PlayerIcon(Icons.Rounded.Add, Color.White.copy(alpha = 0.7f)) { onAdd() }
+                PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White.copy(alpha = 0.7f)) {
+                    onSleep()
+                }
+                PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.7f)) {
+                    s.repeat = !s.repeat
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+    }
+}
+

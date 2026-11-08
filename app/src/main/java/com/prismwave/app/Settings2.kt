@@ -637,8 +637,8 @@ private fun PfAppearancePage(s: AppState) {
     PfLabel("Player", a)
     PfGroup {
         PfChoice(
-            Icons.Rounded.PlayArrow, "Player design style", listOf("Album", "Immersive"), s.playerStyle, a,
-            "More styles are coming soon"
+            Icons.Rounded.PlayArrow, "Player design style", listOf("Album", "Immersive", "Vinyl"), s.playerStyle, a,
+            "Vinyl: a spinning record with lyrics underneath"
         ) {
             s.playerStyle = it
             s.saveSettings()
@@ -1006,6 +1006,11 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added Vinyl player and cover stack", a, listOf(
+        "New Vinyl player style: a spinning record with the cover as the label, a swirling background and the lyric lines underneath",
+        "Cover stack: a 3D stack of your queue, history or likes. Drag to flip through it",
+        "Choose Vinyl in Settings, Appearance, Player design style"
+    ))
     PfChange("Added lyrics upgrade, fixed video stutter, added UI extras", a, listOf(
         "Lyrics: the playing line fills word by word, pause dots, moving background, sync fix, text size and alignment",
         "Lyrics: better song matching, and lyrics are saved on the phone",

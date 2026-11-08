@@ -290,6 +290,7 @@ fun PagesHost(s: AppState) {
             "stats" -> StatsPage(s)
             "collection" -> CollectionPage(s)
             "lyrics" -> LyricsScreen(s)
+            "stack" -> CoverStackScreen(s)
             "eq" -> EqPage(s)
             "car" -> CarPage(s)
             else -> Box(Modifier.fillMaxSize().background(Night))
