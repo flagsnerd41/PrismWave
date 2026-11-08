@@ -39,7 +39,7 @@ private fun PfTransitionsPage(s: AppState) {
     }
     PfLabel("Album cover", a)
     PfGroup {
-        PfSwitch(Icons.Rounded.AutoAwesome, "Cover blur-out", "The cover slowly blurs as the song ends", TransitionPrefs.blur, a) {
+        PfSwitch(Icons.Rounded.AutoAwesome, "Cover blur-out", "The cover slowly blurs as the song ends, together with the audio", TransitionPrefs.blur, a) {
             TransitionPrefs.blur = it
             TransitionPrefs.save()
         }
@@ -48,11 +48,15 @@ private fun PfTransitionsPage(s: AppState) {
             TransitionPrefs.blurSecs.toFloat(), 3f..12f, a,
             { TransitionPrefs.blurSecs = it.toInt() }, { TransitionPrefs.save() }
         )
-        PfSwitch(Icons.Rounded.Palette, "Cover flip", "The cover square flips over to the next song's cover", TransitionPrefs.flip, a) {
-            TransitionPrefs.flip = it
+        PfSwitch(
+            Icons.Rounded.Palette, "Random covers",
+            "At the blurriest moment the cover shuffles through your songs, then settles on the next one and slowly clears",
+            TransitionPrefs.shuffle, a
+        ) {
+            TransitionPrefs.shuffle = it
             TransitionPrefs.save()
         }
-        PfNote("Cover effects show in the full player. Lite mode and Reduce motion turn them off.")
+        PfNote("The cover blur uses the same length as the audio blur-out or AutoMix when those are on. Lite mode and Reduce motion turn cover effects off.")
     }
     PfLabel("8D audio", a)
     PfGroup {

@@ -612,6 +612,12 @@ class AppState(private val ctx: Context) {
 
     fun seekTo(sec: Float) {
         position = sec
+        if (fading) {
+            fading = false
+            fadeJob?.cancel()
+            controller?.volume = 1f
+            MuffleMix.clear()
+        }
         controller?.seekTo((sec * 1000).toLong())
     }
 
@@ -831,7 +837,7 @@ class AppState(private val ctx: Context) {
             MuffleMix.ramp(StudioPrefs.mixStrength, 0f, ms)
             fade(0.3f, 1f, ms)
         } else if (Opts.crossfade > 0 || prevLead != null) {
-            fade(0f, 1f, ((prevLead ?: Opts.crossfade.toFloat()) * 1000f).toLong())
+            AudioShape.rampGain(0.35f, 1f, ((prevLead ?: Opts.crossfade.toFloat()) * 1000f).toLong())
         } else {
             fadeJob?.cancel()
             controller?.volume = 1f
@@ -866,6 +872,7 @@ class AppState(private val ctx: Context) {
             fading = false
             fadeJob?.cancel()
             controller?.volume = 1f
+            AudioShape.reset()
             controller?.seekTo(0)
             controller?.play()
         } else {
@@ -974,7 +981,7 @@ class AppState(private val ctx: Context) {
                 val cf = (if (AutoMix.on) AutoMix.leadFor(current?.id ?: "") else null) ?: Opts.crossfade.toFloat()
                 if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
                     fading = true
-                    fade(c.volume, 0f, (left * 1000).toLong() - 150)
+                    AudioShape.rampGain(1f, 0.35f, (left * 1000).toLong() - 150)
                 }
             }
             listenSeconds++

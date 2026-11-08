@@ -244,6 +244,10 @@ object MuffleMix {
 
     // moves the muffle smoothly from a to b over ms milliseconds
     fun ramp(a: Float, b: Float, ms: Long) {
+        AudioShape.rampMuffle(a, b, ms)
+    }
+
+    private fun rampEq(a: Float, b: Float, ms: Long) {
         cancel()
         val steps = 20
         var k = 0
@@ -262,6 +266,7 @@ object MuffleMix {
     fun clear() {
         cancel()
         outgoing = false
+        AudioShape.reset()
         if (SoundFx.autoMuffle != 0f) {
             SoundFx.autoMuffle = 0f
             SoundFx.reapply()

@@ -34,7 +34,7 @@ class PlaybackService : MediaSessionService() {
                 return DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(arrayOf<AudioProcessor>(EightDProcessor()))
+                    .setAudioProcessors(arrayOf<AudioProcessor>(AudioShapeProcessor(), EightDProcessor()))
                     .build()
             }
         }
