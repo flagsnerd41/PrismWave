@@ -1,0 +1,219 @@
+// ------------------------------------------------------------ home (ArchiveTune style layout)
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun QuickPickCarousel(songs: List<Song>, s: AppState) {
+    val list = songs.take(12)
+    if (list.isEmpty()) return
+    val cfg = LocalConfiguration.current
+    val cardW = (cfg.screenWidthDp * 0.74f).dp
+    val cardH = cardW * 1.1f
+    val side = (cfg.screenWidthDp.dp - cardW) / 2
+    val state = rememberLazyListState()
+    val fling = rememberSnapFlingBehavior(state)
+    LazyRow(
+        state = state,
+        flingBehavior = fling,
+        contentPadding = PaddingValues(horizontal = side),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        itemsIndexed(list) { i, sg -> QuickPickCard(sg, list, s, i, state, cardW, cardH) }
+    }
+}
+
+@Composable
+private fun QuickPickCard(
+    song: Song,
+    from: List<Song>,
+    s: AppState,
+    index: Int,
+    state: LazyListState,
+    w: androidx.compose.ui.unit.Dp,
+    h: androidx.compose.ui.unit.Dp
+) {
+    val shape = RoundedCornerShape(32.dp)
+    Box(
+        Modifier
+            .width(w)
+            .height(h)
+            .graphicsLayer {
+                val info = state.layoutInfo
+                val item = info.visibleItemsInfo.firstOrNull { x -> x.index == index }
+                val center = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+                val dist = if (item != null) {
+                    kotlin.math.abs(item.offset + item.size / 2f - center) / (item.size + 12.dp.toPx())
+                } else {
+                    1f
+                }
+                val d = dist.coerceIn(0f, 1f)
+                scaleX = 1f - 0.10f * d
+                scaleY = 1f - 0.10f * d
+                alpha = 1f - 0.35f * d
+            }
+            .softClick { s.play(song, from) }
+            .clip(shape)
+            .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
+    ) {
+        Cover(song, Modifier.fillMaxSize(), 0.dp, 90.sp, quality = 800)
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0.45f to Color.Transparent,
+                    0.75f to Color.Black.copy(alpha = 0.40f),
+                    1f to Color.Black.copy(alpha = 0.85f)
+                )
+            )
+        )
+        Column(Modifier.align(Alignment.BottomStart).padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
+            Text(
+                song.title,
+                color = Color.White,
+                fontSize = 23.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(song.artist, color = Color.White.copy(alpha = 0.7f), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun CommunityHeader(s: AppState, songs: List<Song>) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "From the community",
+            color = Color.White,
+            fontFamily = PrismFont,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
+        Box(
+            Modifier
+                .bounceClick {
+                    if (songs.isNotEmpty()) {
+                        s.shuffle = true
+                        s.play(songs.random(), songs)
+                    }
+                }
+                .size(56.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(s.accent),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Rounded.MoreHoriz, contentDescription = "Shuffle", tint = Color.Black, modifier = Modifier.size(26.dp))
+        }
+    }
+}
+
+@Composable
+fun HomeScreen(s: AppState) {
+    LaunchedEffect(Opts.offline) {
+        if (!Opts.offline) {
+            s.loadFeed("quick", "new music hits")
+            s.loadFeed("chill", "chill songs")
+            s.loadFeed("workout", "workout songs")
+        }
+    }
+    val quick = if (Opts.offline) s.offlineSongs() else s.feeds["quick"]
+    val chill = if (Opts.offline) emptyList<Song>() else (s.feeds["chill"] ?: emptyList())
+    val workout = if (Opts.offline) emptyList<Song>() else (s.feeds["workout"] ?: emptyList())
+    val moods = listOf("Energize", "Feel good", "Workout", "Relax", "Party", "Commute", "Focus", "Sleep")
+    val history = s.history.toList()
+    val recentIds = history.map { it.id }.toSet()
+    val forgotten = s.liked.filter { it.id !in recentIds }
+    val speedDial = s.topPlayed()
+    val ytPlaylists = s.playlists.filter { it.id.startsWith("yt_") }
+    LaunchedEffect(s.signedIn, Opts.offline, history.size > 0) {
+        if (!Opts.offline) {
+            s.loadYtHome()
+            if (!s.signedIn) s.loadPicks()
+        }
+    }
+    val ytQuick = s.ytHome.firstOrNull { it.title.contains("Quick picks", true) }?.songs
+    val picks = if (s.signedIn) null else s.feeds["picks"]
+    val bestQuick = ytQuick ?: picks ?: quick
+    val community = (chill + workout).distinctBy { it.id }.take(20)
+    Box(Modifier.fillMaxSize()) {
+        HomeTopGlow(s, Modifier.align(Alignment.TopCenter))
+        LazyColumn(
+            contentPadding = PaddingValues(
+                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                bottom = 220.dp
+            )
+        ) {
+            item { Header(s) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(moods) { c ->
+                        Chip(c, false, s.accent) {
+                            s.searchQuery = c + " music"
+                            s.screen = Screen.Search
+                        }
+                    }
+                    item {
+                        Chip("Offline", Opts.offline, s.accent) {
+                            Opts.offline = !Opts.offline
+                            Opts.save()
+                        }
+                    }
+                }
+            }
+            item { HomeSection(if (ytQuick == null && picks != null) "Picked for you" else "Quick picks") }
+            item {
+                if (bestQuick == null) LoadingRow(s) else QuickPickCarousel(bestQuick, s)
+            }
+            if (Opts.showMixes && community.isNotEmpty()) {
+                item { CommunityHeader(s, community) }
+                item { QuickPicksGrid(community, s) }
+            }
+            if (history.isNotEmpty() && Opts.showKeep) {
+                item {
+                    HomeSection("Recently Played") {
+                        s.openPlaylist = null
+                        s.libraryOpen = "History"
+                        s.screen = Screen.Library
+                    }
+                }
+                item { HomeShelf(history, s) }
+            }
+            if (speedDial.size >= 3 && Opts.showSpeed) {
+                item {
+                    HomeSection("Speed Dial") {
+                        s.openPlaylist = null
+                        s.libraryOpen = "My top 50"
+                        s.screen = Screen.Library
+                    }
+                }
+                item { HomeShelf(speedDial, s) }
+            }
+            // the other shelves of your YouTube Music Home (Listen again, and so on)
+            s.ytHome.filter { !it.title.contains("Quick picks", true) }.take(6).forEach { sh ->
+                item { HomeSection(sh.title) }
+                item { HomeShelf(sh.songs, s) }
+            }
+            if (ytPlaylists.isNotEmpty()) {
+                item { HomeSection("Your playlists") }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) { items(ytPlaylists.take(12)) { p -> PlaylistCard(p, s) } }
+                }
+            }
+            if (forgotten.size >= 3 && Opts.showForgotten) {
+                item { HomeSection("Forgotten favorites") }
+                item { HomeShelf(forgotten, s) }
+            }
+        }
+    }
+}
+

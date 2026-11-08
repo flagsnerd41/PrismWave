@@ -93,6 +93,8 @@ class AppState(private val ctx: Context) {
     private var queuedId: String? = null
     private var autoAdvance = false
     var radio = false
+    var coverPool: List<Song> = emptyList()
+    private var warmedFor: String? = null
 
     var screen by mutableStateOf(Screen.Home)
     var current by mutableStateOf<Song?>(null)
@@ -567,7 +569,7 @@ class AppState(private val ctx: Context) {
                     .build()
                 c.setMediaItem(MediaItem.Builder().setUri(url).setMediaId(song.id).setCustomCacheKey(song.id).setMediaMetadata(meta).build())
                 c.prepare()
-                val soft = (Opts.fade || Opts.crossfade > 0) && !(autoAdvance && Opts.crossfade == 0)
+                val soft = false
                 autoAdvance = false
                 if (soft) c.volume = 0f
                 c.play()
@@ -953,6 +955,20 @@ class AppState(private val ctx: Context) {
         saveAll()
     }
 
+    // 30 seconds before a song ends: load the next cover and a few random ones
+    private fun warmCovers() {
+        val cur = current ?: return
+        val next = upcoming().firstOrNull()
+        val pool = (queue + history.toList() + liked.toList())
+            .filter { it.id != cur.id && it.id != next?.id && it.thumb != null }
+            .distinctBy { it.id }
+            .shuffled()
+            .take(12)
+        coverPool = pool
+        val q = if (playerStyle == 1) 1200 else 1000
+        CoverPreload.warm(ctx, listOfNotNull(next) + pool, q)
+    }
+
     fun tick() {
         val c = controller
         if (c != null && current != null && c.playbackState == Player.STATE_ENDED && c.currentMediaItem?.mediaId == current?.id) onEnded()
@@ -982,6 +998,14 @@ class AppState(private val ctx: Context) {
                 if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
                     fading = true
                     AudioShape.rampGain(1f, 0.35f, (left * 1000).toLong() - 150)
+                }
+            }
+            if (dur > 0 && !repeat) {
+                val left30 = dur / 1000f - position
+                val cid = current?.id
+                if (cid != null && cid != warmedFor && left30 > 0f && left30 <= 30f) {
+                    warmedFor = cid
+                    warmCovers()
                 }
             }
             listenSeconds++

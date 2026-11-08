@@ -1006,6 +1006,11 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added Home layout, cover preload and removed start fade", a, listOf(
+        "Home: big Quick picks carousel, mood chips and From the community, like ArchiveTune",
+        "Covers load 30 seconds before the song ends, so the cover shuffle is instant",
+        "Songs start at full volume, no fade-in at the start"
+    ))
     PfChange("Added AutoMix smart mix point", a, listOf(
         "AutoMix listens to the end of a cached song and starts the transition where the outro begins",
         "Uses your crossfade or blur-out style, with a smart length for every song"

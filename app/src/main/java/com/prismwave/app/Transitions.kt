@@ -97,7 +97,8 @@ fun TransitionCover(
         post.snapTo(if (natural) lastBlur[0] else 0f)
         busy = true
         post.animateTo(1f, tween(if (natural) 300 else 260))
-        val pool = (s.queue + s.history.toList() + s.liked.toList())
+        val src = if (s.coverPool.isNotEmpty()) s.coverPool else (s.queue + s.history.toList() + s.liked.toList())
+        val pool = src
             .filter { it.id != song.id && it.id != shown.id && it.thumb != null }
             .distinctBy { it.id }
             .shuffled()
@@ -128,5 +129,16 @@ fun TransitionCover(
             textSize,
             quality = quality
         )
+    }
+}
+
+// Loads covers into Coil's cache ahead of time so they appear instantly.
+object CoverPreload {
+    fun warm(ctx: Context, songs: List<Song>, quality: Int) {
+        val loader = coil.Coil.imageLoader(ctx)
+        for (sg in songs) {
+            val t = sg.thumb ?: continue
+            loader.enqueue(coil.request.ImageRequest.Builder(ctx).data(artUrl(t, quality)).build())
+        }
     }
 }
