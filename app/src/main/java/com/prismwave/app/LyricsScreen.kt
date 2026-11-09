@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -40,16 +42,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -59,6 +66,10 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -81,6 +92,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Lyrics page: the current line fills word by word like karaoke, long pauses show three
@@ -89,7 +101,6 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun LyricsScreen(s: AppState) {
-    BackHandler { Pages.close() }
     val song = s.current
     if (song == null) {
         LaunchedEffect(Unit) { Pages.close() }
@@ -146,8 +157,32 @@ fun LyricsScreen(s: AppState) {
         }
     }
     // cover and title come down into the header
-    val hdr = remember { Animatable(if (reduce) 1f else 0f) }
-    LaunchedEffect(Unit) { if (!reduce) hdr.animateTo(1f, tween(520, easing = FastOutSlowInEasing)) }
+    // the cover flies from the player into the header corner
+    val shared = remember { SharedCover.rect }
+    val density = LocalDensity.current
+    var slot by remember { mutableStateOf<Rect?>(null) }
+    val fly = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(Unit) { if (!reduce) fly.animateTo(1f, tween(620, easing = FastOutSlowInEasing)) }
+    // the player fades in and out together with the cover flying
+    LaunchedEffect(Unit) { snapshotFlow { fly.value }.collect { LyricsMorph.p = it } }
+    DisposableEffect(Unit) { onDispose { LyricsMorph.p = 0f } }
+    val scope = rememberCoroutineScope()
+    var closing by remember { mutableStateOf(false) }
+    // closing: the cover grows back to the player, the lyrics slide down to the lower half, then the controls return
+    val close: () -> Unit = {
+        if (!closing) {
+            if (shared != null && !reduce) {
+                closing = true
+                scope.launch {
+                    fly.animateTo(0f, tween(520, easing = FastOutSlowInEasing))
+                    Pages.close()
+                }
+            } else {
+                Pages.close()
+            }
+        }
+    }
+    BackHandler { close() }
     val total = song.seconds.coerceAtLeast(1).toFloat()
     val blurOn = !Opts.lite && !s.batterySaver
     val fontSize = when (LyricsPrefs.size) {
@@ -162,27 +197,64 @@ fun LyricsScreen(s: AppState) {
     }
     val center = LyricsPrefs.center
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(topC, botC)))
-            .pointerInput(Unit) { detectTapGestures { } }
-    ) {
-        if (!Opts.lite && !s.batterySaver) LyricsBackdrop(art, reduce)
+    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = if (shared != null) (fly.value * 2f).coerceIn(0f, 1f) else 1f }
+                .background(Brush.verticalGradient(listOf(topC, botC)))
+        ) {
+            if (!Opts.lite && !s.batterySaver) LyricsBackdrop(art, reduce)
+        }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-                    .graphicsLayer {
-                        alpha = hdr.value
-                        translationY = (1f - hdr.value) * -80f
-                    },
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Cover(song, Modifier.size(46.dp), 10.dp, 16.sp)
+                Box(Modifier.size(46.dp).onGloballyPositioned { slot = it.boundsInRoot() }) {
+                    val sr = shared
+                    val sl = slot
+                    if (sr != null && sl != null && sr.width > 1f && sl.width > 1f) {
+                        val bigDp = with(density) { sr.width.toDp() }
+                        Box(
+                            Modifier
+                                .requiredSize(bigDp)
+                                .graphicsLayer {
+                                    val p = fly.value
+                                    val k = sl.width / sr.width
+                                    val scale = 1f + (k - 1f) * p
+                                    transformOrigin = TransformOrigin(0f, 0f)
+                                    translationX = (1f - p) * (sr.left - sl.left)
+                                    translationY = (1f - p) * (sr.top - sl.top)
+                                    scaleX = scale
+                                    scaleY = scale
+                                    val eff = 20f + (10f - 20f) * p
+                                    shape = RoundedCornerShape((eff / scale).dp)
+                                    clip = true
+                                }
+                        ) {
+                            Cover(song, Modifier.fillMaxSize(), 0.dp, 60.sp, quality = 600)
+                        }
+                    } else if (sr == null) {
+                        Cover(song, Modifier.fillMaxSize(), 10.dp, 16.sp)
+                    }
+                }
                 Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .graphicsLayer {
+                            val p = fly.value
+                            val sr = shared
+                            val sl = slot
+                            alpha = ((p - 0.15f) / 0.55f).coerceIn(0f, 1f)
+                            translationY = if (sr != null && sl != null) {
+                                (1f - p) * (sr.bottom + 12.dp.toPx() - sl.top)
+                            } else {
+                                (1f - p) * -80f
+                            }
+                        }
+                ) {
                     Text(
                         song.title,
                         color = Color.White,
@@ -200,11 +272,16 @@ fun LyricsScreen(s: AppState) {
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                RoundBtn(Icons.Rounded.Tune, 0.9f, { tune = !tune }, 42.dp)
-                Spacer(Modifier.width(8.dp))
-                RoundBtn(Icons.Rounded.Close, 0.9f, { Pages.close() }, 42.dp)
-                Spacer(Modifier.width(8.dp))
-                RoundBtn(Icons.Rounded.MoreHoriz, 0.9f, { Pages.show("details", song) }, 42.dp)
+                Row(
+                    Modifier.graphicsLayer { alpha = ((fly.value - 0.35f) / 0.5f).coerceIn(0f, 1f) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RoundBtn(Icons.Rounded.Tune, 0.9f, { tune = !tune }, 42.dp)
+                    Spacer(Modifier.width(8.dp))
+                    RoundBtn(if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, 0.9f, { s.toggle() }, 42.dp)
+                    Spacer(Modifier.width(8.dp))
+                    RoundBtn(Icons.Rounded.Close, 0.9f, { close() }, 42.dp)
+                }
             }
             if (tune) {
                 Row(
@@ -244,7 +321,17 @@ fun LyricsScreen(s: AppState) {
                     }
                 }
             }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        if (closing) {
+                            translationY = (1f - fly.value) * size.height * 0.55f
+                            alpha = (fly.value * 1.6f).coerceIn(0f, 1f)
+                        }
+                    }
+            ) {
                 if (busy) {
                     LoadingRow(s)
                 } else if (lines.isEmpty()) {
@@ -333,7 +420,17 @@ fun LyricsScreen(s: AppState) {
                     }
                 }
             }
-            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        if (closing) {
+                            alpha = fly.value
+                            translationY = (1f - fly.value) * 90f
+                        }
+                    }
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
                 SeekBar({ s.position }, total, { s.seekTo(it) }, Modifier.fillMaxWidth())
                 Row(
                     Modifier.fillMaxWidth().padding(top = 4.dp),

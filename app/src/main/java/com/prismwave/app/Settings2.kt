@@ -1006,6 +1006,11 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added cover morph and record spin", a, listOf(
+        "Opening lyrics: the big cover shrinks into the top corner and the title slides up, like Apple Music",
+        "Pause button in the lyrics header",
+        "The vinyl record speeds up when you play and slowly winds down when you pause"
+    ))
     PfChange("Added Vinyl player and cover stack", a, listOf(
         "New Vinyl player style: a spinning record with the cover as the label, a swirling background and the lyric lines underneath",
         "Cover stack: a 3D stack of your queue, history or likes. Drag to flip through it",

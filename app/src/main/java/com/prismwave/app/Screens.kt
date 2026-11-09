@@ -1,6 +1,5 @@
 package com.prismwave.app
 
-import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.material.icons.rounded.Close
 
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior

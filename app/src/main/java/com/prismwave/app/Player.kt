@@ -1,5 +1,8 @@
 package com.prismwave.app
 
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.exponentialDecay
+
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
@@ -507,8 +510,8 @@ fun FullPlayer(s: AppState) {
         Modifier
             .fillMaxSize()
             .graphicsLayer {
-                translationY = lyShift * size.height * 0.18f
-                alpha = 1f - lyShift * 0.9f
+                translationY = if (SharedCover.rect != null) 0f else lyShift * size.height * 0.18f
+                alpha = if (SharedCover.rect != null) (1f - LyricsMorph.p * 1.8f).coerceAtLeast(0f) else (1f - lyShift * 0.9f).coerceAtLeast(0f)
             }
             .offset { IntOffset(0, dragY.value.roundToInt()) }
             .draggable(
@@ -721,6 +724,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
+                .shareCover()
                 .graphicsLayer {
                     scaleX = coverScale
                     scaleY = coverScale
@@ -955,9 +959,17 @@ private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
     val c2 = remember(art) { hueShift(art, 55f) }
     val rot = remember { Animatable(0f) }
     LaunchedEffect(s.playing, s.reduceMotion) {
-        if (s.playing && !s.reduceMotion) {
-            while (true) {
-                rot.animateTo(rot.value + 360f, tween(9000, easing = LinearEasing))
+        if (!s.reduceMotion) {
+            if (s.playing) {
+                // speeds up gently until it reaches the normal speed of 40 degrees a second
+                rot.animateTo(rot.value + 30f, tween(1500, easing = Easing { f -> f * f }))
+                while (true) {
+                    rot.animateTo(rot.value + 360f, tween(9000, easing = LinearEasing))
+                    rot.snapTo(rot.value % 360f)
+                }
+            } else {
+                // keeps turning for a moment and slows down like a real record
+                rot.animateDecay(40f, exponentialDecay(frictionMultiplier = 0.3f))
                 rot.snapTo(rot.value % 360f)
             }
         }
@@ -970,6 +982,7 @@ private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
     Box(
         modifier
             .aspectRatio(1f)
+            .shareCover()
             .graphicsLayer {
                 scaleX = sc
                 scaleY = sc
