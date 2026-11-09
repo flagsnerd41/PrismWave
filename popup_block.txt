@@ -1,0 +1,31 @@
+// ------------------------------------------------------------ popup menu (opens from the three dots)
+
+// each part of the popup shows up a little after the one before: it rises, fades in and sharpens
+@Composable
+private fun PopItem(i: Int, open: Float, content: @Composable () -> Unit) {
+    val p = ((open - 0.10f - i * 0.08f) / 0.45f).coerceIn(0f, 1f)
+    Box(
+        Modifier
+            .graphicsLayer {
+                alpha = p
+                translationY = (1f - p) * 26f
+            }
+            .then(if (p < 0.97f && !Opts.lite) Modifier.blur(((1f - p) * 8f).dp) else Modifier)
+    ) { content() }
+}
+
+@Composable
+private fun PopRow(icon: ImageVector, label: String, sub: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(label, color = Color.White, fontSize = 16.sp)
+            if (sub != null) Text(sub, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+

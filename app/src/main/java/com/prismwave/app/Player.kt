@@ -1,5 +1,8 @@
 package com.prismwave.app
 
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.foundation.layout.requiredWidth
+
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.exponentialDecay
 
@@ -1006,12 +1009,12 @@ private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
             for (i in 0..22) {
                 drawCircle(
                     color = Color.Black.copy(alpha = 0.16f),
-                    radius = r * (0.36f + i * 0.027f),
+                    radius = r * (0.50f + i * 0.0225f),
                     center = ctr,
                     style = Stroke(1.2f)
                 )
             }
-            drawCircle(color = Color.Black.copy(alpha = 0.7f), radius = r * 0.33f, center = ctr)
+            drawCircle(color = Color.Black.copy(alpha = 0.7f), radius = r * 0.47f, center = ctr)
             drawCircle(color = Color.White.copy(alpha = 0.35f), radius = r - 1.5f, center = ctr, style = Stroke(3f))
         }
         // the shine does not turn with the record
@@ -1030,7 +1033,7 @@ private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
         }
         Box(
             Modifier
-                .fillMaxSize(0.30f)
+                .fillMaxSize(0.44f)
                 .align(Alignment.Center)
                 .graphicsLayer { rotationZ = rot.value }
                 .clip(CircleShape)
@@ -1100,7 +1103,12 @@ private fun VinylBody(
             VinylDisc(
                 s, song, art,
                 Modifier
-                    .fillMaxWidth()
+                    .requiredWidth(
+                        minOf(
+                            LocalConfiguration.current.screenWidthDp - 12,
+                            (LocalConfiguration.current.screenHeightDp * 0.43f).toInt()
+                        ).dp
+                    )
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
                         Pages.show("lyrics")
                     }
@@ -1300,6 +1308,37 @@ private fun VolumeCard(accent: Color) {
     }
 }
 
+// ------------------------------------------------------------ popup menu (opens from the three dots)
+
+// each part of the popup shows up a little after the one before: it rises, fades in and sharpens
+@Composable
+private fun PopItem(i: Int, open: Float, content: @Composable () -> Unit) {
+    val p = ((open - 0.10f - i * 0.08f) / 0.45f).coerceIn(0f, 1f)
+    Box(
+        Modifier
+            .graphicsLayer {
+                alpha = p
+                translationY = (1f - p) * 26f
+            }
+            .then(if (p < 0.97f && !Opts.lite) Modifier.blur(((1f - p) * 8f).dp) else Modifier)
+    ) { content() }
+}
+
+@Composable
+private fun PopRow(icon: ImageVector, label: String, sub: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(label, color = Color.White, fontSize = 16.sp)
+            if (sub != null) Text(sub, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
 @Composable
 private fun PlayerMenuSheet(
     s: AppState,
@@ -1369,83 +1408,91 @@ private fun PlayerMenuSheet(
         MenuAction(Icons.Rounded.Subtitles, "Lyrics", false) { close(); Pages.show("lyrics") },
         MenuAction(Icons.Rounded.DirectionsCar, "Car mode", false) { close(); Pages.show("car") }
     )
-    val maxH = (LocalConfiguration.current.screenHeightDp * 0.92f).dp
-    Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { close() }
-            )
+    val cfg = LocalConfiguration.current
+    val maxH = (cfg.screenHeightDp * 0.80f).dp
+    val popW = minOf(cfg.screenWidthDp - 24, 340).dp
+    val open = remember { Animatable(0f) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            open.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 420f))
+        } else {
+            open.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
         }
-        AnimatedVisibility(
-            visible = visible,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = 300f)) { it },
-            exit = slideOutVertically(tween(220)) { it }
+    }
+    val o = open.value
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = o.coerceIn(0f, 1f) }
+                .background(Color.Black.copy(alpha = 0.42f))
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { close() }
+        )
+        // a card that grows out of the top right corner, near the three dots
+        Column(
+            Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 62.dp, end = 12.dp)
+                .width(popW)
+                .heightIn(max = maxH)
+                .graphicsLayer {
+                    val sc = 0.35f + 0.65f * o
+                    scaleX = sc
+                    scaleY = sc
+                    alpha = (o * 1.6f).coerceIn(0f, 1f)
+                    transformOrigin = TransformOrigin(1f, 0f)
+                    shadowElevation = 28.dp.toPx() * o.coerceIn(0f, 1f)
+                    shape = RoundedCornerShape(30.dp)
+                    clip = true
+                }
+                .background(Night)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
+                .verticalScroll(rememberScrollState())
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = maxH)
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(Night)
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
-                    .verticalScroll(rememberScrollState())
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 16.dp)
-            ) {
-                Box(
-                    Modifier
-                        .padding(vertical = 14.dp)
-                        .align(Alignment.CenterHorizontally)
-                        .width(44.dp)
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(Color.White.copy(alpha = 0.35f))
-                )
+            PopItem(0, o) {
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg).padding(16.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Cover(song, Modifier.size(72.dp), 16.dp, 24.sp)
-                    Spacer(Modifier.width(16.dp))
+                    Cover(song, Modifier.size(56.dp), 14.dp, 20.sp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Now Playing", color = s.accent, fontSize = 17.sp)
+                        Text("Now Playing", color = s.accent, fontSize = 13.sp)
                         Text(
                             song.title,
                             color = Color.White,
-                            fontSize = 22.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(song.artist, color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                VolumeCard(s.accent)
-                Spacer(Modifier.height(12.dp))
+            }
+            PopItem(1, o) { VolumeCard(s.accent) }
+            PopItem(2, o) {
                 Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg).padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     actions.chunked(3).forEach { rowItems ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             rowItems.forEach { a -> MenuTile(a, s.accent, Modifier.weight(1f)) }
                             repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(CardBg)) {
-                    MenuRow(Icons.Rounded.Person, "View artist", song.artist) { Pages.openCollection(song.artist, "", 3) }
-                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+            }
+            PopItem(3, o) {
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg)) {
+                    PopRow(Icons.Rounded.Person, "View artist", song.artist) { Pages.openCollection(song.artist, "", 3) }
                     val isDown = DownloadStore.isDownloaded(song)
                     val dlProg = DownloadStore.progress[song.id]
-                    MenuRow(
+                    PopRow(
                         Icons.Rounded.Download,
                         if (isDown) "Remove download" else if (dlProg != null) "Downloading " + (dlProg * 100).toInt() + "%" else "Download"
                     ) {
@@ -1457,12 +1504,9 @@ private fun PlayerMenuSheet(
                             toast("Downloading")
                         }
                     }
-                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                    MenuRow(Icons.Rounded.Info, "Details") { details = true }
-                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                    MenuRow(Icons.Rounded.Equalizer, "Equalizer") { Pages.show("eq") }
-                    Box(Modifier.padding(start = 64.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                    MenuRow(
+                    PopRow(Icons.Rounded.Info, "Details") { details = true }
+                    PopRow(Icons.Rounded.Equalizer, "Equalizer") { Pages.show("eq") }
+                    PopRow(
                         Icons.Rounded.Speed,
                         "Tempo and Pitch",
                         "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)

@@ -267,12 +267,16 @@ fun PagesHost(s: AppState) {
     val vert = (key ?: last) == "lyrics"
     AnimatedVisibility(
         visible = key != null,
-        enter = if (vert) {
+        enter = if (vert && SharedCover.rect != null) {
+            androidx.compose.animation.EnterTransition.None
+        } else if (vert) {
             androidx.compose.animation.slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(420))
         } else {
             slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200))
         },
-        exit = if (vert) {
+        exit = if (vert && SharedCover.rect != null) {
+            androidx.compose.animation.ExitTransition.None
+        } else if (vert) {
             androidx.compose.animation.slideOutVertically(tween(380, easing = FastOutSlowInEasing)) { it / 2 } + fadeOut(tween(300))
         } else {
             slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))

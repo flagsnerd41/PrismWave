@@ -1,0 +1,107 @@
+    val cfg = LocalConfiguration.current
+    val maxH = (cfg.screenHeightDp * 0.80f).dp
+    val popW = minOf(cfg.screenWidthDp - 24, 340).dp
+    val open = remember { Animatable(0f) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            open.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 420f))
+        } else {
+            open.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
+        }
+    }
+    val o = open.value
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = o.coerceIn(0f, 1f) }
+                .background(Color.Black.copy(alpha = 0.42f))
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { close() }
+        )
+        // a card that grows out of the top right corner, near the three dots
+        Column(
+            Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 62.dp, end = 12.dp)
+                .width(popW)
+                .heightIn(max = maxH)
+                .graphicsLayer {
+                    val sc = 0.35f + 0.65f * o
+                    scaleX = sc
+                    scaleY = sc
+                    alpha = (o * 1.6f).coerceIn(0f, 1f)
+                    transformOrigin = TransformOrigin(1f, 0f)
+                    shadowElevation = 28.dp.toPx() * o.coerceIn(0f, 1f)
+                    shape = RoundedCornerShape(30.dp)
+                    clip = true
+                }
+                .background(Night)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
+                .verticalScroll(rememberScrollState())
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            PopItem(0, o) {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Cover(song, Modifier.size(56.dp), 14.dp, 20.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Now Playing", color = s.accent, fontSize = 13.sp)
+                        Text(
+                            song.title,
+                            color = Color.White,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(song.artist, color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            PopItem(1, o) { VolumeCard(s.accent) }
+            PopItem(2, o) {
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    actions.chunked(3).forEach { rowItems ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowItems.forEach { a -> MenuTile(a, s.accent, Modifier.weight(1f)) }
+                            repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
+            }
+            PopItem(3, o) {
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg)) {
+                    PopRow(Icons.Rounded.Person, "View artist", song.artist) { Pages.openCollection(song.artist, "", 3) }
+                    val isDown = DownloadStore.isDownloaded(song)
+                    val dlProg = DownloadStore.progress[song.id]
+                    PopRow(
+                        Icons.Rounded.Download,
+                        if (isDown) "Remove download" else if (dlProg != null) "Downloading " + (dlProg * 100).toInt() + "%" else "Download"
+                    ) {
+                        if (isDown) {
+                            DownloadStore.remove(ctx, song)
+                            toast("Download removed")
+                        } else if (dlProg == null) {
+                            DownloadStore.start(ctx, song)
+                            toast("Downloading")
+                        }
+                    }
+                    PopRow(Icons.Rounded.Info, "Details") { details = true }
+                    PopRow(Icons.Rounded.Equalizer, "Equalizer") { Pages.show("eq") }
+                    PopRow(
+                        Icons.Rounded.Speed,
+                        "Tempo and Pitch",
+                        "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)
+                    ) { tempoOpen = true }
+                }
+            }
+        }
+    }
