@@ -1006,6 +1006,12 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added swipe steps and half lyrics view", a, listOf(
+        "Swipe up on the player: half view with the cover on top, a blurred bottom and the lyrics underneath",
+        "Swipe up again: the full lyrics page. Swipe down goes back one step",
+        "Swipe up on the three dots menu opens the half view too",
+        "Swipe down on the lyrics header closes the lyrics"
+    ))
     PfChange("Added popup menu, fixed cover animation, bigger vinyl cover", a, listOf(
         "The three dots menu is now a popup that grows out of the corner, with parts that rise and sharpen one after another",
         "Fixed the cover animation: the page no longer slides and fades over the flying cover",

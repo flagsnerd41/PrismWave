@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -208,7 +210,17 @@ fun LyricsScreen(s: AppState) {
         }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        var acc = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onDragEnd = { if (acc > 80f) close() },
+                            onVerticalDrag = { _, dy -> acc += dy }
+                        )
+                    }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(Modifier.size(46.dp).onGloballyPositioned { slot = it.boundsInRoot() }) {

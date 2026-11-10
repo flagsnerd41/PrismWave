@@ -1,5 +1,14 @@
 package com.prismwave.app
 
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.layout.requiredWidth
 
@@ -504,6 +513,15 @@ fun FullPlayer(s: AppState) {
     }
     val dragY = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    // steps: the player, the half lyrics view (cover on top, lyrics underneath), the full lyrics page
+    val halfP = remember { Animatable(0f) }
+    var upExtra by remember { mutableStateOf(0f) }
+    val halfVisible by remember { derivedStateOf { halfP.value > 0.001f } }
+    LaunchedEffect(PlayerStage.half) {
+        halfP.animateTo(if (PlayerStage.half) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 260f))
+    }
+    DisposableEffect(Unit) { onDispose { PlayerStage.half = false } }
+    BackHandler(enabled = PlayerStage.half) { PlayerStage.half = false }
     val lyShift by animateFloatAsState(
         if (Pages.open == "lyrics") 1f else 0f,
         tween(520, easing = FastOutSlowInEasing),
@@ -519,12 +537,34 @@ fun FullPlayer(s: AppState) {
             .offset { IntOffset(0, dragY.value.roundToInt()) }
             .draggable(
                 state = rememberDraggableState { d ->
-                    scope.launch { dragY.snapTo((dragY.value + d).coerceAtLeast(0f)) }
+                    scope.launch {
+                        if (halfP.value > 0f || (dragY.value <= 0f && d < 0f)) {
+                            // dragging up opens the half view, dragging down closes it again
+                            val before = halfP.value
+                            halfP.snapTo((halfP.value - d / 650f).coerceIn(0f, 1f))
+                            if (before >= 1f && d < 0f) upExtra += -d
+                        } else {
+                            dragY.snapTo((dragY.value + d).coerceAtLeast(0f))
+                        }
+                    }
                 },
                 orientation = Orientation.Vertical,
-                onDragStopped = {
-                    if (dragY.value > 300f) s.showPlayer = false
-                    else dragY.animateTo(0f, spring(dampingRatio = 0.7f))
+                onDragStopped = { vel ->
+                    if (halfP.value > 0f) {
+                        if (halfP.value >= 0.999f && (upExtra > 160f || vel < -1100f)) {
+                            upExtra = 0f
+                            Pages.show("lyrics")
+                        } else {
+                            upExtra = 0f
+                            val goHalf = if (vel < -700f) true else if (vel > 700f) false else halfP.value > 0.45f
+                            PlayerStage.half = goHalf
+                            halfP.animateTo(if (goHalf) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 260f))
+                        }
+                    } else if (dragY.value > 300f) {
+                        s.showPlayer = false
+                    } else {
+                        dragY.animateTo(0f, spring(dampingRatio = 0.7f))
+                    }
                 }
             )
             .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
@@ -549,6 +589,9 @@ fun FullPlayer(s: AppState) {
             } else {
                 AlbumBody(s, song, { menuDialog = true }, { addDialog = true }, { sleepDialog = true })
             }
+        }
+        if (halfVisible) {
+            HalfLyricsView(s, song) { halfP.value }
         }
     }
     if (menuDialog) {
@@ -1420,6 +1463,31 @@ private fun PlayerMenuSheet(
         }
     }
     val o = open.value
+    val openHalf: () -> Unit = {
+        PlayerStage.half = true
+        close()
+    }
+    val latestOpenHalf by rememberUpdatedState(openHalf)
+    val swipeConn = remember {
+        object : NestedScrollConnection {
+            var acc = 0f
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0f) {
+                    acc += -available.y
+                    if (acc > 100f) {
+                        acc = 0f
+                        latestOpenHalf()
+                    }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                acc = 0f
+                return Velocity.Zero
+            }
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -1448,10 +1516,32 @@ private fun PlayerMenuSheet(
                 }
                 .background(Night)
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
-                .verticalScroll(rememberScrollState())
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // swipe up on this handle, or on the menu, to open the half lyrics view
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        var acc = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onDragEnd = { if (acc < -50f) latestOpenHalf() },
+                            onVerticalDrag = { _, dy -> acc += dy }
+                        )
+                    }
+                    .padding(top = 10.dp, bottom = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.35f)))
+            }
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .nestedScroll(swipeConn)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
             PopItem(0, o) {
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(12.dp),
@@ -1512,6 +1602,7 @@ private fun PlayerMenuSheet(
                         "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)
                     ) { tempoOpen = true }
                 }
+            }
             }
         }
     }
