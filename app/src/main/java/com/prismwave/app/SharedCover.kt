@@ -41,3 +41,8 @@ fun Modifier.shareCover(priority: Int = 0): Modifier {
     DisposableEffect(Unit) { onDispose { SharedCover.clear(owner) } }
     return this.onGloballyPositioned { SharedCover.set(owner, priority, it.boundsInRoot()) }
 }
+
+// where the three dots button is, so the popup menu can grow out of it
+object MenuAnchor {
+    var rect: Rect? = null
+}

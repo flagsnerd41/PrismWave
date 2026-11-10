@@ -1,5 +1,10 @@
 package com.prismwave.app
 
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.derivedStateOf
@@ -465,7 +470,13 @@ private fun PlayerIcon(icon: ImageVector, tint: Color, size: Dp = 26.dp, box: Dp
             pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 350f))
         }
     }
-    Box(Modifier.bounceClick(onClick).size(box), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier
+            .bounceClick(onClick)
+            .size(box)
+            .onGloballyPositioned { if (icon == Icons.Rounded.MoreHoriz) MenuAnchor.rect = it.boundsInRoot() },
+        contentAlignment = Alignment.Center
+    ) {
         Icon(
             icon,
             contentDescription = null,
@@ -671,7 +682,11 @@ private fun TitleRow(
         }
         Spacer(Modifier.width(12.dp))
         Box(
-            Modifier.bounceClick(onMenu).size(40.dp).then(bgMod),
+            Modifier
+                .bounceClick(onMenu)
+                .size(40.dp)
+                .onGloballyPositioned { MenuAnchor.rect = it.boundsInRoot() }
+                .then(bgMod),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Rounded.MoreHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
@@ -1496,20 +1511,43 @@ private fun PlayerMenuSheet(
                 .background(Color.Black.copy(alpha = 0.42f))
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { close() }
         )
-        // a card that grows out of the top right corner, near the three dots
+        // a card that grows out of the three dots button: it opens down from it, or up when the button is low on the screen
+        val anchor = MenuAnchor.rect
+        val dens = LocalDensity.current
+        val screenW = with(dens) { cfg.screenWidthDp.dp.toPx() }
+        val screenH = with(dens) { cfg.screenHeightDp.dp.toPx() }
+        val popWpx = with(dens) { popW.toPx() }
+        val gap = with(dens) { 8.dp.toPx() }
+        val edge = with(dens) { 12.dp.toPx() }
+        val down = anchor == null || anchor.center.y < screenH * 0.5f
+        var cardH by remember { mutableStateOf(0) }
+        val cardLeft = if (anchor != null) {
+            (anchor.right + gap).coerceAtMost(screenW - edge) - popWpx
+        } else {
+            screenW - edge - popWpx
+        }
+        val cardTop = if (anchor == null) {
+            with(dens) { 62.dp.toPx() }
+        } else if (down) {
+            anchor.bottom + gap
+        } else {
+            (anchor.top - gap - cardH).coerceAtLeast(edge)
+        }
+        val originX = (((anchor?.center?.x ?: screenW) - cardLeft) / popWpx).coerceIn(0f, 1f)
+        val originY = if (down) 0f else 1f
+        val roomDp = if (anchor == null || down) maxH else minOf(maxH, with(dens) { ((anchor.top - gap - edge) / density).dp })
         Column(
             Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(top = 62.dp, end = 12.dp)
+                .offset { IntOffset(cardLeft.roundToInt().coerceAtLeast(0), cardTop.roundToInt().coerceAtLeast(0)) }
                 .width(popW)
-                .heightIn(max = maxH)
+                .heightIn(max = roomDp)
+                .onSizeChanged { cardH = it.height }
                 .graphicsLayer {
-                    val sc = 0.35f + 0.65f * o
+                    val sc = 0.30f + 0.70f * o
                     scaleX = sc
                     scaleY = sc
                     alpha = (o * 1.6f).coerceIn(0f, 1f)
-                    transformOrigin = TransformOrigin(1f, 0f)
+                    transformOrigin = TransformOrigin(originX, originY)
                     shadowElevation = 28.dp.toPx() * o.coerceIn(0f, 1f)
                     shape = RoundedCornerShape(30.dp)
                     clip = true
