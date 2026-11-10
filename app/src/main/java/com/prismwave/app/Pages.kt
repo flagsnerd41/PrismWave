@@ -219,6 +219,11 @@ object Pages {
     private var onClosed: (() -> Unit)? = null
 
     fun show(key: String, song: Song? = null, playlistId: String? = null) {
+        if (key == "lyrics" && PlayerStage.open) {
+            // the lyrics happen on the player itself: the cover moves up and the lyrics come in
+            PlayerStage.stage = 2
+            return
+        }
         this.song = song
         this.playlistId = playlistId
         onClosed = null

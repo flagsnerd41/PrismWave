@@ -1,0 +1,154 @@
+@Composable
+private fun VinylBody(
+    s: AppState,
+    song: Song,
+    onMenu: () -> Unit,
+    onAdd: () -> Unit,
+    onSleep: () -> Unit,
+    onQueue: () -> Unit
+) {
+    val ctx = LocalContext.current
+    Lyrics.init(ctx)
+    val artRaw = rememberArtColor(song)
+    val art by animateColorAsState(artRaw, tween(700), label = "vinylArt")
+    val total = song.seconds.coerceAtLeast(1).toFloat()
+    var lines by remember(song.id) { mutableStateOf<List<LyricLine>>(emptyList()) }
+    LaunchedEffect(song.id) { lines = Lyrics.fetch(song) }
+    val synced = lines.isNotEmpty() && lines[0].ms >= 0
+    val posMs = (s.position * 1000).toLong()
+    val idx = if (synced) lines.indexOfLast { it.ms <= posMs + 250 } else -1
+    val line1 = if (idx >= 0) lines[idx].text.ifEmpty { "..." } else song.title
+    val line2 = if (idx >= 0) (lines.getOrNull(idx + 1)?.text ?: song.artist) else song.artist
+    Box(Modifier.fillMaxSize()) {
+        SwirlBackground(art, s.reduceMotion || Opts.lite)
+        // a huge record, pushed to the right so the screen edge cuts it off
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val d = maxWidth * 1.22f
+            Box(
+                Modifier
+                    .requiredSize(d)
+                    .offset(x = maxWidth * 0.80f - d / 2, y = maxHeight * 0.42f - d / 2)
+            ) {
+                VinylDisc(s, song, art, Modifier.fillMaxSize())
+            }
+            // tap opens the lyrics, swipe left or right changes the song
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.68f)
+                    .pointerInput(song.id) {
+                        var acc = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onDragEnd = {
+                                if (acc < -120f) s.next() else if (acc > 120f) s.prev()
+                            },
+                            onHorizontalDrag = { _, dx -> acc += dx }
+                        )
+                    }
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                        Pages.show("lyrics")
+                    }
+            )
+        }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier
+                    .padding(top = 10.dp)
+                    .width(44.dp)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.45f))
+                    .clickable { s.showPlayer = false }
+            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                PlayerIcon(Icons.Rounded.Layers, Color.White) { Pages.show("stack") }
+                PlayerIcon(Icons.Rounded.Subtitles, Color.White) { Pages.show("lyrics") }
+                Spacer(Modifier.weight(1f))
+                PlayerIcon(Icons.Rounded.FormatListBulleted, Color.White) { onQueue() }
+                PlayerIcon(Icons.Rounded.MoreHoriz, Color.White) { onMenu() }
+            }
+            Spacer(Modifier.weight(1f))
+            // the lines of the song at the bottom left, like in the reference
+            Column(Modifier.fillMaxWidth(0.80f).align(Alignment.Start)) {
+                AnimatedContent(
+                    targetState = line1,
+                    transitionSpec = {
+                        (slideInVertically(tween(320)) { it / 2 } + fadeIn(tween(320))) togetherWith
+                            (slideOutVertically(tween(220)) { -it / 2 } + fadeOut(tween(160)))
+                    },
+                    label = "vinylLine1"
+                ) { t ->
+                    Text(t, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                AnimatedContent(
+                    targetState = line2,
+                    transitionSpec = { fadeIn(tween(320)) togetherWith fadeOut(tween(160)) },
+                    label = "vinylLine2"
+                ) { t ->
+                    Text(
+                        t,
+                        color = Color.White.copy(alpha = 0.62f),
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            // a thin line for the progress, drag or tap on it to seek
+            val prog = (s.position / total).coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .pointerInput(song.id) { detectTapGestures { o -> s.seekTo(o.x / size.width * total) } }
+                    .pointerInput(song.id) {
+                        detectHorizontalDragGestures { change, _ ->
+                            s.seekTo((change.position.x / size.width).coerceIn(0f, 1f) * total)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.28f)))
+                Box(
+                    Modifier
+                        .fillMaxWidth(prog)
+                        .height(3.dp)
+                        .align(Alignment.CenterStart)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White)
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.75f)) {
+                    s.shuffle = !s.shuffle
+                }
+                PlayerIcon(Icons.Rounded.SkipPrevious, Color.White, 34.dp) { s.prev() }
+                PlayerIcon(if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, Color.White, 46.dp, 64.dp) {
+                    s.toggle()
+                }
+                PlayerIcon(Icons.Rounded.SkipNext, Color.White, 34.dp) { s.next() }
+                PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.75f)) {
+                    s.repeat = !s.repeat
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+    }
+}
+

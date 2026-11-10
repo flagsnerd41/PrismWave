@@ -763,7 +763,7 @@ private fun PfPlayerPage(s: AppState) {
         }
         PfSlider(
             Icons.Rounded.Sync, "Muffle length", StudioPrefs.mixSecs.toString() + " s",
-            StudioPrefs.mixSecs.toFloat(), 5f..15f, a,
+            StudioPrefs.mixSecs.toFloat(), 5f..20f, a,
             { StudioPrefs.mixSecs = it.toInt() }, { StudioPrefs.save() }
         )
     }
@@ -1006,6 +1006,13 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added stage lyrics, Library redesign, vinyl layout, longer muffle", a, listOf(
+        "Lyrics no longer open as another page: the cover moves up and shrinks into the corner on the same screen",
+        "Half view: the bottom of the cover melts into a blur that continues behind the lyrics",
+        "Library redesigned: sliding tabs, big colorful tiles, playlist grid with cover collages, artist grid",
+        "Vinyl: a huge record pushed to the right like the reference, the lines of the song at the bottom, swipe to change song",
+        "The muffled ending now builds up over the whole length (up to 20 seconds) and the length setting works"
+    ))
     PfChange("Added swipe steps and half lyrics view", a, listOf(
         "Swipe up on the player: half view with the cover on top, a blurred bottom and the lyrics underneath",
         "Swipe up again: the full lyrics page. Swipe down goes back one step",
@@ -1170,7 +1177,7 @@ private fun PfTransitionsPage(s: AppState) {
         }
         PfSlider(
             Icons.Rounded.Sync, "Blur-out length", StudioPrefs.mixSecs.toString() + " s",
-            StudioPrefs.mixSecs.toFloat(), 5f..15f, a,
+            StudioPrefs.mixSecs.toFloat(), 5f..20f, a,
             { StudioPrefs.mixSecs = it.toInt() }, { StudioPrefs.save() }
         )
         PfSlider(

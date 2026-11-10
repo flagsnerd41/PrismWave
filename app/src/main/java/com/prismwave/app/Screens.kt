@@ -1,5 +1,12 @@
 package com.prismwave.app
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.interaction.MutableInteractionSource
+
 import androidx.compose.material.icons.rounded.Close
 
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -752,197 +759,270 @@ fun LibraryScreen(s: AppState) {
     }
 }
 
+// ------------------------------------------------------------ Library, fresh design
+
+@Composable
+private fun LibraryTabs(s: AppState) {
+    val labels = listOf("Library", "Playlists", "Artists")
+    BoxWithConstraints(
+        Modifier
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .fillMaxWidth()
+            .height(50.dp)
+            .clip(RoundedCornerShape(25.dp))
+            .background(CardBg)
+    ) {
+        val w = maxWidth / labels.size
+        val x by animateDpAsState(w * s.libTab, spring(dampingRatio = 0.8f, stiffness = 420f), label = "libTabX")
+        Box(
+            Modifier
+                .offset(x = x)
+                .width(w)
+                .fillMaxHeight()
+                .padding(4.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(s.accent)
+        )
+        Row(Modifier.fillMaxSize()) {
+            labels.forEachIndexed { i, label ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { s.libTab = i },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        label,
+                        color = if (s.libTab == i) Color.Black else Color.White.copy(alpha = 0.85f),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+// a big rounded tile with a soft color, a few covers stacked in the corner and the name at the bottom
+@Composable
+private fun BentoTile(
+    title: String,
+    sub: String,
+    icon: ImageVector,
+    tint: Color,
+    covers: List<Song>,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(28.dp)
+    Box(
+        modifier
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.45f), tint.copy(alpha = 0.14f))))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
+            .softClick(onClick)
+    ) {
+        Row(Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 14.dp)) {
+            covers.take(3).forEachIndexed { i, sg ->
+                Cover(sg, Modifier.offset(x = (-14 * i).dp).size(34.dp).border(2.dp, Color(0xFF14111A), CircleShape), 17.dp, 12.sp)
+            }
+        }
+        Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) { Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+            Spacer(Modifier.height(10.dp))
+            Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sub, color = Color.White.copy(alpha = 0.65f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun PlaylistTile(p: Playlist, s: AppState, modifier: Modifier) {
+    Column(modifier.softClick { s.openPlaylist = p.id }) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            PlaylistArt(p, p.songs.firstOrNull(), maxWidth, 24.dp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(p.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(p.songs.size.toString() + " tracks", color = TextDim, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun NewPlaylistTile(s: AppState, modifier: Modifier, onClick: () -> Unit) {
+    Column(modifier.softClick(onClick)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .size(maxWidth)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(s.accent.copy(alpha = 0.14f))
+                    .border(1.5.dp, s.accent.copy(alpha = 0.5f), RoundedCornerShape(24.dp)),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Rounded.Add, contentDescription = null, tint = s.accent, modifier = Modifier.size(40.dp)) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("New playlist", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text("Start a mix", color = TextDim, fontSize = 13.sp)
+    }
+}
+
 @Composable
 private fun LibraryMain(s: AppState) {
     var creating by remember { mutableStateOf(false) }
+    var sort by remember { mutableStateOf(0) }
     val top = s.topPlayed()
     LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
         item { Header(s) }
         item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                item { Chip("Library", s.libTab == 0, s.accent) { s.libTab = 0 } }
-                item { Chip("Playlists", s.libTab == 1, s.accent) { s.libTab = 1 } }
+            Column(Modifier.padding(horizontal = 24.dp).padding(top = 4.dp)) {
+                Text("Your library", color = Color.White, fontFamily = PrismFont, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    s.liked.size.toString() + " liked  •  " + s.playlists.size + " playlists  •  " + DownloadStore.songs.size + " offline",
+                    color = TextDim,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         }
+        item { LibraryTabs(s) }
         if (s.signedIn && s.accountMsg.isNotEmpty()) {
             item {
                 Text(
                     s.accountMsg,
                     color = TextDim,
                     fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
                 )
             }
         }
         if (s.libTab == 1) {
             item {
-                Row(
-                    Modifier
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(s.accent)
-                        .clickable { creating = true }
-                        .padding(horizontal = 22.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.Black)
-                    Spacer(Modifier.width(8.dp))
-                    Text("New playlist", color = Color.Black, fontWeight = FontWeight.SemiBold)
-                }
-            }
-            if (s.playlists.isEmpty()) {
-                item { Text("No playlists yet", color = TextDim, modifier = Modifier.padding(horizontal = 20.dp)) }
-            }
-            items(s.playlists.toList()) { p ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { s.openPlaylist = p.id }
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val first = p.songs.firstOrNull()
-                    if (first != null) {
-                        PlaylistArt(p, first, 60.dp, 14.dp)
-                    } else {
-                        Box(Modifier.size(60.dp).clip(RoundedCornerShape(14.dp)).background(CardBg2))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column {
-                        Text(p.name, color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Text(p.songs.size.toString() + " tracks", color = TextDim, fontSize = 13.sp)
+                    itemsIndexed(listOf("Recent", "A to Z", "Most songs")) { i, label ->
+                        Chip(label, sort == i, s.accent) { sort = i }
                     }
                 }
             }
-        } else {
-            item {
-                val first = top.firstOrNull()
-                Column(
-                    Modifier
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(30.dp))
-                        .background(CardBg2)
-                        .padding(20.dp)
-                ) {
-                    Row {
-                        if (first != null) {
-                            Cover(first, Modifier.size(96.dp), 18.dp, 34.sp)
-                            Spacer(Modifier.width(16.dp))
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Box(
-                                Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(s.accent.copy(alpha = 0.2f))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) { Text("MOST PLAYED", color = s.accent, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                first?.title ?: "Play something first",
-                                color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(top.size.toString() + " songs", color = TextDim, fontSize = 15.sp)
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Row(
-                            Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(s.accent)
-                                .clickable { if (first != null) s.play(first, top) }
-                                .padding(horizontal = 22.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Play all", color = Color.Black, fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(Modifier.weight(1f))
-                        RoundBtn(Icons.Rounded.ArrowForward, 0.9f, { s.libraryOpen = "My top 50" })
-                    }
-                }
+            val list = when (sort) {
+                1 -> s.playlists.sortedBy { it.name.lowercase() }
+                2 -> s.playlists.sortedByDescending { it.songs.size }
+                else -> s.playlists.toList()
             }
-            val pink = Color(0xFF5A3A3A)
-            val olive = Color(0xFF4A4224)
-            val tiles = listOf(
-                listOf("Liked songs", s.liked.size.toString() + " tracks", Icons.Rounded.Favorite, pink, Color(0xFFFF8A9A)),
-                listOf("Offline", "Downloaded", Icons.Rounded.Download, olive, s.accent),
-                listOf("Cached", "Instant playback", Icons.Rounded.Sync, olive, s.accent),
-                listOf("Local Files", "On device", Icons.Rounded.Folder, olive, s.accent),
-                listOf("My top 50", "All time", Icons.Rounded.TrendingUp, olive, s.accent)
-            )
-            itemsIndexed(tiles.chunked(2)) { ri, pair ->
+            val cells: List<Playlist?> = list + listOf<Playlist?>(null)
+            itemsIndexed(cells.chunked(2)) { ri, pair ->
                 Row(
-                    Modifier.appear(ri).fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Modifier.appear(ri).fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    pair.forEach { t ->
-                        LibTile(
-                            t[0] as String, t[1] as String, t[2] as ImageVector,
-                            t[3] as Color, t[4] as Color, Modifier.weight(1f)
-                        ) { s.libraryOpen = t[0] as String }
+                    pair.forEach { p ->
+                        if (p == null) {
+                            NewPlaylistTile(s, Modifier.weight(1f)) { creating = true }
+                        } else {
+                            PlaylistTile(p, s, Modifier.weight(1f))
+                        }
                     }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
-            item { SongRowList("Recently played", s.history.toList(), s) }
-            item {
-                SectionTitle("Your playlists", "See all") { s.libTab = 1 }
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+        } else if (s.libTab == 2) {
+            val all = s.history.toList() + s.liked.toList() + s.playlists.flatMap { it.songs }
+            val counts = all.groupingBy { it.artist }.eachCount()
+            val artists = all.distinctBy { it.artist }.sortedByDescending { counts[it.artist] ?: 0 }.take(60)
+            if (artists.isEmpty()) {
+                item { Text("Play some music and your artists show up here", color = TextDim, modifier = Modifier.padding(24.dp)) }
+            }
+            itemsIndexed(artists.chunked(3)) { ri, row ->
+                Row(
+                    Modifier.appear(ri).fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(s.playlists.toList()) { PlaylistCard(it, s) }
-                    item {
+                    row.forEach { a ->
                         Column(
                             Modifier
-                                .width(168.dp)
-                                .height(214.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                                .background(CardBg)
-                                .clickable { creating = true },
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                                .weight(1f)
+                                .softClick {
+                                    s.searchQuery = a.artist
+                                    s.screen = Screen.Search
+                                },
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(Icons.Rounded.Add, contentDescription = null, tint = s.accent)
-                            Text("New playlist", color = Color.White)
+                            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                Cover(a, Modifier.size(maxWidth), maxWidth / 2, 30.sp)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(a.artist, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text((counts[a.artist] ?: 0).toString() + " songs", color = TextDim, fontSize = 12.sp)
                         }
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        } else {
+            val pink = Color(0xFFFF6B8A)
+            val gold = s.accent
+            val teal = Color(0xFF4DB6AC)
+            val blue = Color(0xFF7C9CFF)
+            val violet = Color(0xFFB07CFF)
+            item {
+                Row(
+                    Modifier.appear(0).fillMaxWidth().padding(horizontal = 20.dp).height(252.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    BentoTile(
+                        "Liked songs", s.liked.size.toString() + " tracks", Icons.Rounded.Favorite, pink,
+                        s.liked.toList(), Modifier.weight(1f).fillMaxHeight()
+                    ) { s.libraryOpen = "Liked songs" }
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        BentoTile(
+                            "Offline", DownloadStore.songs.size.toString() + " downloaded", Icons.Rounded.Download, gold,
+                            DownloadStore.songs.toList(), Modifier.weight(1f).fillMaxWidth()
+                        ) { s.libraryOpen = "Offline" }
+                        BentoTile(
+                            "Cached", "Instant playback", Icons.Rounded.Sync, teal,
+                            emptyList(), Modifier.weight(1f).fillMaxWidth()
+                        ) { s.libraryOpen = "Cached" }
                     }
                 }
             }
-            val artists = (s.history.toList() + s.liked.toList()).distinctBy { it.artist }.take(12)
-            if (artists.isNotEmpty()) {
-                item { SectionTitle("Your artists") }
+            item {
+                Row(
+                    Modifier.appear(1).fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).height(120.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    BentoTile(
+                        "Local files", "On device", Icons.Rounded.Folder, blue,
+                        emptyList(), Modifier.weight(1f).fillMaxHeight()
+                    ) { s.libraryOpen = "Local Files" }
+                    BentoTile(
+                        "My top 50", "All time", Icons.Rounded.TrendingUp, violet,
+                        top, Modifier.weight(1f).fillMaxHeight()
+                    ) { s.libraryOpen = "My top 50" }
+                }
+            }
+            if (s.history.isNotEmpty()) {
+                item {
+                    HomeSection("Recently played") {
+                        s.openPlaylist = null
+                        s.libraryOpen = "History"
+                    }
+                }
+                item { HomeShelf(s.history.toList(), s) }
+            }
+            if (s.playlists.isNotEmpty()) {
+                item { HomeSection("Your playlists") { s.libTab = 1 } }
                 item {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(artists) { a ->
-                            Column(
-                                Modifier
-                                    .width(88.dp)
-                                    .clickable {
-                                        s.searchQuery = a.artist
-                                        s.screen = Screen.Search
-                                    },
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Cover(a, Modifier.size(88.dp), 44.dp, 30.sp)
-                                Spacer(Modifier.height(6.dp))
-                                Text(a.artist, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) { items(s.playlists.toList().take(10)) { PlaylistCard(it, s) } }
                 }
             }
         }

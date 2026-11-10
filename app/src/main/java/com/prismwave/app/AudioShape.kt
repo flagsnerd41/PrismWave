@@ -75,8 +75,8 @@ class AudioShapeProcessor : BaseAudioProcessor() {
     }
 
     private fun coefFor(m: Float): Float {
-        val k = 1f - m
-        val fc = 350f + 16000f * k * k * k
+        // the sound gets duller smoothly over the whole length, from 20000 Hz down to about 400 Hz
+        val fc = (20000.0 * Math.pow(0.02, m.toDouble())).toFloat().coerceIn(300f, 20000f)
         val a = 1f - exp(-2.0 * PI * fc / rate).toFloat()
         return if (a < 0.001f) 0.001f else if (a > 1f) 1f else a
     }

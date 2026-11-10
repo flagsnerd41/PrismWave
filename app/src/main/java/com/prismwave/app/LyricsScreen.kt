@@ -459,7 +459,7 @@ fun LyricsScreen(s: AppState) {
 }
 
 @Composable
-private fun TuneBtn(label: String, onClick: () -> Unit) {
+fun TuneBtn(label: String, onClick: () -> Unit) {
     Box(
         Modifier
             .clip(RoundedCornerShape(50))
@@ -475,7 +475,7 @@ private fun TuneBtn(label: String, onClick: () -> Unit) {
 // The line that is playing fills word by word. The time of each word is guessed from its
 // length, because the lyric files only know when a whole line starts.
 @Composable
-private fun LyricText(
+fun LyricText(
     text: String,
     startMs: Long,
     endMs: Long,
@@ -520,7 +520,7 @@ private fun LyricText(
 
 // three dots that fill up during an instrumental part
 @Composable
-private fun PauseDots(startMs: Long, endMs: Long, on: Boolean, clock: () -> Long) {
+fun PauseDots(startMs: Long, endMs: Long, on: Boolean, clock: () -> Long) {
     val p = if (on) ((clock() - startMs).toFloat() / (endMs - startMs).coerceAtLeast(1L)).coerceIn(0f, 1f) else 0f
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         for (i in 0 until 3) {

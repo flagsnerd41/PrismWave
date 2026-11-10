@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.layout.requiredSize
+
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onSizeChanged
@@ -528,11 +530,17 @@ fun FullPlayer(s: AppState) {
     val halfP = remember { Animatable(0f) }
     var upExtra by remember { mutableStateOf(0f) }
     val halfVisible by remember { derivedStateOf { halfP.value > 0.001f } }
-    LaunchedEffect(PlayerStage.half) {
-        halfP.animateTo(if (PlayerStage.half) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 260f))
+    LaunchedEffect(PlayerStage.stage) {
+        halfP.animateTo(PlayerStage.stage.toFloat(), spring(dampingRatio = 0.85f, stiffness = 260f))
     }
-    DisposableEffect(Unit) { onDispose { PlayerStage.half = false } }
-    BackHandler(enabled = PlayerStage.half) { PlayerStage.half = false }
+    DisposableEffect(Unit) {
+        PlayerStage.open = true
+        onDispose {
+            PlayerStage.open = false
+            PlayerStage.stage = 0
+        }
+    }
+    BackHandler(enabled = PlayerStage.stage > 0) { PlayerStage.back() }
     val lyShift by animateFloatAsState(
         if (Pages.open == "lyrics") 1f else 0f,
         tween(520, easing = FastOutSlowInEasing),
@@ -550,10 +558,8 @@ fun FullPlayer(s: AppState) {
                 state = rememberDraggableState { d ->
                     scope.launch {
                         if (halfP.value > 0f || (dragY.value <= 0f && d < 0f)) {
-                            // dragging up opens the half view, dragging down closes it again
-                            val before = halfP.value
-                            halfP.snapTo((halfP.value - d / 650f).coerceIn(0f, 1f))
-                            if (before >= 1f && d < 0f) upExtra += -d
+                            // dragging up goes up a step: player, half view, full lyrics. Dragging down goes back.
+                            halfP.snapTo((halfP.value - d / 650f).coerceIn(0f, 2f))
                         } else {
                             dragY.snapTo((dragY.value + d).coerceAtLeast(0f))
                         }
@@ -562,15 +568,14 @@ fun FullPlayer(s: AppState) {
                 orientation = Orientation.Vertical,
                 onDragStopped = { vel ->
                     if (halfP.value > 0f) {
-                        if (halfP.value >= 0.999f && (upExtra > 160f || vel < -1100f)) {
-                            upExtra = 0f
-                            Pages.show("lyrics")
-                        } else {
-                            upExtra = 0f
-                            val goHalf = if (vel < -700f) true else if (vel > 700f) false else halfP.value > 0.45f
-                            PlayerStage.half = goHalf
-                            halfP.animateTo(if (goHalf) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 260f))
-                        }
+                        val v = halfP.value
+                        val target = (
+                            if (vel < -700f) kotlin.math.floor(v) + 1f
+                            else if (vel > 700f) kotlin.math.ceil(v) - 1f
+                            else v.roundToInt().toFloat()
+                        ).coerceIn(0f, 2f).toInt()
+                        PlayerStage.stage = target
+                        halfP.animateTo(target.toFloat(), spring(dampingRatio = 0.85f, stiffness = 260f))
                     } else if (dragY.value > 300f) {
                         s.showPlayer = false
                     } else {
@@ -583,6 +588,7 @@ fun FullPlayer(s: AppState) {
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
     ) {
         AnimatedContent(
+            modifier = Modifier.graphicsLayer { alpha = (1f - halfP.value * 3f).coerceAtLeast(0f) },
             targetState = s.playerStyle,
             transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
             label = "pstyle"
@@ -602,7 +608,7 @@ fun FullPlayer(s: AppState) {
             }
         }
         if (halfVisible) {
-            HalfLyricsView(s, song) { halfP.value }
+            LyricsStage(s, song) { halfP.value }
         }
     }
     if (menuDialog) {
@@ -985,7 +991,7 @@ private fun hueShift(c: Color, deg: Float): Color {
 fun SwirlBackground(art: Color, still: Boolean) {
     val c2 = remember(art) { hueShift(art, 55f) }
     val c3 = remember(art) { hueShift(art, -45f) }
-    val base by animateColorAsState(lerp(art, Color.Black, 0.60f), tween(700), label = "swirlBase")
+    val base by animateColorAsState(lerp(art, Color.Black, 0.30f), tween(700), label = "swirlBase")
     val tr = rememberInfiniteTransition(label = "swirl")
     val t by tr.animateFloat(
         0f, 1f,
@@ -1043,7 +1049,6 @@ private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
     Box(
         modifier
             .aspectRatio(1f)
-            .shareCover()
             .graphicsLayer {
                 scaleX = sc
                 scaleY = sc
@@ -1067,12 +1072,12 @@ private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
             for (i in 0..22) {
                 drawCircle(
                     color = Color.Black.copy(alpha = 0.16f),
-                    radius = r * (0.50f + i * 0.0225f),
+                    radius = r * (0.44f + i * 0.0245f),
                     center = ctr,
                     style = Stroke(1.2f)
                 )
             }
-            drawCircle(color = Color.Black.copy(alpha = 0.7f), radius = r * 0.47f, center = ctr)
+            drawCircle(color = Color.Black.copy(alpha = 0.7f), radius = r * 0.40f, center = ctr)
             drawCircle(color = Color.White.copy(alpha = 0.35f), radius = r - 1.5f, center = ctr, style = Stroke(3f))
         }
         // the shine does not turn with the record
@@ -1091,8 +1096,9 @@ private fun VinylDisc(s: AppState, song: Song, art: Color, modifier: Modifier) {
         }
         Box(
             Modifier
-                .fillMaxSize(0.44f)
+                .fillMaxSize(0.34f)
                 .align(Alignment.Center)
+                .shareCover(0, true)
                 .graphicsLayer { rotationZ = rot.value }
                 .clip(CircleShape)
         ) {
@@ -1133,6 +1139,36 @@ private fun VinylBody(
     val line2 = if (idx >= 0) (lines.getOrNull(idx + 1)?.text ?: song.artist) else song.artist
     Box(Modifier.fillMaxSize()) {
         SwirlBackground(art, s.reduceMotion || Opts.lite)
+        // a huge record, pushed to the right so the screen edge cuts it off
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val d = maxWidth * 1.22f
+            Box(
+                Modifier
+                    .requiredSize(d)
+                    .offset(x = maxWidth * 0.80f - d / 2, y = maxHeight * 0.42f - d / 2)
+            ) {
+                VinylDisc(s, song, art, Modifier.fillMaxSize())
+            }
+            // tap opens the lyrics, swipe left or right changes the song
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.68f)
+                    .pointerInput(song.id) {
+                        var acc = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onDragEnd = {
+                                if (acc < -120f) s.next() else if (acc > 120f) s.prev()
+                            },
+                            onHorizontalDrag = { _, dx -> acc += dx }
+                        )
+                    }
+                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                        Pages.show("lyrics")
+                    }
+            )
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -1158,21 +1194,8 @@ private fun VinylBody(
                 PlayerIcon(Icons.Rounded.MoreHoriz, Color.White) { onMenu() }
             }
             Spacer(Modifier.weight(1f))
-            VinylDisc(
-                s, song, art,
-                Modifier
-                    .requiredWidth(
-                        minOf(
-                            LocalConfiguration.current.screenWidthDp - 12,
-                            (LocalConfiguration.current.screenHeightDp * 0.43f).toInt()
-                        ).dp
-                    )
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
-                        Pages.show("lyrics")
-                    }
-            )
-            Spacer(Modifier.weight(1f))
-            Column(Modifier.fillMaxWidth()) {
+            // the lines of the song at the bottom left, like in the reference
+            Column(Modifier.fillMaxWidth(0.80f).align(Alignment.Start)) {
                 AnimatedContent(
                     targetState = line1,
                     transitionSpec = {
@@ -1181,7 +1204,7 @@ private fun VinylBody(
                     },
                     label = "vinylLine1"
                 ) { t ->
-                    Text(t, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(t, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 AnimatedContent(
                     targetState = line2,
@@ -1190,8 +1213,8 @@ private fun VinylBody(
                 ) { t ->
                     Text(
                         t,
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 18.sp,
+                        color = Color.White.copy(alpha = 0.62f),
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1199,25 +1222,46 @@ private fun VinylBody(
                     )
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            GlowSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth())
-            TimeLabels(s, total)
-            Spacer(Modifier.height(4.dp))
-            TransportRow(s, 44.dp, 66.dp, true)
+            Spacer(Modifier.height(20.dp))
+            // a thin line for the progress, drag or tap on it to seek
+            val prog = (s.position / total).coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .pointerInput(song.id) { detectTapGestures { o -> s.seekTo(o.x / size.width * total) } }
+                    .pointerInput(song.id) {
+                        detectHorizontalDragGestures { change, _ ->
+                            s.seekTo((change.position.x / size.width).coerceIn(0f, 1f) * total)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.28f)))
+                Box(
+                    Modifier
+                        .fillMaxWidth(prog)
+                        .height(3.dp)
+                        .align(Alignment.CenterStart)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White)
+                )
+            }
             Spacer(Modifier.height(6.dp))
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.7f)) {
+                PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.75f)) {
                     s.shuffle = !s.shuffle
                 }
-                PlayerIcon(Icons.Rounded.Add, Color.White.copy(alpha = 0.7f)) { onAdd() }
-                PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White.copy(alpha = 0.7f)) {
-                    onSleep()
+                PlayerIcon(Icons.Rounded.SkipPrevious, Color.White, 34.dp) { s.prev() }
+                PlayerIcon(if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, Color.White, 46.dp, 64.dp) {
+                    s.toggle()
                 }
-                PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.7f)) {
+                PlayerIcon(Icons.Rounded.SkipNext, Color.White, 34.dp) { s.next() }
+                PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.75f)) {
                     s.repeat = !s.repeat
                 }
             }

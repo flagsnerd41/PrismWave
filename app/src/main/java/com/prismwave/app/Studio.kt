@@ -73,7 +73,7 @@ object StudioPrefs {
     var model by mutableStateOf("claude-haiku-5-5")
     var presets by mutableStateOf<List<FxSettings>>(emptyList())
     var mixOn by mutableStateOf(false)
-    var mixSecs by mutableStateOf(10)
+    var mixSecs by mutableStateOf(12)
     var mixStrength by mutableStateOf(0.9f)
     var lastStar = 0L
 
@@ -84,7 +84,7 @@ object StudioPrefs {
         starOn = sp.getBoolean("starOn", true)
         lightsOn = sp.getBoolean("lightsOn", true)
         mixOn = sp.getBoolean("mixOn", false)
-        mixSecs = sp.getInt("mixSecs", 10).coerceIn(5, 15)
+        mixSecs = sp.getInt("mixSecs", 12).coerceIn(5, 20)
         mixStrength = sp.getFloat("mixStrength", 0.9f).coerceIn(0.3f, 1f)
         apiKey = sp.getString("apiKey", "") ?: ""
         model = sp.getString("model", "claude-haiku-5-5") ?: "claude-haiku-5-5"
