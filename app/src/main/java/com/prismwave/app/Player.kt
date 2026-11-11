@@ -891,14 +891,26 @@ private fun ImmersiveBody(
             if (VideoSync.showVideo(song)) {
                 VideoStage(s, song, Modifier.fillMaxSize())
                 // a plain gradient on top instead of cutting the video with a mask every frame
+                // the bottom of the video melts into a blurred copy of the cover: the title area is frosted, no hard edge
+                if (!Opts.lite) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    brush = Brush.verticalGradient(0.46f to Color.Transparent, 0.78f to Color.Black),
+                                    blendMode = BlendMode.DstIn
+                                )
+                            }
+                    ) {
+                        Cover(song, Modifier.fillMaxSize().blur(36.dp), 0.dp, 160.sp, quality = 400)
+                    }
+                }
                 Box(
                     Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            0.44f to Color.Transparent,
-                            0.60f to bottom.copy(alpha = 0.30f),
-                            0.80f to bottom.copy(alpha = 0.80f),
-                            1f to bottom
-                        )
+                        Brush.verticalGradient(0.50f to Color.Transparent, 1f to bottom.copy(alpha = 0.85f))
                     )
                 )
             } else {
