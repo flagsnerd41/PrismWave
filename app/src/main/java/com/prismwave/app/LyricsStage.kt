@@ -1,5 +1,8 @@
 package com.prismwave.app
 
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.style.TextAlign
+
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -150,22 +153,23 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     }
     val active by remember(lines, synced, off) {
         derivedStateOf {
-            if (synced) lines.indexOfLast { it.ms <= smoothMs + off + 250 } else -1
+            if (synced) lines.indexOfLast { it.ms <= smoothMs + off } else -1
         }
     }
     val posMs = (s.position * 1000).toLong()
-    val idxHalf = if (synced) lines.indexOfLast { it.ms <= posMs + off + 250 } else -1
+    val idxHalf = if (synced) lines.indexOfLast { it.ms <= posMs + off } else -1
     val base = lerp(art, Color.Black, 0.55f)
+    val gradTop = remember(art) { tone(art, 180f, 0.45f, 0.30f) }
+    val gradBottom = remember(art) { tone(art, 0f, 0.90f, 0.55f) }
     val total = song.seconds.coerceAtLeast(1).toFloat()
     val listState = rememberLazyListState()
     LaunchedEffect(active, lines, fullVisible) {
         if (fullVisible && active >= 0) {
-            val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == active }
-            if (info != null) {
-                listState.animateScrollBy(info.offset.toFloat(), tween(650, easing = FastOutSlowInEasing))
-            } else {
-                listState.animateScrollToItem(active)
+            val target = (listState.layoutInfo.viewportSize.height * 0.35f).toInt()
+            if (abs(active + 1 - listState.firstVisibleItemIndex) > 15) {
+                listState.scrollToItem((active - 1).coerceAtLeast(0), 0)
             }
+            listState.animateScrollToItem(active + 1, -target)
         }
     }
     val blurOn = !Opts.lite && !s.batterySaver
@@ -220,7 +224,16 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
         }
 
         // 1. the soft layers behind everything
-        SwirlBackground(art, s.reduceMotion || Opts.lite)
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - (st() - 1f).coerceIn(0f, 1f) }) {
+            SwirlBackground(art, s.reduceMotion || Opts.lite)
+        }
+        // the full lyrics get a smooth gradient of the cover colors, like ArchiveTune
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = (st() - 1f).coerceIn(0f, 1f) }
+                .background(Brush.verticalGradient(0f to gradTop, 0.5f to lerp(gradTop, gradBottom, 0.45f), 1f to gradBottom))
+        )
         if (!Opts.lite) {
             Cover(
                 song,
@@ -447,16 +460,35 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                         )
                     } else {
                         LazyColumn(
-                            Modifier.fillMaxSize(),
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(alpha = 0.99f)
+                                .drawWithContent {
+                                    drawContent()
+                                    val px = 80.dp.toPx()
+                                    drawRect(
+                                        brush = Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = 0f, endY = px),
+                                        blendMode = BlendMode.DstIn
+                                    )
+                                    drawRect(
+                                        brush = Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = size.height - px, endY = size.height),
+                                        blendMode = BlendMode.DstIn
+                                    )
+                                },
                             state = listState,
-                            contentPadding = PaddingValues(top = 20.dp, bottom = 240.dp)
+                            contentPadding = PaddingValues(top = 0.dp, bottom = 240.dp)
                         ) {
+                            item { Spacer(Modifier.height(120.dp)) }
                             itemsIndexed(lines) { i, ln ->
                                 val dist = if (synced && active >= 0) abs(i - active) else 0
                                 val on = !synced || i == active
                                 val a by animateFloatAsState(
-                                    if (on) 1f else (0.5f - 0.07f * dist).coerceAtLeast(0.16f),
-                                    tween(380),
+                                    if (on) 1f
+                                    else if (dist == 1) 0.52f
+                                    else if (dist == 2) 0.30f
+                                    else if (dist == 3) 0.18f
+                                    else 0.10f,
+                                    tween(if (on) 330 else 500, easing = FastOutSlowInEasing),
                                     label = "sa"
                                 )
                                 val sc by animateFloatAsState(
@@ -465,8 +497,9 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     label = "ss"
                                 )
                                 val br by animateDpAsState(
-                                    if (on || !blurOn) 0.dp else (1.5f + 1.1f * dist).coerceAtMost(7f).dp,
-                                    tween(380),
+                                    if (on || !blurOn || !synced) 0.dp
+                                    else (if (dist == 1) 2f else if (dist == 2) 5f else 12f).dp,
+                                    tween(300, easing = FastOutSlowInEasing),
                                     label = "sb"
                                 )
                                 val endMs = if (i + 1 < lines.size) lines[i + 1].ms else ln.ms + 5000L
@@ -491,7 +524,17 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (ln.text.isEmpty()) {
                                         PauseDots(ln.ms, endMs, on && synced, { smoothMs + off })
                                     } else {
-                                        LyricText(ln.text, ln.ms, endMs, on && synced, { smoothMs + off }, fontSize, lineHeight, center)
+                                        // the whole line lights up at once, only when it is sung
+                                        Text(
+                                            ln.text,
+                                            color = Color.White,
+                                            fontFamily = PrismFont,
+                                            fontSize = fontSize,
+                                            lineHeight = lineHeight,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = if (center) TextAlign.Center else TextAlign.Start,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
                                     }
                                 }
                             }
@@ -513,4 +556,14 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
             }
         }
     }
+}
+
+// a color from the cover with its hue turned, a maximum saturation and a fixed brightness
+private fun tone(c: Color, turn: Float, maxSat: Float, bright: Float): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(c.toArgb(), hsv)
+    hsv[0] = (hsv[0] + turn + 360f) % 360f
+    hsv[1] = (hsv[1] + 0.15f).coerceAtMost(maxSat)
+    hsv[2] = bright
+    return Color(android.graphics.Color.HSVToColor(hsv))
 }

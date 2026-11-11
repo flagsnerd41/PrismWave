@@ -1006,6 +1006,11 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added ArchiveTune lyrics look", a, listOf(
+        "Gradient background from the cover colors, the playing line sits in the middle",
+        "The whole line lights up at once, only when it is sung, no word by word",
+        "Lines fade and blur the further they are from the playing one"
+    ))
     PfChange("Added stage lyrics, Library redesign, vinyl layout, longer muffle", a, listOf(
         "Lyrics no longer open as another page: the cover moves up and shrinks into the corner on the same screen",
         "Half view: the bottom of the cover melts into a blur that continues behind the lyrics",
