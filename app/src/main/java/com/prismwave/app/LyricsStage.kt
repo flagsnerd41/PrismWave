@@ -1,5 +1,12 @@
 package com.prismwave.app
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.style.TextAlign
 
@@ -151,10 +158,24 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
             smoothMs = (lastPos * 1000f).toLong() + (if (s.playing) now - lastAt else 0L)
         }
     }
+    val playing by remember(lines, synced, off) {
+        derivedStateOf { if (synced) lines.indexOfLast { it.ms <= smoothMs + off } else -1 }
+    }
+    // a line is lit only while it is being sung. After that the list moves on to the next line,
+    // which waits there dim until the song reaches it, like ArchiveTune
+    val ended by remember(lines, synced, off) {
+        derivedStateOf {
+            val pi = playing
+            synced && pi >= 0 && smoothMs + off >= lines[pi].ms + sungMs(lines, pi)
+        }
+    }
     val active by remember(lines, synced, off) {
         derivedStateOf {
-            if (synced) lines.indexOfLast { it.ms <= smoothMs + off } else -1
+            if (!synced) -1 else if (playing < 0) 0 else if (ended && playing + 1 < lines.size) playing + 1 else playing
         }
+    }
+    val litIdx by remember(lines, synced, off) {
+        derivedStateOf { if (synced && playing >= 0 && !ended) playing else -1 }
     }
     val posMs = (s.position * 1000).toLong()
     val idxHalf = if (synced) lines.indexOfLast { it.ms <= posMs + off } else -1
@@ -481,9 +502,10 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                             item { Spacer(Modifier.height(120.dp)) }
                             itemsIndexed(lines) { i, ln ->
                                 val dist = if (synced && active >= 0) abs(i - active) else 0
-                                val on = !synced || i == active
+                                val on = !synced || i == litIdx
                                 val a by animateFloatAsState(
                                     if (on) 1f
+                                    else if (dist == 0) 0.50f
                                     else if (dist == 1) 0.52f
                                     else if (dist == 2) 0.30f
                                     else if (dist == 3) 0.18f
@@ -492,12 +514,12 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     label = "sa"
                                 )
                                 val sc by animateFloatAsState(
-                                    if (on && synced) 1f else if (synced) 0.86f else 1f,
+                                    if (!synced || dist == 0) 1f else 0.95f,
                                     spring(dampingRatio = 0.72f, stiffness = 260f),
                                     label = "ss"
                                 )
                                 val br by animateDpAsState(
-                                    if (on || !blurOn || !synced) 0.dp
+                                    if (dist == 0 || !blurOn || !synced) 0.dp
                                     else (if (dist == 1) 2f else if (dist == 2) 5f else 12f).dp,
                                     tween(300, easing = FastOutSlowInEasing),
                                     label = "sb"
@@ -524,17 +546,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (ln.text.isEmpty()) {
                                         PauseDots(ln.ms, endMs, on && synced, { smoothMs + off })
                                     } else {
-                                        // the whole line lights up at once, only when it is sung
-                                        Text(
-                                            ln.text,
-                                            color = Color.White,
-                                            fontFamily = PrismFont,
-                                            fontSize = fontSize,
-                                            lineHeight = lineHeight,
-                                            fontWeight = FontWeight.Bold,
-                                            textAlign = if (center) TextAlign.Center else TextAlign.Start,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
+                                        BounceText(ln.text, on && synced, synced, fontSize, lineHeight, center)
                                     }
                                 }
                             }
@@ -566,4 +578,62 @@ private fun tone(c: Color, turn: Float, maxSat: Float, bright: Float): Color {
     hsv[1] = (hsv[1] + 0.15f).coerceAtMost(maxSat)
     hsv[2] = bright
     return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
+// how long a line is sung: a guess from its length, never longer than the gap to the next line
+private fun sungMs(lines: List<LyricLine>, i: Int): Long {
+    val gap = if (i + 1 < lines.size) lines[i + 1].ms - lines[i].ms else 6000L
+    return (lines[i].text.length * 75L).coerceIn(1400L, 6500L).coerceAtMost((gap - 200L).coerceAtLeast(500L))
+}
+
+// the line lights up when it is sung and its words bounce up one after another (like ArchiveTune)
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BounceText(
+    text: String,
+    lit: Boolean,
+    animate: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+    center: Boolean
+) {
+    val words = remember(text) { text.split(" ") }
+    val scales = remember(words.size) { List(words.size) { Animatable(1f) } }
+    val floats = remember(words.size) { List(words.size) { Animatable(0f) } }
+    LaunchedEffect(lit) {
+        if (lit && animate) {
+            words.indices.forEach { i ->
+                launch {
+                    delay(i * 40L)
+                    scales[i].animateTo(1.045f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh))
+                    scales[i].animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+                }
+                launch {
+                    delay(i * 40L)
+                    floats[i].animateTo(-5f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh))
+                    floats[i].animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+                }
+            }
+        }
+    }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (center) Arrangement.Center else Arrangement.Start
+    ) {
+        words.forEachIndexed { i, w ->
+            Text(
+                if (i < words.lastIndex) w + " " else w,
+                color = Color.White,
+                fontFamily = PrismFont,
+                fontSize = fontSize,
+                lineHeight = lineHeight,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = scales[i].value
+                    scaleY = scales[i].value
+                    translationY = floats[i].value * this.density
+                }
+            )
+        }
+    }
 }
