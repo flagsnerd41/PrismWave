@@ -69,6 +69,7 @@ internal fun ArchiveLyricsLine(
     center: Boolean,
     currentPositionMs: Long = 0L,
     timedWords: List<ArchiveTimedWord>? = null,
+    isRtl: Boolean = false,
 ) {
     val units = remember(text) { text.toLyricsWrappingUnits() }
     val scales = remember(units) { List(units.size) { Animatable(1f) } }
@@ -142,6 +143,7 @@ internal fun ArchiveLyricsLine(
                         positionMs = currentPositionMs,
                         fontSize = fontSize,
                         lineHeight = lineHeight,
+                        isRtl = isRtl,
                     )
                 }
             }
@@ -171,6 +173,7 @@ private fun ArchiveTimedWordText(
     positionMs: Long,
     fontSize: TextUnit,
     lineHeight: TextUnit,
+    isRtl: Boolean,
 ) {
     val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
     val progress = when {
@@ -221,10 +224,14 @@ private fun ArchiveTimedWordText(
                         drawContent()
                         if (active && progress < 1f) {
                             val edge = 8.dp.toPx()
-                            val centerX = (size.width + edge * 2f) * progress - edge
+                            val centerX = if (isRtl) {
+                                size.width - ((size.width + edge * 2f) * progress - edge)
+                            } else {
+                                (size.width + edge * 2f) * progress - edge
+                            }
                             drawRect(
                                 brush = Brush.horizontalGradient(
-                                    colors = listOf(Color.Black, Color.Transparent),
+                                    colors = if (isRtl) listOf(Color.Transparent, Color.Black) else listOf(Color.Black, Color.Transparent),
                                     startX = centerX - edge,
                                     endX = centerX + edge,
                                 ),
