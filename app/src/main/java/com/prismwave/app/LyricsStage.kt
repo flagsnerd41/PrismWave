@@ -79,6 +79,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.animation.core.LinearEasing
+import kotlinx.coroutines.coroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -188,6 +190,8 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     val total = song.seconds.coerceAtLeast(1).toFloat()
     val listState = rememberLazyListState()
     var placed by remember(song.id) { mutableStateOf(false) }
+    var lagDelta by remember(song.id) { mutableStateOf(0f) }
+    val lagProg = remember(song.id) { Animatable(1f) }
     LaunchedEffect(active, lines, fullVisible) {
         if (fullVisible && active >= 0) {
             withFrameNanos { }
@@ -199,7 +203,13 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
             } else {
                 val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == active + 1 }
                 if (info != null) {
-                    listState.animateScrollBy((info.offset - target).toFloat(), tween(850, easing = FastOutSlowInEasing))
+                    val delta = (info.offset - target).toFloat()
+                    lagDelta = delta
+                    lagProg.snapTo(0f)
+                    coroutineScope {
+                        launch { lagProg.animateTo(1f, tween(1200, easing = LinearEasing)) }
+                        listState.animateScrollBy(delta, tween(850, easing = FastOutSlowInEasing))
+                    }
                 } else {
                     listState.animateScrollToItem(active + 1, -target)
                 }
@@ -354,14 +364,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                     modifier = Modifier.padding(top = 20.dp)
                 )
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    for (k in 0 until 4) {
-                        val ln = lines.getOrNull(if (idxHalf >= 0) idxHalf + k else k)
-                        if (ln != null) {
-                            HalfLine(ln.text.ifEmpty { "..." }, k, idxHalf, s.reduceMotion)
-                        }
-                    }
-                }
+                HalfLyrics(lines, idxHalf, s.reduceMotion)
             }
         }
 
@@ -523,7 +526,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (prevActive != active) {
                                         prevActive = active
                                         val d = abs(i - active)
-                                        if (synced && active >= 0 && d in 1..6 && !s.reduceMotion) {
+                                        if (false) {
                                             val dir = if (i < active) -1f else 1f
                                             drift.snapTo(dir * 16f)
                                             drift.animateTo(0f, tween(900, delayMillis = d * 70, easing = FastOutSlowInEasing))
@@ -543,7 +546,10 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                         .padding(horizontal = 26.dp, vertical = 11.dp)
                                         .graphicsLayer {
                                             alpha = a
-                                            translationY = drift.value * this.density
+                                            val tms = lagProg.value * 1200f
+                                            val e = FastOutSlowInEasing.transform((tms / 850f).coerceIn(0f, 1f))
+                                            val ei = FastOutSlowInEasing.transform(((tms - (if (i > active) minOf(i - active, 5) * 70f else 0f)) / 850f).coerceIn(0f, 1f))
+                                            translationY = lagDelta * (e - ei)
                                             scaleX = sc
                                             scaleY = sc
                                             transformOrigin = TransformOrigin(if (center) 0.5f else 0f, 0.5f)
@@ -646,35 +652,67 @@ private fun BounceText(
     }
 }
 
+
 @Composable
-private fun HalfLine(text: String, k: Int, idx: Int, still: Boolean) {
-    val drift = remember { Animatable(0f) }
-    val appear = remember { Animatable(1f) }
-    var prev by remember { mutableStateOf(idx) }
-    LaunchedEffect(idx) {
-        if (prev != idx) {
-            prev = idx
-            if (!still) {
-                drift.snapTo(16f)
-                appear.snapTo(0.3f)
-                launch { appear.animateTo(1f, tween(900, delayMillis = k * 70, easing = FastOutSlowInEasing)) }
-                drift.animateTo(0f, tween(900, delayMillis = k * 70, easing = FastOutSlowInEasing))
+private fun HalfLyrics(lines: List<LyricLine>, idx: Int, still: Boolean) {
+    val ls = rememberLazyListState()
+    var placed by remember { mutableStateOf(false) }
+    var lagDelta by remember { mutableStateOf(0f) }
+    val lagProg = remember { Animatable(1f) }
+    val a0 = idx.coerceAtLeast(0)
+    LaunchedEffect(a0, lines) {
+        if (lines.isEmpty()) return@LaunchedEffect
+        val info = ls.layoutInfo.visibleItemsInfo.firstOrNull { it.index == a0 }
+        if (!placed || still || info == null) {
+            ls.scrollToItem(a0)
+            placed = true
+        } else {
+            val delta = info.offset.toFloat()
+            lagDelta = delta
+            lagProg.snapTo(0f)
+            coroutineScope {
+                launch { lagProg.animateTo(1f, tween(1200, easing = LinearEasing)) }
+                ls.animateScrollBy(delta, tween(850, easing = FastOutSlowInEasing))
             }
         }
     }
-    Text(
-        text,
-        color = Color.White,
-        fontSize = if (k == 0) 27.sp else 25.sp,
-        lineHeight = 33.sp,
-        fontWeight = FontWeight.Bold,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .graphicsLayer {
-                alpha = (if (k == 0) 1f else (0.58f - 0.16f * k).coerceAtLeast(0.14f)) * appear.value
-                translationY = drift.value * this.density
-            }
-            .then(if (k > 0 && !Opts.lite) Modifier.blur((k * 1.6f).dp) else Modifier)
-    )
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        state = ls,
+        userScrollEnabled = false,
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        itemsIndexed(lines) { i, ln ->
+            val k = i - a0
+            val al by animateFloatAsState(
+                if (k < 0) 0f else if (k == 0) 1f else (0.58f - 0.16f * k).coerceAtLeast(0.14f),
+                tween(700, easing = FastOutSlowInEasing),
+                label = "ha"
+            )
+            val bl by animateDpAsState(
+                if (k <= 0 || Opts.lite) 0.dp else (k * 1.6f).coerceAtMost(8f).dp,
+                tween(500),
+                label = "hb"
+            )
+            Text(
+                ln.text.ifEmpty { "..." },
+                color = Color.White,
+                fontSize = 26.sp,
+                lineHeight = 33.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = al
+                        val tms = lagProg.value * 1200f
+                        val e = FastOutSlowInEasing.transform((tms / 850f).coerceIn(0f, 1f))
+                        val ei = FastOutSlowInEasing.transform(((tms - (if (i > a0) minOf(i - a0, 5) * 70f else 0f)) / 850f).coerceIn(0f, 1f))
+                        translationY = lagDelta * (e - ei)
+                    }
+                    .then(if (bl > 0.05.dp) Modifier.blur(bl) else Modifier)
+            )
+        }
+    }
 }
