@@ -197,7 +197,12 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                 listState.scrollBy(-target.toFloat())
                 placed = true
             } else {
-                listState.animateScrollToItem(active + 1, -target)
+                val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == active + 1 }
+                if (info != null) {
+                    listState.animateScrollBy((info.offset - target).toFloat(), tween(850, easing = FastOutSlowInEasing))
+                } else {
+                    listState.animateScrollToItem(active + 1, -target)
+                }
             }
         }
     }
