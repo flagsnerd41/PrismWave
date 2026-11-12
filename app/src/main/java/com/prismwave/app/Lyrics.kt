@@ -107,9 +107,6 @@ object Lyrics {
     // created when the provider actually supplies timestamp markers.
     private fun parse(lrc: String): List<LyricLine> {
         val sourceLines = lrc.lines()
-        val lineStarts = sourceLines.map { line ->
-            timeTag.find(line)?.let(::timestampMs)
-        }
         val out = ArrayList<LyricLine>()
         for ((lineIndex, raw) in sourceLines.withIndex()) {
             val lineTags = timeTag.findAll(raw).toList()
@@ -118,6 +115,9 @@ object Lyrics {
             if (lineText.isEmpty()) continue
             val wordTags = wordTimeTag.findAll(lineText).toList()
             val baseLineStart = timestampMs(lineTags.first())
+            val followingLineStart = sourceLines.drop(lineIndex + 1)
+                .firstNotNullOfOrNull { nextLine -> timeTag.find(nextLine)?.let(::timestampMs) }
+                ?.takeIf { it > baseLineStart }
             val parsedWords = if (wordTags.isEmpty()) null else {
                 wordTags.mapIndexedNotNull { index, tag ->
                     val startIndex = tag.range.last + 1
@@ -127,6 +127,7 @@ object Lyrics {
                     if (tokenText.isEmpty()) return@mapIndexedNotNull null
                     val start = timestampMs(tag)
                     val nextStart = wordTags.getOrNull(index + 1)?.let(::timestampMs)
+                        ?: followingLineStart
                     ArchiveTimedWord(
                         text = tokenText,
                         startMs = start,
