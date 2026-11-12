@@ -26,6 +26,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -171,11 +172,14 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     }
     val active by remember(lines, synced, off) {
         derivedStateOf {
-            if (!synced) -1 else if (playing < 0) 0 else if (ended && playing + 1 < lines.size) playing + 1 else playing
+            if (!synced) -1 else if (playing < 0) 0 else playing
         }
     }
     val litIdx by remember(lines, synced, off) {
-        derivedStateOf { if (synced && playing >= 0 && !ended) playing else -1 }
+        derivedStateOf {
+            val longGap = playing >= 0 && playing + 1 < lines.size && lines[playing + 1].ms - lines[playing].ms > 9000L
+            if (synced && playing >= 0 && (!ended || !longGap)) playing else -1
+        }
     }
     val posMs = (s.position * 1000).toLong()
     val idxHalf = if (synced) lines.indexOfLast { it.ms <= posMs + off } else -1
@@ -184,13 +188,18 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     val gradBottom = remember(art) { tone(art, 0f, 0.90f, 0.55f) }
     val total = song.seconds.coerceAtLeast(1).toFloat()
     val listState = rememberLazyListState()
+    var placed by remember(song.id) { mutableStateOf(false) }
     LaunchedEffect(active, lines, fullVisible) {
         if (fullVisible && active >= 0) {
+            withFrameNanos { }
             val target = (listState.layoutInfo.viewportSize.height * 0.35f).toInt()
-            if (abs(active + 1 - listState.firstVisibleItemIndex) > 15) {
-                listState.scrollToItem((active - 1).coerceAtLeast(0), 0)
+            if (!placed || abs(active + 1 - listState.firstVisibleItemIndex) > 15) {
+                listState.scrollToItem(active + 1, 0)
+                listState.scrollBy(-target.toFloat())
+                placed = true
+            } else {
+                listState.animateScrollToItem(active + 1, -target)
             }
-            listState.animateScrollToItem(active + 1, -target)
         }
     }
     val blurOn = !Opts.lite && !s.batterySaver
@@ -524,6 +533,20 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     tween(300, easing = FastOutSlowInEasing),
                                     label = "sb"
                                 )
+                                val drift = remember { Animatable(0f) }
+                                var prevActive by remember { mutableStateOf(active) }
+                                LaunchedEffect(active) {
+                                    if (prevActive != active) {
+                                        prevActive = active
+                                        val d = abs(i - active)
+                                        if (synced && active >= 0 && d in 1..6 && !s.reduceMotion) {
+                                            val dir = if (i < active) -1f else 1f
+                                            delay(d * 35L)
+                                            drift.animateTo(dir * 14f, tween(260, easing = FastOutSlowInEasing))
+                                            drift.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 140f))
+                                        }
+                                    }
+                                }
                                 val endMs = if (i + 1 < lines.size) lines[i + 1].ms else ln.ms + 5000L
                                 Box(
                                     Modifier
@@ -536,6 +559,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                         .padding(horizontal = 26.dp, vertical = 11.dp)
                                         .graphicsLayer {
                                             alpha = a
+                                            translationY = drift.value * this.density
                                             scaleX = sc
                                             scaleY = sc
                                             transformOrigin = TransformOrigin(if (center) 0.5f else 0f, 0.5f)
