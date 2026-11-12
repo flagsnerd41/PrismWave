@@ -526,7 +526,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (prevActive != active) {
                                         prevActive = active
                                         val d = abs(i - active)
-                                        if (false) {
+                                        if (synced && active >= 0 && d in 1..6 && !s.reduceMotion) {
                                             val dir = if (i < active) -1f else 1f
                                             drift.snapTo(dir * 16f)
                                             drift.animateTo(0f, tween(900, delayMillis = d * 70, easing = FastOutSlowInEasing))
@@ -549,7 +549,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                             val tms = lagProg.value * 1200f
                                             val e = FastOutSlowInEasing.transform((tms / 850f).coerceIn(0f, 1f))
                                             val ei = FastOutSlowInEasing.transform(((tms - (if (i > active) minOf(i - active, 5) * 70f else 0f)) / 850f).coerceIn(0f, 1f))
-                                            translationY = lagDelta * (e - ei)
+                                            translationY = lagDelta * (e - ei) + drift.value * this.density
                                             scaleX = sc
                                             scaleY = sc
                                             transformOrigin = TransformOrigin(if (center) 0.5f else 0f, 0.5f)
