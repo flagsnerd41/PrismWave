@@ -56,6 +56,12 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -185,8 +191,8 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     val posMs = (s.position * 1000).toLong()
     val idxHalf = if (synced) lines.indexOfLast { it.ms <= posMs + off } else -1
     val base = lerp(art, Color.Black, 0.55f)
-    val gradTop = remember(art) { tone(art, -14f, 0.70f, 0.36f) }
-    val gradBottom = remember(art) { tone(art, 0f, 0.90f, 0.52f) }
+    val gradTop = remember(art) { tone(art, -22f, 0.75f, 0.18f) }
+    val gradBottom = remember(art) { tone(art, 12f, 0.95f, 0.50f) }
     val total = song.seconds.coerceAtLeast(1).toFloat()
     val listState = rememberLazyListState()
     var placed by remember(song.id) { mutableStateOf(false) }
@@ -220,12 +226,12 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     val fontSize = when (LyricsPrefs.size) {
         0 -> 25.sp
         2 -> 36.sp
-        else -> 30.sp
+        else -> 28.sp
     }
     val lineHeight = when (LyricsPrefs.size) {
         0 -> 32.sp
         2 -> 44.sp
-        else -> 38.sp
+        else -> 36.sp
     }
     val center = LyricsPrefs.center
 
@@ -276,7 +282,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = (st() - 1f).coerceIn(0f, 1f) }
-                .background(Brush.verticalGradient(0f to gradTop, 0.5f to lerp(gradTop, gradBottom, 0.45f), 1f to gradBottom))
+                .background(Brush.verticalGradient(0f to gradTop, 0.55f to lerp(gradTop, gradBottom, 0.25f), 1f to gradBottom))
         )
         if (!Opts.lite) {
             Cover(
@@ -488,7 +494,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                         blendMode = BlendMode.DstIn
                                     )
                                     drawRect(
-                                        brush = Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = size.height - px, endY = size.height),
+                                        brush = Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = size.height - px * 1.8f, endY = size.height),
                                         blendMode = BlendMode.DstIn
                                     )
                                 },
@@ -526,7 +532,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (prevActive != active) {
                                         prevActive = active
                                         val d = abs(i - active)
-                                        if (synced && active >= 0 && d in 1..6 && !s.reduceMotion) {
+                                        if (false) {
                                             val dir = if (i < active) -1f else 1f
                                             drift.snapTo(dir * 16f)
                                             drift.animateTo(0f, tween(900, delayMillis = d * 70, easing = FastOutSlowInEasing))
@@ -543,13 +549,13 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                             interactionSource = remember { MutableInteractionSource() },
                                             enabled = synced
                                         ) { s.seekTo(((ln.ms - off).coerceAtLeast(0L)) / 1000f) }
-                                        .padding(horizontal = 26.dp, vertical = 11.dp)
+                                        .padding(horizontal = 26.dp, vertical = 13.dp)
                                         .graphicsLayer {
                                             alpha = a
                                             val tms = lagProg.value * 1200f
                                             val e = FastOutSlowInEasing.transform((tms / 850f).coerceIn(0f, 1f))
                                             val ei = FastOutSlowInEasing.transform(((tms - (if (i > active) minOf(i - active, 5) * 70f else 0f)) / 850f).coerceIn(0f, 1f))
-                                            translationY = lagDelta * (e - ei) + drift.value * this.density
+                                            translationY = lagDelta * (e - ei)
                                             scaleX = sc
                                             scaleY = sc
                                             transformOrigin = TransformOrigin(if (center) 0.5f else 0f, 0.5f)
@@ -569,15 +575,26 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                 }
                 Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
                     SeekBar({ s.position }, total, { s.seekTo(it) }, Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(fmt(s.position.toInt()), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
+                        Text("-" + fmt((song.seconds - s.position.toInt()).coerceAtLeast(0)), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
+                    }
                     Row(
-                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                        Modifier.fillMaxWidth().padding(top = 14.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RoundBtn(Icons.Rounded.SkipPrevious, 0.9f, { s.prev() }, 50.dp)
-                        PlayButton(s, 64.dp, 32.dp)
-                        RoundBtn(Icons.Rounded.SkipNext, 0.9f, { s.next() }, 50.dp)
+                        Box(Modifier.bounceClick { s.prev() }.size(72.dp), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.FastRewind, contentDescription = null, tint = Color.White, modifier = Modifier.size(46.dp))
+                        }
+                        Box(Modifier.bounceClick { s.toggle() }.size(88.dp), contentAlignment = Alignment.Center) {
+                            Icon(if (s.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(70.dp))
+                        }
+                        Box(Modifier.bounceClick { s.next() }.size(72.dp), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.FastForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(46.dp))
+                        }
                     }
+                    VolumeRow()
                 }
             }
         }
@@ -714,5 +731,36 @@ private fun HalfLyrics(lines: List<LyricLine>, idx: Int, still: Boolean) {
                     .then(if (bl > 0.05.dp) Modifier.blur(bl) else Modifier)
             )
         }
+    }
+}
+
+@Composable
+private fun VolumeRow() {
+    val ctx = LocalContext.current
+    val am = remember { ctx.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
+    val maxV = remember { am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
+    var vol by remember { mutableStateOf(am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / maxV) }
+    var lastSet by remember { mutableStateOf(vol) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(500)
+            val cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() / maxV
+            if (abs(cur - lastSet) > 0.01f) {
+                vol = cur
+                lastSet = cur
+            }
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Rounded.VolumeOff, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(12.dp))
+        SeekBar({ vol }, 1f, {
+            val step = (it * maxV).roundToInt()
+            vol = it
+            lastSet = step.toFloat() / maxV
+            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, step, 0)
+        }, Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        Icon(Icons.Rounded.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
     }
 }
