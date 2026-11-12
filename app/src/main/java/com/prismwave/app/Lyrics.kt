@@ -15,7 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 // ms = -1 means the lyrics are not synced (plain text only)
-class LyricLine(val ms: Long, val text: String)
+class LyricLine(val ms: Long, val text: String, val words: List<ArchiveTimedWord>? = null)
 
 // look of the lyrics page and the sync fix for each song
 object LyricsPrefs {
@@ -66,7 +66,7 @@ object Lyrics {
             val out = ArrayList<LyricLine>()
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONArray(i)
-                out.add(LyricLine(o.getLong(0), o.getString(1)))
+                val words = if (o.length() > 2) {\n                    val wordArray = o.optJSONArray(2)\n                    if (wordArray == null) null else (0 until wordArray.length()).mapNotNull { index ->\n                        val w = wordArray.optJSONArray(index) ?: return@mapNotNull null\n                        if (w.length() < 3) return@mapNotNull null\n                        ArchiveTimedWord(w.optString(0), w.optLong(1), w.optLong(2))\n                    }.takeIf { it.isNotEmpty() }\n                } else null\n                out.add(LyricLine(o.getLong(0), o.getString(1), words))
             }
             if (out.isEmpty()) null else out
         } catch (e: Exception) {
@@ -78,7 +78,7 @@ object Lyrics {
         val f = fileFor(id) ?: return
         try {
             val arr = JSONArray()
-            for (l in lines) arr.put(JSONArray().put(l.ms).put(l.text))
+            for (l in lines) {\n                val item = JSONArray().put(l.ms).put(l.text)\n                l.words?.let { words ->\n                    val wordArray = JSONArray()\n                    words.forEach { word -> wordArray.put(JSONArray().put(word.text).put(word.startMs).put(word.endMs)) }\n                    item.put(wordArray)\n                }\n                arr.put(item)\n            }
             f.writeText(arr.toString())
         } catch (e: Exception) {
         }
@@ -98,15 +98,50 @@ object Lyrics {
         }
     }
 
+    private val wordTimeTag = Regex("<(\\d+):(\\d+(?:\\.\\d+)?)>")
+    
+    private fun timestampMs(match: MatchResult): Long =
+        ((match.groupValues[1].toLong() * 60 + match.groupValues[2].toDouble()) * 1000).toLong()
+
+    // Supports normal LRC plus enhanced LRC word markers. Word timings are only
+    // created when the provider actually supplies timestamp markers.
     private fun parse(lrc: String): List<LyricLine> {
+        val sourceLines = lrc.lines()
+        val lineStarts = sourceLines.map { line ->
+            timeTag.find(line)?.let(::timestampMs)
+        }
         val out = ArrayList<LyricLine>()
-        for (raw in lrc.lines()) {
-            val tags = timeTag.findAll(raw).toList()
-            if (tags.isEmpty()) continue
-            val text = raw.replace(timeTag, "").trim()
-            for (m in tags) {
-                val t = ((m.groupValues[1].toLong() * 60 + m.groupValues[2].toDouble()) * 1000).toLong()
-                out.add(LyricLine(t, text))
+        for ((lineIndex, raw) in sourceLines.withIndex()) {
+            val lineTags = timeTag.findAll(raw).toList()
+            if (lineTags.isEmpty()) continue
+            val lineText = raw.replace(timeTag, "").trim()
+            if (lineText.isEmpty()) continue
+            val wordTags = wordTimeTag.findAll(lineText).toList()
+            val baseLineStart = timestampMs(lineTags.first())
+            val parsedWords = if (wordTags.isEmpty()) null else {
+                wordTags.mapIndexedNotNull { index, tag ->
+                    val startIndex = tag.range.last + 1
+                    val endIndex = wordTags.getOrNull(index + 1)?.range?.first ?: lineText.length
+                    val prefix = if (index == 0) lineText.substring(0, tag.range.first) else ""
+                    val tokenText = prefix + lineText.substring(startIndex, endIndex)
+                    if (tokenText.isEmpty()) return@mapIndexedNotNull null
+                    val start = timestampMs(tag)
+                    val nextStart = wordTags.getOrNull(index + 1)?.let(::timestampMs)
+                    ArchiveTimedWord(
+                        text = tokenText,
+                        startMs = start,
+                        endMs = (nextStart ?: (start + 650L)).coerceAtLeast(start + 1L),
+                    )
+                }.takeIf { it.isNotEmpty() }
+            }
+            lineTags.forEach { lineTag ->
+                val lineStart = timestampMs(lineTag)
+                val offset = lineStart - baseLineStart
+                val words = parsedWords?.map { word ->
+                    word.copy(startMs = (word.startMs + offset).coerceAtLeast(0L),
+                        endMs = (word.endMs + offset).coerceAtLeast(word.startMs + offset + 1L))
+                }
+                out.add(LyricLine(lineStart, lineText.replace(wordTimeTag, ""), words))
             }
         }
         return out.sortedBy { it.ms }
