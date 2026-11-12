@@ -172,20 +172,19 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     }
     val active by remember(lines, synced, off) {
         derivedStateOf {
-            if (!synced) -1 else if (playing < 0) 0 else playing
+            if (!synced) -1 else if (playing < 0) 0 else if (ended && playing + 1 < lines.size && lines[playing + 1].ms - lines[playing].ms > 2500L) playing + 1 else playing
         }
     }
     val litIdx by remember(lines, synced, off) {
         derivedStateOf {
-            val longGap = playing >= 0 && playing + 1 < lines.size && lines[playing + 1].ms - lines[playing].ms > 9000L
-            if (synced && playing >= 0 && (!ended || !longGap)) playing else -1
+            if (synced && playing >= 0 && !ended) playing else -1
         }
     }
     val posMs = (s.position * 1000).toLong()
     val idxHalf = if (synced) lines.indexOfLast { it.ms <= posMs + off } else -1
     val base = lerp(art, Color.Black, 0.55f)
-    val gradTop = remember(art) { tone(art, 180f, 0.45f, 0.30f) }
-    val gradBottom = remember(art) { tone(art, 0f, 0.90f, 0.55f) }
+    val gradTop = remember(art) { tone(art, -14f, 0.70f, 0.36f) }
+    val gradBottom = remember(art) { tone(art, 0f, 0.90f, 0.52f) }
     val total = song.seconds.coerceAtLeast(1).toFloat()
     val listState = rememberLazyListState()
     var placed by remember(song.id) { mutableStateOf(false) }
@@ -350,31 +349,11 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                     modifier = Modifier.padding(top = 20.dp)
                 )
             } else {
-                AnimatedContent(
-                    targetState = idxHalf,
-                    transitionSpec = {
-                        (slideInVertically(tween(450, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(350))) togetherWith
-                            (slideOutVertically(tween(350, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(250)))
-                    },
-                    label = "stageLines"
-                ) { i ->
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        for (k in 0 until 4) {
-                            val ln = lines.getOrNull(if (i >= 0) i + k else k)
-                            if (ln != null) {
-                                Text(
-                                    ln.text.ifEmpty { "..." },
-                                    color = Color.White,
-                                    fontSize = if (k == 0) 27.sp else 25.sp,
-                                    lineHeight = 33.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .graphicsLayer { alpha = if (k == 0) 1f else (0.58f - 0.16f * k).coerceAtLeast(0.14f) }
-                                        .then(if (k > 0 && !Opts.lite) Modifier.blur((k * 1.6f).dp) else Modifier)
-                                )
-                            }
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    for (k in 0 until 4) {
+                        val ln = lines.getOrNull(if (idxHalf >= 0) idxHalf + k else k)
+                        if (ln != null) {
+                            HalfLine(ln.text.ifEmpty { "..." }, k, idxHalf, s.reduceMotion)
                         }
                     }
                 }
@@ -518,7 +497,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     else if (dist == 1) 0.52f
                                     else if (dist == 2) 0.30f
                                     else if (dist == 3) 0.18f
-                                    else 0.10f,
+                                    else 0.14f,
                                     tween(if (on) 330 else 500, easing = FastOutSlowInEasing),
                                     label = "sa"
                                 )
@@ -529,7 +508,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                 )
                                 val br by animateDpAsState(
                                     if (dist == 0 || !blurOn || !synced) 0.dp
-                                    else (if (dist == 1) 2f else if (dist == 2) 5f else 12f).dp,
+                                    else (if (dist == 1) 1.5f else if (dist == 2) 3.5f else 6f).dp,
                                     tween(300, easing = FastOutSlowInEasing),
                                     label = "sb"
                                 )
@@ -540,10 +519,10 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                         prevActive = active
                                         val d = abs(i - active)
                                         if (synced && active >= 0 && d in 1..6 && !s.reduceMotion) {
-                                            val dir = if (i < active) 1f else -1f
-                                            delay(d * 60L)
-                                            drift.animateTo(dir * 18f, tween(700, easing = FastOutSlowInEasing))
-                                            drift.animateTo(0f, tween(900, easing = FastOutSlowInEasing))
+                                            val dir = if (i < active) -1f else 1f
+                                            drift.snapTo(dir * 16f)
+                                            drift.animateTo(0f, tween(900, delayMillis = d * 70, easing = FastOutSlowInEasing))
+                                            
                                         }
                                     }
                                 }
@@ -607,7 +586,7 @@ private fun tone(c: Color, turn: Float, maxSat: Float, bright: Float): Color {
 // how long a line is sung: a guess from its length, never longer than the gap to the next line
 private fun sungMs(lines: List<LyricLine>, i: Int): Long {
     val gap = if (i + 1 < lines.size) lines[i + 1].ms - lines[i].ms else 6000L
-    return (lines[i].text.length * 75L).coerceIn(1400L, 6500L).coerceAtMost((gap - 200L).coerceAtLeast(500L))
+    return (lines[i].text.length * 95L).coerceIn(1800L, 8000L).coerceAtMost((gap - 200L).coerceAtLeast(500L))
 }
 
 // the line lights up when it is sung and its words bounce up one after another (like ArchiveTune)
@@ -660,4 +639,37 @@ private fun BounceText(
             )
         }
     }
+}
+
+@Composable
+private fun HalfLine(text: String, k: Int, idx: Int, still: Boolean) {
+    val drift = remember { Animatable(0f) }
+    val appear = remember { Animatable(1f) }
+    var prev by remember { mutableStateOf(idx) }
+    LaunchedEffect(idx) {
+        if (prev != idx) {
+            prev = idx
+            if (!still) {
+                drift.snapTo(16f)
+                appear.snapTo(0.3f)
+                launch { appear.animateTo(1f, tween(900, delayMillis = k * 70, easing = FastOutSlowInEasing)) }
+                drift.animateTo(0f, tween(900, delayMillis = k * 70, easing = FastOutSlowInEasing))
+            }
+        }
+    }
+    Text(
+        text,
+        color = Color.White,
+        fontSize = if (k == 0) 27.sp else 25.sp,
+        lineHeight = 33.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .graphicsLayer {
+                alpha = (if (k == 0) 1f else (0.58f - 0.16f * k).coerceAtLeast(0.14f)) * appear.value
+                translationY = drift.value * this.density
+            }
+            .then(if (k > 0 && !Opts.lite) Modifier.blur((k * 1.6f).dp) else Modifier)
+    )
 }
