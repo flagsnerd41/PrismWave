@@ -212,34 +212,47 @@ fun NavBar(s: AppState) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         LiquidGlass(s.glassAlpha(), Modifier.weight(1f).height(72.dp), 36.dp) {
-            Row(
-                Modifier.fillMaxSize().padding(5.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                tabs.forEach { (screen, icon, label) ->
-                    val sel = s.screen == screen
-                    val bg by animateColorAsState(
-                        if (sel) s.accent.copy(alpha = 0.24f) else Color.Transparent, tween(250), label = "navbg"
-                    )
-                    val fg by animateColorAsState(
-                        if (sel) s.accent else Color.White.copy(alpha = 0.85f), tween(250), label = "navfg"
-                    )
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(31.dp))
-                            .background(bg)
-                            .softClick {
-                                s.screen = screen
-                                s.libraryOpen = null
-                                s.openPlaylist = null
-                            },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(28.dp))
-                        Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            BoxWithConstraints(Modifier.fillMaxSize().padding(5.dp)) {
+                val tabW = (maxWidth - 4.dp) / 2
+                val idx = tabs.indexOfFirst { it.first == s.screen }
+                var lastIdx by remember { mutableStateOf(0) }
+                val shownIdx = if (idx >= 0) idx else lastIdx
+                androidx.compose.runtime.SideEffect { lastIdx = shownIdx }
+                val pillX by animateDpAsState((tabW + 4.dp) * shownIdx, tween(420, easing = FastOutSlowInEasing), label = "pillx")
+                val pillA by animateFloatAsState(if (idx >= 0) 1f else 0f, tween(260), label = "pilla")
+                Box(
+                    Modifier
+                        .width(tabW)
+                        .fillMaxHeight()
+                        .graphicsLayer {
+                            translationX = pillX.toPx()
+                            alpha = pillA
+                        }
+                        .clip(RoundedCornerShape(31.dp))
+                        .background(s.accent.copy(alpha = 0.24f))
+                )
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    tabs.forEach { (screen, icon, label) ->
+                        val sel = s.screen == screen
+                        val fg by animateColorAsState(
+                            if (sel) s.accent else Color.White.copy(alpha = 0.85f), tween(300), label = "navfg"
+                        )
+                        Column(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(31.dp))
+                                .softClick {
+                                    s.screen = screen
+                                    s.libraryOpen = null
+                                    s.openPlaylist = null
+                                },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(28.dp))
+                            Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
                     }
                 }
             }
@@ -289,10 +302,11 @@ fun MiniPlayer(s: AppState) {
     }
     AnimatedVisibility(
         visible = shown,
-        enter = slideInVertically(spring(dampingRatio = 0.75f, stiffness = 260f)) { it } + fadeIn(tween(250))
+        enter = slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(350))
     ) {
-        LiquidGlass(
+        MiniShell(
             s.glassAlpha(),
+            art,
             Modifier
                 .fillMaxWidth()
                 .drawBehind {
@@ -1711,5 +1725,41 @@ private fun PlayerMenuSheet(
             Pages.show("details", song)
             details = false
         }
+    }
+}
+
+object MiniStyle {
+    var gradient by mutableStateOf(true)
+    private var loaded = false
+    fun init(ctx: android.content.Context) {
+        if (loaded) return
+        loaded = true
+        gradient = ctx.getSharedPreferences("prismwave", 0).getBoolean("miniGradient", true)
+    }
+    fun set(ctx: android.content.Context, v: Boolean) {
+        gradient = v
+        ctx.getSharedPreferences("prismwave", 0).edit().putBoolean("miniGradient", v).apply()
+    }
+}
+
+// the mini player: a gradient of the cover colors, or the blur glass
+@Composable
+private fun MiniShell(
+    alpha: Float,
+    art: Color,
+    modifier: Modifier,
+    radius: androidx.compose.ui.unit.Dp,
+    content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit
+) {
+    if (MiniStyle.gradient) {
+        val c by animateColorAsState(art, tween(700), label = "miniArt")
+        Box(
+            modifier
+                .clip(RoundedCornerShape(radius))
+                .background(Brush.horizontalGradient(listOf(lerp(Night, c, 0.62f), lerp(Night, c, 0.30f)))),
+            content = content
+        )
+    } else {
+        LiquidGlass(alpha, modifier, radius, content)
     }
 }

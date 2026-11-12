@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx) }
+            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(false) }
@@ -280,8 +280,8 @@ fun Main(s: AppState) {
             }
             AnimatedVisibility(
                 visible = s.showPlayer,
-                enter = slideInVertically(spring(dampingRatio = 0.85f, stiffness = 300f)) { it } + fadeIn(tween(200)),
-                exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))
+                enter = slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(380)),
+                exit = slideOutVertically(tween(420, easing = FastOutSlowInEasing)) { it / 2 } + fadeOut(tween(320))
             ) { FullPlayer(s) }
             PagesHost(s)
             VideoWarmup(s)

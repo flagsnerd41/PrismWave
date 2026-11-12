@@ -668,6 +668,10 @@ private fun PfAppearancePage(s: AppState) {
             if (ok) "Real glass refraction on the bottom bar. Off or Lite mode uses the normal blur" else "Needs Android 13 or newer",
             LiquidGlassOpt.on && ok, a
         ) { if (ok) LiquidGlassOpt.set(lctx, it) }
+        PfSwitch(
+            Icons.Rounded.Palette, "Gradient mini player",
+            "Cover color gradient. Off uses the blur glass", MiniStyle.gradient, a
+        ) { MiniStyle.set(lctx, it) }
     }
     PfLabel("Status bar", a)
     PfGroup {
