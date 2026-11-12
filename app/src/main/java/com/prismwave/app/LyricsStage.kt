@@ -540,10 +540,10 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                         prevActive = active
                                         val d = abs(i - active)
                                         if (synced && active >= 0 && d in 1..6 && !s.reduceMotion) {
-                                            val dir = if (i < active) -1f else 1f
-                                            delay(d * 35L)
-                                            drift.animateTo(dir * 14f, tween(260, easing = FastOutSlowInEasing))
-                                            drift.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 140f))
+                                            val dir = if (i < active) 1f else -1f
+                                            delay(d * 60L)
+                                            drift.animateTo(dir * 18f, tween(700, easing = FastOutSlowInEasing))
+                                            drift.animateTo(0f, tween(900, easing = FastOutSlowInEasing))
                                         }
                                     }
                                 }
@@ -625,7 +625,7 @@ private fun BounceText(
     val scales = remember(words.size) { List(words.size) { Animatable(1f) } }
     val floats = remember(words.size) { List(words.size) { Animatable(0f) } }
     LaunchedEffect(lit) {
-        if (lit && animate) {
+        if (false) {
             words.indices.forEach { i ->
                 launch {
                     delay(i * 40L)
