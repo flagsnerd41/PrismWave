@@ -205,7 +205,7 @@ object Lyrics {
         return out.distinct()
     }
 
-    suspend fun fetch(song: Song): List<LyricLine> = withContext(Dispatchers.IO) {
+    internal suspend fun fetch(song: Song): List<LyricLine> = withContext(Dispatchers.IO) {
         cache[song.id]?.let { return@withContext it }
         load(song.id)?.let {
             cache[song.id] = it
