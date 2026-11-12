@@ -546,7 +546,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (ln.text.isEmpty()) {
                                         PauseDots(ln.ms, endMs, on && synced, { smoothMs + off })
                                     } else {
-                                        BounceText(ln.text, on && synced, synced, fontSize, lineHeight, center)
+                                        ArchiveLyricsLine(ln.text, on && synced, synced, fontSize, lineHeight, center, currentPositionMs = smoothMs + off)
                                     }
                                 }
                             }
@@ -584,56 +584,4 @@ private fun tone(c: Color, turn: Float, maxSat: Float, bright: Float): Color {
 private fun sungMs(lines: List<LyricLine>, i: Int): Long {
     val gap = if (i + 1 < lines.size) lines[i + 1].ms - lines[i].ms else 6000L
     return (lines[i].text.length * 75L).coerceIn(1400L, 6500L).coerceAtMost((gap - 200L).coerceAtLeast(500L))
-}
-
-// the line lights up when it is sung and its words bounce up one after another (like ArchiveTune)
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun BounceText(
-    text: String,
-    lit: Boolean,
-    animate: Boolean,
-    fontSize: androidx.compose.ui.unit.TextUnit,
-    lineHeight: androidx.compose.ui.unit.TextUnit,
-    center: Boolean
-) {
-    val words = remember(text) { text.split(" ") }
-    val scales = remember(words.size) { List(words.size) { Animatable(1f) } }
-    val floats = remember(words.size) { List(words.size) { Animatable(0f) } }
-    LaunchedEffect(lit) {
-        if (lit && animate) {
-            words.indices.forEach { i ->
-                launch {
-                    delay(i * 40L)
-                    scales[i].animateTo(1.045f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh))
-                    scales[i].animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
-                }
-                launch {
-                    delay(i * 40L)
-                    floats[i].animateTo(-5f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh))
-                    floats[i].animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
-                }
-            }
-        }
-    }
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (center) Arrangement.Center else Arrangement.Start
-    ) {
-        words.forEachIndexed { i, w ->
-            Text(
-                if (i < words.lastIndex) w + " " else w,
-                color = Color.White,
-                fontFamily = PrismFont,
-                fontSize = fontSize,
-                lineHeight = lineHeight,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = scales[i].value
-                    scaleY = scales[i].value
-                    translationY = floats[i].value * this.density
-                }
-            )
-        }
-    }
 }
