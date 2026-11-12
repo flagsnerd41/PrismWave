@@ -15,7 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 // ms = -1 means the lyrics are not synced (plain text only)
-class LyricLine(val ms: Long, val text: String, val words: List<ArchiveTimedWord>? = null)
+internal class LyricLine(val ms: Long, val text: String, val words: List<ArchiveTimedWord>? = null)
 
 // look of the lyrics page and the sync fix for each song
 object LyricsPrefs {
@@ -66,7 +66,15 @@ object Lyrics {
             val out = ArrayList<LyricLine>()
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONArray(i)
-                val words = if (o.length() > 2) {\n                    val wordArray = o.optJSONArray(2)\n                    if (wordArray == null) null else (0 until wordArray.length()).mapNotNull { index ->\n                        val w = wordArray.optJSONArray(index) ?: return@mapNotNull null\n                        if (w.length() < 3) return@mapNotNull null\n                        ArchiveTimedWord(w.optString(0), w.optLong(1), w.optLong(2))\n                    }.takeIf { it.isNotEmpty() }\n                } else null\n                out.add(LyricLine(o.getLong(0), o.getString(1), words))
+                val words = if (o.length() > 2) {
+                    val wordArray = o.optJSONArray(2)
+                    if (wordArray == null) null else (0 until wordArray.length()).mapNotNull { index ->
+                        val w = wordArray.optJSONArray(index) ?: return@mapNotNull null
+                        if (w.length() < 3) return@mapNotNull null
+                        ArchiveTimedWord(w.optString(0), w.optLong(1), w.optLong(2))
+                    }.takeIf { it.isNotEmpty() }
+                } else null
+                out.add(LyricLine(o.getLong(0), o.getString(1), words))
             }
             if (out.isEmpty()) null else out
         } catch (e: Exception) {
@@ -78,7 +86,15 @@ object Lyrics {
         val f = fileFor(id) ?: return
         try {
             val arr = JSONArray()
-            for (l in lines) {\n                val item = JSONArray().put(l.ms).put(l.text)\n                l.words?.let { words ->\n                    val wordArray = JSONArray()\n                    words.forEach { word -> wordArray.put(JSONArray().put(word.text).put(word.startMs).put(word.endMs)) }\n                    item.put(wordArray)\n                }\n                arr.put(item)\n            }
+            for (l in lines) {
+                val item = JSONArray().put(l.ms).put(l.text)
+                l.words?.let { words ->
+                    val wordArray = JSONArray()
+                    words.forEach { word -> wordArray.put(JSONArray().put(word.text).put(word.startMs).put(word.endMs)) }
+                    item.put(wordArray)
+                }
+                arr.put(item)
+            }
             f.writeText(arr.toString())
         } catch (e: Exception) {
         }
