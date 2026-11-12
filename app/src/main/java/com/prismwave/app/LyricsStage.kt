@@ -1,11 +1,5 @@
 package com.prismwave.app
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.style.TextAlign
