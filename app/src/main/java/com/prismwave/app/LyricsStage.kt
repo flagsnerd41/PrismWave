@@ -209,7 +209,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .graphicsLayer { alpha = (st() * 3f).coerceIn(0f, 1f) }
+            .graphicsLayer { alpha = (st() * 1.6f).coerceIn(0f, 1f) }
             .background(base)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
     ) {

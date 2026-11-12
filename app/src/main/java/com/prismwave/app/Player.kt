@@ -531,7 +531,7 @@ fun FullPlayer(s: AppState) {
     var upExtra by remember { mutableStateOf(0f) }
     val halfVisible by remember { derivedStateOf { halfP.value > 0.001f } }
     LaunchedEffect(PlayerStage.stage) {
-        halfP.animateTo(PlayerStage.stage.toFloat(), spring(dampingRatio = 0.85f, stiffness = 260f))
+        halfP.animateTo(PlayerStage.stage.toFloat(), spring(dampingRatio = 0.9f, stiffness = 150f))
     }
     DisposableEffect(Unit) {
         PlayerStage.open = true
@@ -575,7 +575,7 @@ fun FullPlayer(s: AppState) {
                             else v.roundToInt().toFloat()
                         ).coerceIn(0f, 2f).toInt()
                         PlayerStage.stage = target
-                        halfP.animateTo(target.toFloat(), spring(dampingRatio = 0.85f, stiffness = 260f))
+                        halfP.animateTo(target.toFloat(), spring(dampingRatio = 0.9f, stiffness = 150f))
                     } else if (dragY.value > 300f) {
                         s.showPlayer = false
                     } else {
@@ -588,7 +588,12 @@ fun FullPlayer(s: AppState) {
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
     ) {
         AnimatedContent(
-            modifier = Modifier.graphicsLayer { alpha = (1f - halfP.value * 3f).coerceAtLeast(0f) },
+            modifier = Modifier.graphicsLayer {
+                val sc = 1f - 0.07f * halfP.value.coerceIn(0f, 1f)
+                scaleX = sc
+                scaleY = sc
+                alpha = (1f - halfP.value * 2f).coerceAtLeast(0f)
+            },
             targetState = s.playerStyle,
             transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
             label = "pstyle"
