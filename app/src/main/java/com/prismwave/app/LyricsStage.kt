@@ -540,7 +540,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (ln.text.isEmpty()) {
                                         PauseDots(ln.ms, endMs, on && synced, { smoothMs + off })
                                     } else {
-                                        ArchiveLyricsLine(ln.text, on && synced, synced, fontSize, lineHeight, center, currentPositionMs = smoothMs + off)
+                                        ArchiveLyricsLine(ln.text, on && synced, synced, fontSize, lineHeight, center, currentPositionMs = smoothMs + off, timedWords = ln.words)
                                     }
                                 }
                             }
