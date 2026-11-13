@@ -42,48 +42,70 @@ private fun Modifier.flightBox(rect: () -> FloatArray): Modifier = this.layout {
     layout(constraints.maxWidth, constraints.maxHeight) { p.place(r[0].roundToInt(), r[1].roundToInt()) }
 }
 
-// When the full player opens, the small cover of the mini player grows and flies to the big cover.
+// Opening the full player: the small cover of the mini player grows and flies to the big cover.
+// Closing it: the big cover shrinks and flies back into the mini player.
 @Composable
 fun CoverFlight(s: AppState) {
     val density = LocalDensity.current
     val cfg = LocalConfiguration.current
     val p = remember { Animatable(0f) }
+    val wasOpen = remember { BooleanArray(1) }
     var active by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
     var from by remember { mutableStateOf<Rect?>(null) }
     var to by remember { mutableStateOf<Rect?>(null) }
     var wide by remember { mutableStateOf(false) }
-    var round by remember { mutableStateOf(false) }
+    var rad0 by remember { mutableStateOf(12f) }
+    var rad1 by remember { mutableStateOf(20f) }
     LaunchedEffect(s.showPlayer) {
-        if (!s.showPlayer) {
-            active = false
-            return@LaunchedEffect
-        }
-        val start = MiniCover.rect
-        if (start == null || s.reduceMotion) return@LaunchedEffect
-        // the Immersive player has a full-width cover stage, the others report where their cover is
-        if (s.playerStyle != 1) {
-            var tries = 0
-            while (SharedCover.rect == null && tries < 8) {
-                delay(16)
-                tries++
-            }
-        }
-        val sr = if (s.playerStyle == 1) null else SharedCover.rect
+        val mini = MiniCover.rect
         val wPx = density.density * cfg.screenWidthDp
         val hPx = density.density * cfg.screenHeightDp
-        from = start
-        to = sr ?: Rect(0f, 0f, wPx, hPx * 0.64f)
-        wide = sr == null
-        round = sr != null && SharedCover.circle
-        p.snapTo(0f)
-        active = true
-        p.animateTo(1f, tween(480, easing = FastOutSlowInEasing))
-        active = false
+        if (s.showPlayer) {
+            active = false
+            wasOpen[0] = true
+            if (mini == null || s.reduceMotion) return@LaunchedEffect
+            // the Immersive player has a full-width cover stage, the others report where their cover is
+            if (s.playerStyle != 1) {
+                var tries = 0
+                while (SharedCover.rect == null && tries < 8) {
+                    delay(16)
+                    tries++
+                }
+            }
+            val sr = if (s.playerStyle == 1) null else SharedCover.rect
+            from = mini
+            to = sr ?: Rect(0f, 0f, wPx, hPx * 0.64f)
+            wide = sr == null
+            closing = false
+            rad0 = 12f
+            rad1 = if (sr != null && SharedCover.circle) sr.width / density.density / 2f else if (sr == null) 0f else 20f
+            p.snapTo(0f)
+            active = true
+            p.animateTo(1f, tween(480, easing = FastOutSlowInEasing))
+            active = false
+        } else {
+            val was = wasOpen[0]
+            wasOpen[0] = false
+            active = false
+            // only when the player itself is showing, not the lyrics
+            if (!was || mini == null || s.reduceMotion || PlayerStage.stage != 0 || Pages.open == "lyrics") return@LaunchedEffect
+            val sr = if (s.playerStyle == 1) null else SharedCover.rect
+            from = sr ?: Rect(0f, 0f, wPx, hPx * 0.64f)
+            to = mini
+            wide = sr == null
+            closing = true
+            rad0 = if (sr != null && SharedCover.circle) sr.width / density.density / 2f else if (sr == null) 0f else 20f
+            rad1 = 12f
+            p.snapTo(0f)
+            active = true
+            p.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+            active = false
+        }
     }
     val f = from
     val t = to
     if (active && f != null && t != null) {
-        val endRad = if (round) t.width / density.density / 2f else if (wide) 0f else 20f
         Box(Modifier.fillMaxSize()) {
             Box(
                 Modifier
@@ -98,14 +120,14 @@ fun CoverFlight(s: AppState) {
                     }
                     .graphicsLayer {
                         val v = p.value
-                        shape = RoundedCornerShape((12f + (endRad - 12f) * v).coerceAtLeast(0f).dp)
+                        shape = RoundedCornerShape((rad0 + (rad1 - rad0) * v).coerceAtLeast(0f).dp)
                         clip = true
                         compositingStrategy = CompositingStrategy.Offscreen
                     }
                     .drawWithContent {
                         drawContent()
                         if (wide) {
-                            val v = p.value
+                            val v = if (closing) 1f - p.value else p.value
                             drawRect(
                                 brush = Brush.verticalGradient(
                                     0f to Color.Black,
