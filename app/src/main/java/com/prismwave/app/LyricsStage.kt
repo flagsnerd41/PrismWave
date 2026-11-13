@@ -1,7 +1,6 @@
 package com.prismwave.app
 
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.statusBars
 
 import androidx.compose.animation.core.Animatable
@@ -252,7 +251,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
         val halfH = hPx * 0.56f
         val smallSize = 46f * dp
         val smallLeft = 16f * dp
-        val smallTop = maxOf(WindowInsets.statusBarsIgnoringVisibility.getTop(density), WindowInsets.displayCutout.getTop(density), WindowInsets.statusBars.getTop(density)).toFloat() + 26f * dp
+        val smallTop = maxOf(WindowInsets.displayCutout.getTop(density), WindowInsets.statusBars.getTop(density)).toFloat() + 26f * dp
         val rowH = 56f * dp
 
         fun ease(x: Float): Float = FastOutSlowInEasing.transform(x.coerceIn(0f, 1f))
