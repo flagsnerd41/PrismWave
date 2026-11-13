@@ -143,17 +143,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 
 // ------------------------------------------------------------ shared bits
 
 @Composable
 fun Header(s: AppState) {
     var stats by remember { mutableStateOf(false) }
+    val hdrA by animateFloatAsState(if (HeaderPos.hide) 0f else 1f, tween(250), label = "hdr")
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AppLogo(42.dp)
+        Box(
+            Modifier
+                .onGloballyPositioned { HeaderPos.logo = it.boundsInRoot() }
+                .graphicsLayer { alpha = hdrA }
+        ) { AppLogo(42.dp) }
         Spacer(Modifier.width(12.dp))
         Text(
             "PrismWave",
@@ -162,7 +172,10 @@ fun Header(s: AppState) {
             fontSize = 27.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.4.sp,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .onGloballyPositioned { HeaderPos.title = it.boundsInRoot() }
+                .graphicsLayer { alpha = hdrA }
         )
         RoundBtn(Icons.Rounded.History, 0.9f, {
             s.openPlaylist = null
@@ -2404,4 +2417,11 @@ private fun ProfileAvatar(s: AppState) {
             Icon(Icons.Rounded.AccountCircle, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(34.dp))
         }
     }
+}
+
+// where the home header logo and title are, so the welcome screen can fly into them
+object HeaderPos {
+    var logo by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+    var title by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+    var hide by mutableStateOf(false)
 }
