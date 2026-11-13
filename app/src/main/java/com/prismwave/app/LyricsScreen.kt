@@ -1,5 +1,10 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.statusBars
+
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 
 import android.os.SystemClock
@@ -199,6 +204,8 @@ fun LyricsScreen(s: AppState) {
     }
     val center = LyricsPrefs.center
 
+    val lyTop = with(density) { maxOf(WindowInsets.statusBarsIgnoringVisibility.getTop(this), WindowInsets.displayCutout.getTop(this), WindowInsets.statusBars.getTop(this)).toDp() } + 24.dp
+
     Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }) {
         Box(
             Modifier
@@ -208,7 +215,7 @@ fun LyricsScreen(s: AppState) {
         ) {
             if (!Opts.lite && !s.batterySaver) LyricsBackdrop(art, reduce)
         }
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        Column(Modifier.fillMaxSize().padding(top = lyTop).navigationBarsPadding()) {
             Row(
                 Modifier
                     .fillMaxWidth()

@@ -1269,12 +1269,8 @@ fun PlaylistScreen(s: AppState, id: String) {
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            (i + 1).toString(),
-                            color = if (cur) s.accent else Color.White.copy(alpha = 0.6f),
-                            fontSize = 15.sp,
-                            modifier = Modifier.width(30.dp)
-                        )
+                        Cover(song, Modifier.size(50.dp), 10.dp, 18.sp)
+                        Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
                                 song.title,
@@ -1322,7 +1318,7 @@ fun PlaylistScreen(s: AppState, id: String) {
                             )
                         }
                     }
-                    Box(Modifier.padding(start = 50.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                    Box(Modifier.padding(start = 84.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
                 }
                 if (rowMenu) SongMenu(song, s, pl.id) { rowMenu = false }
             }

@@ -341,7 +341,7 @@ fun MiniPlayer(s: AppState) {
                     Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Cover(song, Modifier.size(50.dp), 12.dp, 20.sp)
+                    Cover(song, Modifier.size(50.dp).onGloballyPositioned { MiniCover.rect = it.boundsInRoot() }, 12.dp, 20.sp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(

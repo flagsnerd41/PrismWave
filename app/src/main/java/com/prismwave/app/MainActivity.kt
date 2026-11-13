@@ -101,7 +101,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx) }
+            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(false) }
@@ -243,7 +243,13 @@ fun Main(s: AppState) {
     val strength = (if (cur != null && Opts.livingBg) 1f else 0.5f) * (if (Opts.theme == 2) 0.35f else 1f)
     val tintTop by animateColorAsState(lerp(Night, artC, 0.42f * strength), tween(900), label = "tintTop")
     val tintBot by animateColorAsState(lerp(Night, artC, 0.16f * strength), tween(900), label = "tintBot")
-    LaunchedEffect(artC) { if (cur != null && Opts.livingBg) s.accent = lerp(artC, Color.White, 0.35f) }
+    LaunchedEffect(artC, AppColors.ver, AppColors.palette) {
+        if (Opts.livingBg) {
+            if (cur != null) s.accent = lerp(artC, Color.White, 0.35f)
+        } else {
+            s.accent = AppColors.palette
+        }
+    }
     var scrolled by remember { mutableStateOf(0f) }
     LaunchedEffect(s.screen, s.openPlaylist, s.libraryOpen) { scrolled = 0f }
     val showBar by remember { derivedStateOf { scrolled > 6f } }
@@ -334,9 +340,10 @@ fun Main(s: AppState) {
             }
             AnimatedVisibility(
                 visible = s.showPlayer,
-                enter = slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(380)),
+                enter = if (MiniCover.rect != null && !s.reduceMotion) fadeIn(tween(380)) else slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(380)),
                 exit = slideOutVertically(tween(420, easing = FastOutSlowInEasing)) { it / 2 } + fadeOut(tween(320))
             ) { FullPlayer(s) }
+            CoverFlight(s)
             PagesHost(s)
             VideoWarmup(s)
             ScrobbleWatcher(s)

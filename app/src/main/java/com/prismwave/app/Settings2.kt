@@ -361,7 +361,7 @@ private fun PfAccent(s: AppState) {
             Spacer(Modifier.height(14.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 listOf(
-                    Gold, Color(0xFF4DB6AC), Color(0xFFE57A8A), Color(0xFF8AB4F8), Color(0xFFB39DDB), Color(0xFFFFA45C)
+                    Gold, Color(0xFF4DB6AC), Color(0xFFE57A8A), Color(0xFF8AB4F8), Color(0xFFB39DDB), Color(0xFFFFA45C), Color(0xFF81C784), Color(0xFFEF5350)
                 ).forEach { c ->
                     Box(
                         Modifier
@@ -370,6 +370,7 @@ private fun PfAccent(s: AppState) {
                             .background(c)
                             .then(if (c == s.accent) Modifier.border(3.dp, Color.White, CircleShape) else Modifier)
                             .clickable {
+                                AppColors.pick(c)
                                 s.accent = c
                                 s.saveSettings()
                             }
@@ -631,6 +632,14 @@ private fun PfAppearancePage(s: AppState) {
         ) {
             Opts.theme = it
             Opts.save()
+        }
+        PfChoice(
+            Icons.Rounded.AutoAwesome, "App colors", listOf("Color palette", "Follow music theme"), if (Opts.livingBg) 1 else 0, a,
+            "Palette: the colors you pick. Follow music: the app takes the colors of the playing cover"
+        ) {
+            AppColors.setFollow(it == 1)
+            if (it == 0) s.accent = AppColors.palette
+            s.saveSettings()
         }
         PfAccent(s)
     }
