@@ -124,6 +124,18 @@ object Updater {
         }
     }
 
+    var status by mutableStateOf("")
+
+    // the Check for updates button in Settings
+    suspend fun checkNow(ctx: Context) {
+        status = "Checking..."
+        checked = false
+        dismissed = false
+        info = null
+        check(ctx)
+        status = if (info != null) "New version found" else "You have the latest version"
+    }
+
     suspend fun download(ctx: Context, i: UpdateInfo): File? = withContext(Dispatchers.IO) {
         try {
             val dir = File(ctx.cacheDir, "updates")

@@ -1009,9 +1009,16 @@ private fun PfBackupPage(s: AppState, onBackup: () -> Unit, onRestore: () -> Uni
 @Composable
 private fun PfAboutPage(s: AppState) {
     val a = s.accent
+    val uctx = LocalContext.current
+    val uscope = rememberCoroutineScope()
     PfLabel("PrismWave", a)
     PfGroup {
         PfInfo(Icons.Rounded.Info, "Version", "v27", a)
+        PfAction(
+            Icons.Rounded.Sync, "Check for updates",
+            if (Updater.status.isNotEmpty()) Updater.status else "Look for a newer version", a,
+            Updater.status != "Checking..."
+        ) { uscope.launch { Updater.checkNow(uctx) } }
         PfNote("Private build, made from scratch")
     }
 }
