@@ -8,7 +8,35 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 
-val PrismFont = FontFamily(Font(R.font.outfit_bold, FontWeight.Bold))
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+val AppFont = FontFamily(
+    Font(R.font.inter, FontWeight.Normal, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(400))),
+    Font(R.font.inter, FontWeight.Medium, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(500))),
+    Font(R.font.inter, FontWeight.SemiBold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(600))),
+    Font(R.font.inter, FontWeight.Bold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(700)))
+)
+val PrismFont = AppFont
+
+private val AppTypography: androidx.compose.material3.Typography by lazy {
+    val d = androidx.compose.material3.Typography()
+    d.copy(
+        displayLarge = d.displayLarge.copy(fontFamily = AppFont),
+        displayMedium = d.displayMedium.copy(fontFamily = AppFont),
+        displaySmall = d.displaySmall.copy(fontFamily = AppFont),
+        headlineLarge = d.headlineLarge.copy(fontFamily = AppFont),
+        headlineMedium = d.headlineMedium.copy(fontFamily = AppFont),
+        headlineSmall = d.headlineSmall.copy(fontFamily = AppFont),
+        titleLarge = d.titleLarge.copy(fontFamily = AppFont),
+        titleMedium = d.titleMedium.copy(fontFamily = AppFont),
+        titleSmall = d.titleSmall.copy(fontFamily = AppFont),
+        bodyLarge = d.bodyLarge.copy(fontFamily = AppFont),
+        bodyMedium = d.bodyMedium.copy(fontFamily = AppFont),
+        bodySmall = d.bodySmall.copy(fontFamily = AppFont),
+        labelLarge = d.labelLarge.copy(fontFamily = AppFont),
+        labelMedium = d.labelMedium.copy(fontFamily = AppFont),
+        labelSmall = d.labelSmall.copy(fontFamily = AppFont)
+    )
+}
 
 val CardBg = Color.White.copy(alpha = 0.07f)
 val CardBg2 = Color.White.copy(alpha = 0.11f)
@@ -42,6 +70,7 @@ fun PrismTheme(accent: Color = Gold, content: @Composable () -> Unit) {
             surfaceVariant = Surface2,
             onSurfaceVariant = TextDim
         ),
+        typography = AppTypography,
         content = content
     )
 }

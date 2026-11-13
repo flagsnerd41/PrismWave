@@ -714,11 +714,10 @@ private fun HalfLyrics(lines: List<LyricLine>, idx: Int, still: Boolean) {
             Text(
                 ln.text.ifEmpty { "..." },
                 color = Color.White,
-                fontSize = 26.sp,
-                lineHeight = 33.sp,
+                fontFamily = PrismFont,
+                fontSize = 28.sp,
+                lineHeight = 36.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
