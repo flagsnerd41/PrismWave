@@ -176,6 +176,9 @@ fun SkyGlow(s: AppState, modifier: Modifier = Modifier) {
         List(34) { floatArrayOf(r.nextFloat(), r.nextFloat() * 0.5f, r.nextFloat() * 6.28f, 0.8f + r.nextFloat() * 1.4f) }
     }
     val tint = s.accent
+    val cur = s.current
+    val cover = if (cur != null) rememberArtColor(cur) else tint
+    val coverA by androidx.compose.animation.animateColorAsState(cover, tween(900), label = "glowc")
     Box(
         modifier
             .fillMaxWidth()
@@ -184,7 +187,7 @@ fun SkyGlow(s: AppState, modifier: Modifier = Modifier) {
             .drawWithContent {
                 drawContent()
                 drawRect(
-                    Brush.verticalGradient(0f to Color.Black, 0.5f to Color.Black, 1f to Color.Transparent),
+                    Brush.verticalGradient(0f to Color.Black, 0.3f to Color.Black, 1f to Color.Transparent),
                     blendMode = BlendMode.DstIn
                 )
             }
@@ -197,34 +200,16 @@ fun SkyGlow(s: AppState, modifier: Modifier = Modifier) {
             val c = Offset(w * 0.08f + sin(ang) * w * 0.015f, hh * sky.orbY * 0.45f + cos(ang) * hh * 0.006f)
             val night = sky.night
             val sunV = (1f - night).coerceIn(0f, 1f)
-            val outer = lerp(sky.outer, tint, 0.30f)
-            // wide soft color, then the closer halo
-            drawRect(Brush.radialGradient(listOf(outer.copy(alpha = 0.42f), Color.Transparent), center = c, radius = w * 1.1f))
-            drawRect(Brush.radialGradient(listOf(sky.halo.copy(alpha = 0.50f), Color.Transparent), center = c, radius = w * 0.7f))
-            if (sunV > 0.03f) {
-                val pulse = 1f + 0.04f * sin(ang * 2f)
-                drawRect(
-                    Brush.radialGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.95f * sunV),
-                            sky.core.copy(alpha = 0.85f * sunV),
-                            sky.core.copy(alpha = 0f)
-                        ),
-                        center = c,
-                        radius = w * 0.22f * pulse
-                    )
-                )
-                for (i in 0 until 12) {
-                    val a2 = ang * 0.5f + i * (2f * PI.toFloat() / 12f)
-                    val end = Offset(c.x + cos(a2) * w * 0.9f, c.y + sin(a2) * w * 0.9f)
-                    drawLine(
-                        Brush.linearGradient(listOf(sky.core.copy(alpha = 0.20f * sunV), Color.Transparent), start = c, end = end),
-                        c,
-                        end,
-                        strokeWidth = w * 0.05f
-                    )
-                }
-            }
+            val d = 0.45f + 0.55f * sunV
+            val c1 = coverA
+            val c2 = lerp(coverA, sky.halo, 0.45f)
+            val c3 = lerp(coverA, Color.White, 0.18f)
+            val b1 = Offset(w * (0.15f + 0.10f * sin(ang)), hh * 0.10f)
+            val b2 = Offset(w * (0.60f + 0.12f * cos(ang + 1f)), hh * 0.05f)
+            val b3 = Offset(w * (0.98f + 0.05f * sin(ang + 2f)), hh * 0.24f)
+            drawRect(Brush.radialGradient(listOf(c1.copy(alpha = 0.70f * d), Color.Transparent), center = b1, radius = w * 0.9f))
+            drawRect(Brush.radialGradient(listOf(c2.copy(alpha = 0.55f * d), Color.Transparent), center = b2, radius = w * 0.75f))
+            drawRect(Brush.radialGradient(listOf(c3.copy(alpha = 0.40f * d), Color.Transparent), center = b3, radius = w * 0.6f))
             if (night > 0.03f) {
                 drawRect(Brush.radialGradient(listOf(sky.core.copy(alpha = 0.45f * night), Color.Transparent), center = c, radius = w * 0.34f))
                 drawCircle(sky.core.copy(alpha = 0.9f * night), radius = w * 0.06f, center = c)
