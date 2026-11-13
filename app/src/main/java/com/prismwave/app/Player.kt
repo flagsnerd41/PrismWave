@@ -1,5 +1,7 @@
 package com.prismwave.app
 
+import androidx.compose.foundation.border
+
 import androidx.compose.foundation.layout.requiredSize
 
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -555,6 +557,11 @@ fun FullPlayer(s: AppState) {
         }
     }
     BackHandler(enabled = PlayerStage.stage > 0) { PlayerStage.back() }
+    val menuBlur by animateDpAsState(
+        if (menuDialog && !Opts.lite && Build.VERSION.SDK_INT >= 31) 14.dp else 0.dp,
+        tween(300),
+        label = "menublur"
+    )
     val lyShift by animateFloatAsState(
         if (Pages.open == "lyrics") 1f else 0f,
         tween(520, easing = FastOutSlowInEasing),
@@ -597,6 +604,7 @@ fun FullPlayer(s: AppState) {
                     }
                 }
             )
+            .then(if (menuBlur > 0.5.dp) Modifier.blur(menuBlur) else Modifier)
             .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
             .background(Night)
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
@@ -1627,7 +1635,12 @@ private fun PlayerMenuSheet(
                     shape = RoundedCornerShape(30.dp)
                     clip = true
                 }
-                .background(Night)
+                .background(if (Opts.lite) Night else Night.copy(alpha = 0.62f))
+                .border(
+                    1.dp,
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.06f))),
+                    RoundedCornerShape(30.dp)
+                )
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
         ) {
             // swipe up on this handle, or on the menu, to open the half lyrics view
