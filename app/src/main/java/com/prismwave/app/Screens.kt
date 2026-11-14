@@ -164,7 +164,7 @@ fun Header(s: AppState) {
             Modifier
                 .onGloballyPositioned { HeaderPos.logo = it.boundsInRoot() }
                 .graphicsLayer { alpha = hdrA }
-        ) { AppLogo(42.dp) }
+        ) { PrismSpinner(Modifier.size(width = 60.dp, height = 46.dp), s.reduceMotion || Opts.lite) }
         Spacer(Modifier.width(12.dp))
         Text(
             "PrismWave",
