@@ -36,3 +36,12 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           files: app/build/outputs/apk/release/app-release.apk
           make_latest: true
+      - name: Send link to Telegram
+        env:
+          NOTE: ${{ github.event.head_commit.message }}
+        run: |
+          curl -s "https://api.telegram.org/bot${{ secrets.TG_TOKEN }}/sendMessage" \
+            --data-urlencode "chat_id=${{ secrets.TG_CHAT }}" \
+            --data-urlencode "text=PrismWave build ${{ github.run_number }} is ready 🚀
+          $NOTE
+          https://github.com/${{ github.repository }}/releases/tag/build-${{ github.run_number }}"
