@@ -818,6 +818,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
         Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(c1, c2, c3)))
+            .glowBehind(art, s.playing, s.batterySaver, 0.35f)
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(horizontal = 26.dp),
@@ -925,6 +926,7 @@ private fun ImmersiveBody(
                 )
             )
         )
+        Box(Modifier.fillMaxSize().glowBehind(art, s.playing, s.batterySaver, 0.42f))
         // sharp cover stage on top, fading into the backdrop
         Box(
             Modifier

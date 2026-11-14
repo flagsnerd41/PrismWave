@@ -304,6 +304,8 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                 .background(Brush.verticalGradient(0.40f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.55f)))
         )
 
+        // the moving glow behind the half view and the full lyrics
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = st().coerceIn(0f, 1f) }.glowBehind(art, s.playing, s.batterySaver, 0f))
         // 2. the cover: it flies up, then shrinks into the corner
         Box(
             Modifier

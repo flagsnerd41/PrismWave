@@ -90,6 +90,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -112,10 +113,20 @@ private fun PfLabel(text: String, accent: Color) {
     )
 }
 
+private object PfSeq {
+    private var n = 0
+    fun next(): Int {
+        n = (n + 1) % 7
+        return n
+    }
+}
+
 @Composable
 private fun PfGroup(content: @Composable ColumnScope.() -> Unit) {
+    val seq = remember { PfSeq.next() }
     Column(
         Modifier
+            .appear(seq)
             .padding(horizontal = 16.dp, vertical = 2.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp)),
@@ -138,7 +149,7 @@ private fun PfRow(
         Modifier
             .fillMaxWidth()
             .background(CardBg)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .then(if (onClick != null) Modifier.softClick { onClick() } else Modifier)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -439,6 +450,29 @@ private fun PfMainGroup(items: List<PfItem>, accent: Color, base: Int, onOpen: (
     }
 }
 
+@Composable
+private fun PfAboutBanner(accent: Color, onOpen: () -> Unit) {
+    Row(
+        Modifier
+            .appear(0)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(accent.copy(alpha = 0.32f), CardBg)))
+            .softClick { onOpen() }
+            .padding(horizontal = 18.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AppLogo(56.dp)
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text("About PrismWave", color = Color.White, fontFamily = RetroBlendy, fontSize = 24.sp)
+            Text("Version 1.5 and updates", color = TextDim, fontSize = 14.sp)
+        }
+        Icon(Icons.Rounded.ArrowForward, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+    }
+}
+
 // ------------------------------------------------------------ the screen (Material 3 large top bar)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -475,10 +509,12 @@ fun SettingsScreen(s: AppState) {
             if (s.reduceMotion) {
                 fadeIn(tween(120)) togetherWith fadeOut(tween(80))
             } else {
-                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> if (forward) w / 4 else -w / 4 } +
-                    fadeIn(tween(260))) togetherWith
-                    (slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { w -> if (forward) -w / 4 else w / 4 } +
-                        fadeOut(tween(160)))
+                (slideInHorizontally(tween(480, easing = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f))) { w -> if (forward) w / 3 else -w / 5 } +
+                    fadeIn(tween(340, delayMillis = 60)) +
+                    androidx.compose.animation.scaleIn(tween(480, easing = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)), initialScale = 0.94f)) togetherWith
+                    (slideOutHorizontally(tween(360, easing = FastOutSlowInEasing)) { w -> if (forward) -w / 6 else w / 3 } +
+                        fadeOut(tween(200)) +
+                        androidx.compose.animation.scaleOut(tween(360, easing = FastOutSlowInEasing), targetScale = 0.96f))
             }
         },
         label = "settingsPage2"
@@ -526,6 +562,7 @@ fun SettingsScreen(s: AppState) {
                     .padding(bottom = 220.dp)
             ) {
                 if (pg == null) {
+                    PfAboutBanner(acc) { page = "about" }
                     PfMainGroup(
                         listOf(
                             PfItem("account", "Account", "Sign in and manage account sync", Icons.Rounded.AccountCircle),
@@ -553,8 +590,7 @@ fun SettingsScreen(s: AppState) {
                     PfMainGroup(
                         listOf(
                             PfItem("backup", "Backup and restore", "Save or bring back your library", Icons.Rounded.Folder),
-                            PfItem("changelog", "What's new", "Changes in each version", Icons.Rounded.History),
-                            PfItem("about", "About PrismWave", "Version, updates and credits", Icons.Rounded.Info)
+                            PfItem("changelog", "What's new", "Changes in each version", Icons.Rounded.History)
                         ),
                         acc, 9
                     ) { page = it }
@@ -696,6 +732,26 @@ private fun PfAppearancePage(s: AppState) {
             Icons.Rounded.Palette, "Status bar darkness", (Opts.blurDark * 100).toInt().toString() + "%",
             Opts.blurDark, 0f..0.9f, a, { Opts.blurDark = it }, { Opts.save() }
         )
+    }
+    GlowPrefs.init(LocalContext.current.applicationContext)
+    PfLabel("Moving glow", a)
+    PfGroup {
+        PfSwitch(
+            Icons.Rounded.AutoAwesome, "Moving glow",
+            "Bright and dark colors from the cover flow behind the player and the lyrics. Off in Lite mode and Battery saver",
+            GlowPrefs.on, a
+        ) {
+            GlowPrefs.on = it
+            GlowPrefs.save()
+        }
+        PfChoice(Icons.Rounded.Palette, "Glow strength", listOf("Soft", "Normal", "Strong"), GlowPrefs.intensity, a) {
+            GlowPrefs.intensity = it
+            GlowPrefs.save()
+        }
+        PfChoice(Icons.Rounded.Speed, "Glow speed", listOf("Slow", "Normal", "Fast"), GlowPrefs.speed, a) {
+            GlowPrefs.speed = it
+            GlowPrefs.save()
+        }
     }
     PfLabel("Extras", a)
     PfGroup {
@@ -932,6 +988,61 @@ private fun PfFmSection(f: FmService, accent: Color, hint: String) {
 }
 
 @Composable
+private fun PfDiscordSection() {
+    val a = Color(0xFF5865F2)
+    val ctx = LocalContext.current
+    val logo = ImageVector.vectorResource(R.drawable.ic_discord)
+    Row(
+        Modifier
+            .appear(0)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(a, Color(0xFF4752C4))))
+            .padding(horizontal = 20.dp, vertical = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(logo, contentDescription = null, tint = Color.White, modifier = Modifier.size(46.dp))
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text("Discord", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("Show what you listen to on your profile", color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
+        }
+    }
+    PfGroup {
+        PfSwitch(
+            logo, "Discord status",
+            if (DiscordRpc.hasToken()) "Shows the song you listen to on your Discord profile"
+            else "Sign in to Discord first. Unofficial, so an alt account is safer",
+            DiscordRpc.enabled && DiscordRpc.hasToken(), a
+        ) { on ->
+            if (on && !DiscordRpc.hasToken()) DiscordRpc.loginOpen = true
+            else DiscordRpc.setEnabled(ctx, on)
+        }
+        if (DiscordRpc.hasToken()) {
+            PfField("Discord application ID (optional, adds cover art)", DiscordRpc.appId, a, false) {
+                DiscordRpc.setAppId(ctx, it)
+            }
+            PfAction(Icons.Rounded.Lock, "Sign out of Discord", "Forget the Discord login on this phone", a) {
+                DiscordRpc.logout(ctx)
+            }
+        }
+        if (!DiscordRpc.hasToken()) {
+            PfAction(
+                Icons.Rounded.Lock, "Use token from clipboard",
+                "If the sign-in page does not work, copy your Discord token and tap here", a
+            ) {
+                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val tok = (cm.primaryClip?.getItemAt(0)?.text?.toString() ?: "").trim().trim('"')
+                if (tok.length > 40) DiscordRpc.onToken(ctx.applicationContext, tok)
+            }
+        }
+        if (DiscordRpc.status.isNotEmpty()) PfNote(DiscordRpc.status)
+    }
+    if (DiscordRpc.loginOpen) DiscordLogin()
+}
+
+@Composable
 private fun PfIntegrationPage(s: AppState) {
     val a = s.accent
     val ctx = LocalContext.current
@@ -941,6 +1052,7 @@ private fun PfIntegrationPage(s: AppState) {
     var lbInput by remember { mutableStateOf("") }
     var lbMsg by remember { mutableStateOf("") }
     var lbBusy by remember { mutableStateOf(false) }
+    PfDiscordSection()
     PfLabel("ListenBrainz", a)
     PfGroup {
         val lbOk = Scrobbler.lbUser.isNotEmpty()
@@ -979,38 +1091,6 @@ private fun PfIntegrationPage(s: AppState) {
         Scrobbler.librefm, a,
         "Use your Libre.fm username and password. Enter an API key and secret the same way as for Last.fm."
     )
-    PfLabel("Discord", a)
-    PfGroup {
-        PfSwitch(
-            Icons.Rounded.AutoAwesome, "Discord status",
-            if (DiscordRpc.hasToken()) "Shows the song you listen to on your Discord profile"
-            else "Sign in to Discord first. Unofficial, so an alt account is safer",
-            DiscordRpc.enabled && DiscordRpc.hasToken(), a
-        ) { on ->
-            if (on && !DiscordRpc.hasToken()) DiscordRpc.loginOpen = true
-            else DiscordRpc.setEnabled(ctx, on)
-        }
-        if (DiscordRpc.hasToken()) {
-            PfField("Discord application ID (optional, adds cover art)", DiscordRpc.appId, a, false) {
-                DiscordRpc.setAppId(ctx, it)
-            }
-            PfAction(Icons.Rounded.Lock, "Sign out of Discord", "Forget the Discord login on this phone", a) {
-                DiscordRpc.logout(ctx)
-            }
-        }
-        if (!DiscordRpc.hasToken()) {
-            PfAction(
-                Icons.Rounded.Lock, "Use token from clipboard",
-                "If the sign-in page does not work, copy your Discord token and tap here", a
-            ) {
-                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                val tok = (cm.primaryClip?.getItemAt(0)?.text?.toString() ?: "").trim().trim('"')
-                if (tok.length > 40) DiscordRpc.onToken(ctx.applicationContext, tok)
-            }
-        }
-        if (DiscordRpc.status.isNotEmpty()) PfNote(DiscordRpc.status)
-    }
-    if (DiscordRpc.loginOpen) DiscordLogin()
     PfNote("A song is scrobbled after half of it has played (or 4 minutes), and only if it is longer than 30 seconds.")
 }
 
@@ -1086,6 +1166,12 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added moving glow, Discord on top and smoother settings", a, listOf(
+        "Moving glow behind the player controls and the lyrics: bright and dark colors from the cover flow and move. Settings, Appearance",
+        "About PrismWave is now the first thing in Settings",
+        "Discord is at the top of Integration with its logo",
+        "Settings: pages slide and scale in smoothly, cards rise one after another, rows squish when pressed"
+    ))
     PfChange("Added idle screen", a, listOf(
         "Idle on the full player: after a minute it goes to the half view, after another minute to a black screen",
         "The black screen has a small cover, the controls, and the lyrics at the bottom with the app icon",
