@@ -348,7 +348,7 @@ fun MiniPlayer(s: AppState) {
                     Column(Modifier.weight(1f)) {
                         AnimatedContent(
                             targetState = song.title,
-                            modifier = Modifier.clip(RoundedCornerShape(2.dp)),
+                            modifier = Modifier.clip(RoundedCornerShape(2.dp)).onGloballyPositioned { MiniTitle.rect = it.boundsInRoot() },
                             transitionSpec = {
                                 (slideInVertically(tween(340, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(300))) togetherWith
                                     (slideOutVertically(tween(260, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(160)))
@@ -688,7 +688,13 @@ private fun TitleRow(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.basicMarquee()
+                modifier = Modifier
+                    .graphicsLayer { alpha = if (FlightState.running) 0f else 1f }
+                    .onGloballyPositioned {
+                        PlayerTitle.rect = it.boundsInRoot()
+                        PlayerTitle.sizeSp = titleSize.value
+                    }
+                    .basicMarquee()
             )
             Text(
                 if (s.status.isNotEmpty()) s.status else song.artist,
@@ -696,7 +702,7 @@ private fun TitleRow(
                 fontSize = artistSize,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.basicMarquee()
+                modifier = Modifier.graphicsLayer { alpha = if (FlightState.running) 0f else 1f }.basicMarquee()
             )
         }
         val liked = s.isLiked(song)
@@ -823,6 +829,8 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
         if (VideoSync.has[song.id] == true) {
             ModePills()
             Spacer(Modifier.height(14.dp))
+        } else {
+            Spacer(Modifier.height(58.dp))
         }
         Box(
             Modifier

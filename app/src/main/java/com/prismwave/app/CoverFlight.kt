@@ -4,6 +4,10 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -35,6 +39,20 @@ import kotlinx.coroutines.delay
 // where the cover of the mini player is on screen
 object MiniCover {
     var rect: Rect? = null
+}
+
+// the title of the mini player and of the full player, so the title can fly between them
+object MiniTitle {
+    var rect: Rect? = null
+}
+
+object PlayerTitle {
+    var rect: Rect? = null
+    var sizeSp: Float = 22f
+}
+
+object FlightState {
+    var running by mutableStateOf(false)
 }
 
 // the cover that was tapped on a list or card, so the player can grow out of it
@@ -85,7 +103,12 @@ fun CoverFlight(s: AppState) {
     var wide by remember { mutableStateOf(false) }
     var rad0 by remember { mutableStateOf(12f) }
     var rad1 by remember { mutableStateOf(20f) }
+    var titleOn by remember { mutableStateOf(false) }
+    var tFrom by remember { mutableStateOf<Rect?>(null) }
+    var tTo by remember { mutableStateOf<Rect?>(null) }
+    var tSize1 by remember { mutableStateOf(22f) }
     LaunchedEffect(s.showPlayer) {
+        FlightState.running = false
         val mini = MiniCover.rect
         val wPx = density.density * cfg.screenWidthDp
         val hPx = density.density * cfg.screenHeightDp
@@ -104,7 +127,18 @@ fun CoverFlight(s: AppState) {
                     tries++
                 }
             }
+            var t2 = 0
+            while (PlayerTitle.rect == null && t2 < 10) {
+                delay(16)
+                t2++
+            }
             val sr = if (s.playerStyle == 1) null else SharedCover.rect
+            val mt = MiniTitle.rect
+            val pt = PlayerTitle.rect
+            titleOn = tap == null && mt != null && pt != null
+            tFrom = mt
+            tTo = pt
+            tSize1 = PlayerTitle.sizeSp
             from = start
             to = sr ?: Rect(0f, 0f, wPx, hPx * 0.64f)
             wide = sr == null
@@ -113,12 +147,16 @@ fun CoverFlight(s: AppState) {
             rad1 = if (sr != null && SharedCover.circle) sr.width / density.density / 2f else if (sr == null) 0f else 20f
             p.snapTo(0f)
             active = true
+            FlightState.running = titleOn
             p.animateTo(1f, tween(480, easing = FastOutSlowInEasing))
+            FlightState.running = false
             active = false
         } else {
             val was = wasOpen[0]
             wasOpen[0] = false
             active = false
+            titleOn = false
+            PlayerTitle.rect = null
             // only when the player itself is showing, not the lyrics
             if (!was || mini == null || s.reduceMotion || PlayerStage.stage != 0 || Pages.open == "lyrics") return@LaunchedEffect
             val sr = if (s.playerStyle == 1) null else SharedCover.rect
@@ -172,6 +210,25 @@ fun CoverFlight(s: AppState) {
             ) {
                 val song = s.current
                 if (song != null) Cover(song, Modifier.fillMaxSize(), 0.dp, 20.sp, quality = 800)
+            }
+            val ta = tFrom
+            val tb = tTo
+            if (titleOn && !closing && ta != null && tb != null) {
+                val v = p.value
+                Text(
+                    s.current?.title ?: "",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (17f + (tSize1 - 17f) * v).sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            (ta.left + (tb.left - ta.left) * p.value).roundToInt(),
+                            (ta.top + (tb.top - ta.top) * p.value).roundToInt()
+                        )
+                    }
+                )
             }
         }
     }

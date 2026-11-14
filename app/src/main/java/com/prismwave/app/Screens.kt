@@ -154,6 +154,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun Header(s: AppState) {
     var stats by remember { mutableStateOf(false) }
+    var titleFs by remember { mutableStateOf(26f) }
     val hdrA by animateFloatAsState(if (HeaderPos.hide) 0f else 1f, tween(250), label = "hdr")
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
@@ -169,7 +170,10 @@ fun Header(s: AppState) {
             "PrismWave",
             color = Color.White,
             fontFamily = RetroBlendy,
-            fontSize = 28.sp,
+            fontSize = titleFs.sp,
+            maxLines = 1,
+            softWrap = false,
+            onTextLayout = { if (it.hasVisualOverflow && titleFs > 12f) titleFs -= 1f },
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.4.sp,
             modifier = Modifier
