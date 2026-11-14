@@ -20,7 +20,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
@@ -32,6 +35,31 @@ import kotlinx.coroutines.delay
 // where the cover of the mini player is on screen
 object MiniCover {
     var rect: Rect? = null
+}
+
+// the cover that was tapped on a list or card, so the player can grow out of it
+object TapCover {
+    var rect: Rect? = null
+    var radius: Float = 20f
+}
+
+class CoverRef {
+    var c: LayoutCoordinates? = null
+}
+
+fun Modifier.trackCover(ref: CoverRef): Modifier = this.onGloballyPositioned { ref.c = it }
+
+// play a song and open the full player, growing it out of the cover that was tapped
+fun openFrom(s: AppState, song: Song, from: List<Song>, ref: CoverRef, radius: Float) {
+    val c = ref.c
+    if (c != null && c.isAttached) {
+        TapCover.rect = c.boundsInRoot()
+        TapCover.radius = radius
+    } else {
+        TapCover.rect = null
+    }
+    s.play(song, from)
+    s.showPlayer = true
 }
 
 private fun Modifier.flightBox(rect: () -> FloatArray): Modifier = this.layout { measurable, constraints ->
@@ -64,7 +92,10 @@ fun CoverFlight(s: AppState) {
         if (s.showPlayer) {
             active = false
             wasOpen[0] = true
-            if (mini == null || s.reduceMotion) return@LaunchedEffect
+            val tap = TapCover.rect
+            TapCover.rect = null
+            val start = tap ?: mini
+            if (start == null || s.reduceMotion) return@LaunchedEffect
             // the Immersive player has a full-width cover stage, the others report where their cover is
             if (s.playerStyle != 1) {
                 var tries = 0
@@ -74,11 +105,11 @@ fun CoverFlight(s: AppState) {
                 }
             }
             val sr = if (s.playerStyle == 1) null else SharedCover.rect
-            from = mini
+            from = start
             to = sr ?: Rect(0f, 0f, wPx, hPx * 0.64f)
             wide = sr == null
             closing = false
-            rad0 = 12f
+            rad0 = if (tap != null) TapCover.radius else 12f
             rad1 = if (sr != null && SharedCover.circle) sr.width / density.density / 2f else if (sr == null) 0f else 20f
             p.snapTo(0f)
             active = true

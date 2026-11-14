@@ -168,8 +168,8 @@ fun Header(s: AppState) {
         Text(
             "PrismWave",
             color = Color.White,
-            fontFamily = PrismFont,
-            fontSize = 27.sp,
+            fontFamily = RetroBlendy,
+            fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.4.sp,
             modifier = Modifier
@@ -257,9 +257,10 @@ fun QuickCard(song: Song, s: AppState, from: List<Song>, modifier: Modifier = Mo
 
 @Composable
 fun RecentCard(song: Song, s: AppState, from: List<Song>, modifier: Modifier = Modifier) {
-    Column(modifier.softClick { s.play(song, from) }.width(140.dp)) {
+    val cref = remember { CoverRef() }
+    Column(modifier.softClick { openFrom(s, song, from, cref, 24f) }.width(140.dp)) {
         Box {
-            Cover(song, Modifier.size(140.dp), 24.dp, 44.sp)
+            Cover(song, Modifier.size(140.dp).trackCover(cref), 24.dp, 44.sp)
             PlayBadge(s.accent, Modifier.align(Alignment.BottomEnd).padding(8.dp))
         }
         Spacer(Modifier.height(8.dp))
@@ -293,17 +294,18 @@ private fun QuickPicksGrid(songs: List<Song>, s: AppState) {
     ) {
         gridItems(songs.take(20)) { sg ->
             val cur = s.current?.id == sg.id
+            val cref = remember { CoverRef() }
             Row(
                 Modifier
                     .width(itemW)
                     .height(66.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(if (cur) s.accent.copy(alpha = 0.18f) else Color.Transparent)
-                    .clickable { s.play(sg, songs) }
+                    .clickable { openFrom(s, sg, songs, cref, 12f) }
                     .padding(horizontal = 6.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Cover(sg, Modifier.size(54.dp), 12.dp, 18.sp)
+                Cover(sg, Modifier.size(54.dp).trackCover(cref), 12.dp, 18.sp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -2016,8 +2018,9 @@ private fun HomeSection(title: String, onClick: (() -> Unit)? = null) {
 @Composable
 private fun HomeCard(song: Song, from: List<Song>, s: AppState, modifier: Modifier = Modifier) {
     val cur = s.current?.id == song.id
-    Column(modifier.softClick { s.play(song, from) }.width(150.dp)) {
-        Cover(song, Modifier.size(150.dp), 20.dp, 44.sp)
+    val cref = remember { CoverRef() }
+    Column(modifier.softClick { openFrom(s, song, from, cref, 20f) }.width(150.dp)) {
+        Cover(song, Modifier.size(150.dp).trackCover(cref), 20.dp, 44.sp)
         Spacer(Modifier.height(8.dp))
         Text(
             song.title,
@@ -2185,6 +2188,7 @@ private fun QuickPickCard(
     h: androidx.compose.ui.unit.Dp
 ) {
     val shape = RoundedCornerShape(32.dp)
+    val cref = remember { CoverRef() }
     Box(
         Modifier
             .width(w)
@@ -2203,11 +2207,11 @@ private fun QuickPickCard(
                 scaleY = 1f - 0.10f * d
                 alpha = 1f - 0.35f * d
             }
-            .softClick { s.play(song, from) }
+            .softClick { openFrom(s, song, from, cref, 32f) }
             .clip(shape)
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
     ) {
-        Cover(song, Modifier.fillMaxSize(), 0.dp, 90.sp, quality = 800)
+        Cover(song, Modifier.fillMaxSize().trackCover(cref), 0.dp, 90.sp, quality = 800)
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(

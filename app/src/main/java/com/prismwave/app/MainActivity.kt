@@ -340,7 +340,7 @@ fun Main(s: AppState) {
             }
             AnimatedVisibility(
                 visible = s.showPlayer,
-                enter = if (MiniCover.rect != null && !s.reduceMotion) fadeIn(tween(380)) else slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(380)),
+                enter = if ((MiniCover.rect != null || TapCover.rect != null) && !s.reduceMotion) fadeIn(tween(380)) else slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(380)),
                 exit = if (MiniCover.rect != null && !s.reduceMotion && PlayerStage.stage == 0 && Pages.open != "lyrics") fadeOut(tween(320)) else slideOutVertically(tween(420, easing = FastOutSlowInEasing)) { it / 2 } + fadeOut(tween(320))
             ) { FullPlayer(s) }
             CoverFlight(s)

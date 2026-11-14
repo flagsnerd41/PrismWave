@@ -207,11 +207,13 @@ fun Cover(
         )
         val thumb = song.thumb
         if (thumb != null) {
-            val req = remember(thumb, quality) {
-                ImageRequest.Builder(ctx).data(artUrl(thumb, quality)).crossfade(350).build()
+            var failed by remember(thumb, quality) { mutableStateOf(false) }
+            val req = remember(thumb, quality, failed) {
+                ImageRequest.Builder(ctx).data(if (failed) thumb else artUrl(thumb, quality)).crossfade(350).build()
             }
             AsyncImage(
                 model = req,
+                onError = { failed = true },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

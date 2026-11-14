@@ -346,21 +346,31 @@ fun MiniPlayer(s: AppState) {
                     Cover(song, Modifier.size(50.dp).onGloballyPositioned { MiniCover.rect = it.boundsInRoot() }, 12.dp, 20.sp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(
-                            song.title,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            if (s.status.isNotEmpty()) s.status else song.artist,
-                            color = TextDim,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        AnimatedContent(
+                            targetState = song.title,
+                            modifier = Modifier.clip(RoundedCornerShape(2.dp)),
+                            transitionSpec = {
+                                (slideInVertically(tween(340, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(300))) togetherWith
+                                    (slideOutVertically(tween(260, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(160)))
+                            },
+                            label = "minititle"
+                        ) { t ->
+                            Text(
+                                t,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        AnimatedContent(
+                            targetState = if (s.status.isNotEmpty()) s.status else song.artist,
+                            transitionSpec = { fadeIn(tween(320, delay = 120)) togetherWith fadeOut(tween(140)) },
+                            label = "miniartist"
+                        ) { t ->
+                            Text(t, color = TextDim, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                     Box(Modifier.bounceClick { s.toggle() }.size(48.dp), contentAlignment = Alignment.Center) {
                         if (s.loading) {
