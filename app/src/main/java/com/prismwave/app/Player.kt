@@ -557,7 +557,11 @@ fun FullPlayer(s: AppState) {
     var upExtra by remember { mutableStateOf(0f) }
     val halfVisible by remember { derivedStateOf { halfP.value > 0.001f } }
     LaunchedEffect(PlayerStage.stage) {
-        halfP.animateTo(PlayerStage.stage.toFloat(), spring(dampingRatio = 0.9f, stiffness = 150f))
+        if (Aod.auto) {
+            halfP.animateTo(PlayerStage.stage.toFloat(), tween(1100, easing = FastOutSlowInEasing))
+        } else {
+            halfP.animateTo(PlayerStage.stage.toFloat(), spring(dampingRatio = 0.9f, stiffness = 150f))
+        }
     }
     DisposableEffect(Unit) {
         PlayerStage.open = true
@@ -580,6 +584,7 @@ fun FullPlayer(s: AppState) {
     Box(
         Modifier
             .fillMaxSize()
+            .aodTouch()
             .graphicsLayer {
                 translationY = if (SharedCover.rect != null) 0f else lyShift * size.height * 0.18f
                 alpha = if (SharedCover.rect != null) (1f - LyricsMorph.p * 1.8f).coerceAtLeast(0f) else (1f - lyShift * 0.9f).coerceAtLeast(0f)
@@ -647,6 +652,7 @@ fun FullPlayer(s: AppState) {
         if (halfVisible) {
             LyricsStage(s, song) { halfP.value }
         }
+        AodHost(s, song, menuDialog || addDialog || queueDialog || sleepDialog)
     }
     if (menuDialog) {
         PlayerMenuSheet(

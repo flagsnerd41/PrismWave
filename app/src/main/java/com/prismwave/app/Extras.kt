@@ -81,7 +81,7 @@ object SettingsNav {
 
 // the "What's new" button in the Home header, with a dot until it is opened
 object WhatsNew {
-    const val ID = "added-about-header-playlist"
+    const val ID = "added-idle-screen"
     private var p: SharedPreferences? = null
     var seen by mutableStateOf(true)
 

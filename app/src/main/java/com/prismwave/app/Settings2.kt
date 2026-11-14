@@ -780,6 +780,28 @@ private fun PfPlayerPage(s: AppState) {
             { StudioPrefs.mixSecs = it.toInt() }, { StudioPrefs.save() }
         )
     }
+    Aod.init(LocalContext.current.applicationContext)
+    PfLabel("Idle screen", a)
+    PfGroup {
+        PfSwitch(
+            Icons.Rounded.Speed, "Always on display",
+            "Idle on the player: half view, then a black screen with lyrics. The screen stays on while music plays on the player",
+            Aod.enabled, a
+        ) {
+            Aod.enabled = it
+            Aod.save()
+        }
+        PfSlider(
+            Icons.Rounded.History, "Half view after", Aod.halfMin.toString() + " min",
+            Aod.halfMin.toFloat(), 1f..5f, a,
+            { Aod.halfMin = it.toInt().coerceIn(1, 5) }, { Aod.save() }
+        )
+        PfSlider(
+            Icons.Rounded.History, "Black screen after another", Aod.blackMin.toString() + " min",
+            Aod.blackMin.toFloat(), 1f..5f, a,
+            { Aod.blackMin = it.toInt().coerceIn(1, 5) }, { Aod.save() }
+        )
+    }
     PfLabel("Video (experiment)", a)
     PfGroup {
         val vctx = LocalContext.current
@@ -1064,6 +1086,12 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added idle screen", a, listOf(
+        "Idle on the full player: after a minute it goes to the half view, after another minute to a black screen",
+        "The black screen has a small cover, the controls, and the lyrics at the bottom with the app icon",
+        "Touch the empty black screen to come back. Timers are in Settings, Player",
+        "The full player to half player step is slower and smoother when the idle timer does it"
+    ))
     PfChange("Added About page, pinned header and new playlist design", a, listOf(
         "About PrismWave in Settings: cat picture, logo, Retro Blendy name, version 1.5 and Check for updates",
         "The Home, Search and Library header stays on top while you scroll, with a fading blur under it",
