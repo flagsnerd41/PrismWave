@@ -164,16 +164,13 @@ fun Header(s: AppState) {
             Modifier
                 .onGloballyPositioned { HeaderPos.logo = it.boundsInRoot() }
                 .graphicsLayer { alpha = hdrA }
-        ) { PrismSpinner(Modifier.size(width = 60.dp, height = 46.dp), s.reduceMotion || Opts.lite) }
+        ) { AppLogo(42.dp) }
         Spacer(Modifier.width(12.dp))
         Text(
             "PrismWave",
             color = Color.White,
-            fontFamily = RetroBlendy,
-            fontSize = titleFs.sp,
-            maxLines = 1,
-            softWrap = false,
-            onTextLayout = { if (it.hasVisualOverflow && titleFs > 12f) titleFs -= 1f },
+            fontFamily = PrismFont,
+            fontSize = 27.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.4.sp,
             modifier = Modifier
