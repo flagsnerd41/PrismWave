@@ -320,6 +320,9 @@ fun Main(s: AppState) {
                 exit = fadeOut(tween(200))
             ) { TopBlur(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 18.dp) }
             
+            if (headerShown(s)) {
+                Box(Modifier.align(Alignment.TopCenter)) { PinnedHeader(s) }
+            }
             Column(
                 Modifier
                     .align(Alignment.BottomCenter)

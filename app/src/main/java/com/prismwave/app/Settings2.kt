@@ -465,7 +465,7 @@ fun SettingsScreen(s: AppState) {
         "storage" to "Storage",
         "backup" to "Backup and restore",
         "changelog" to "What's new",
-        "about" to "About"
+        "about" to "About PrismWave"
     )
     AnimatedContent(
         targetState = page,
@@ -554,7 +554,7 @@ fun SettingsScreen(s: AppState) {
                         listOf(
                             PfItem("backup", "Backup and restore", "Save or bring back your library", Icons.Rounded.Folder),
                             PfItem("changelog", "What's new", "Changes in each version", Icons.Rounded.History),
-                            PfItem("about", "About", "Version and build info", Icons.Rounded.Info)
+                            PfItem("about", "About PrismWave", "Version, updates and credits", Icons.Rounded.Info)
                         ),
                         acc, 9
                     ) { page = it }
@@ -1011,21 +1011,64 @@ private fun PfAboutPage(s: AppState) {
     val a = s.accent
     val uctx = LocalContext.current
     val uscope = rememberCoroutineScope()
-    PfLabel("PrismWave", a)
+    val build = (Updater.currentCode(uctx) - 100).coerceAtLeast(0)
+    Box(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .height(400.dp)
+            .clip(RoundedCornerShape(28.dp))
+    ) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(R.drawable.about_cat),
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    0.35f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = 0.85f)
+                )
+            )
+        )
+        Column(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AppLogo(80.dp)
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "PrismWave",
+                color = Color.White,
+                fontFamily = RetroBlendy,
+                fontSize = 40.sp,
+                letterSpacing = 0.6.sp
+            )
+            Text("made by flagsnerd", color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp)
+        }
+    }
+    PfLabel("Version", a)
     PfGroup {
-        PfInfo(Icons.Rounded.Info, "Version", "v27", a)
+        PfInfo(Icons.Rounded.Info, "Current version", "1.5", a)
         PfAction(
             Icons.Rounded.Sync, "Check for updates",
             if (Updater.status.isNotEmpty()) Updater.status else "Look for a newer version", a,
             Updater.status != "Checking..."
         ) { uscope.launch { Updater.checkNow(uctx) } }
-        PfNote("Private build, made from scratch")
+        PfNote("Private build, made from scratch. Build " + build)
     }
 }
 
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added About page, pinned header and new playlist design", a, listOf(
+        "About PrismWave in Settings: cat picture, logo, Retro Blendy name, version 1.5 and Check for updates",
+        "The Home, Search and Library header stays on top while you scroll, with a fading blur under it",
+        "Playlist page like ArchiveTune: full cover on top, big title, round buttons with a Play pill"
+    ))
     PfChange("Added ArchiveTune lyrics look", a, listOf(
         "Gradient background from the cover colors, the playing line sits in the middle",
         "The whole line lights up at once, only when it is sung, no word by word",

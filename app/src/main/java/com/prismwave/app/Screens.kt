@@ -543,8 +543,7 @@ fun SearchScreen(s: AppState) {
         busy = false
     }
     val searching = s.searchQuery.trim().length >= 2
-    LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
-        item { Header(s) }
+    LazyColumn(contentPadding = PaddingValues(top = statusTop() + PinnedHeaderHeight, bottom = 220.dp)) {
         item {
             OutlinedTextField(
                 value = s.searchQuery,
@@ -768,7 +767,7 @@ fun LibraryScreen(s: AppState) {
         label = "library"
     ) { p ->
         when {
-            p.startsWith("pl:") -> PlaylistScreen(s, p.removePrefix("pl:"))
+            p.startsWith("pl:") -> PlaylistScreen2(s, p.removePrefix("pl:"))
             p.startsWith("lib:") -> SongListScreen(s, p.removePrefix("lib:"))
             else -> LibraryMain(s)
         }
@@ -893,7 +892,7 @@ private fun LibraryMain(s: AppState) {
     var sort by remember { mutableStateOf(0) }
     val top = s.topPlayed()
     LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
-        item { Header(s) }
+        item { Spacer(Modifier.height(PinnedHeaderHeight)) }
         item {
             Column(Modifier.padding(horizontal = 24.dp).padding(top = 4.dp)) {
                 Text("Your library", color = Color.White, fontFamily = PrismFont, fontSize = 32.sp, fontWeight = FontWeight.Bold)
@@ -2304,7 +2303,7 @@ fun HomeScreen(s: AppState) {
                 bottom = 220.dp
             )
         ) {
-            item { Header(s) }
+            item { Spacer(Modifier.height(PinnedHeaderHeight)) }
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
