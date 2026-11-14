@@ -366,7 +366,7 @@ fun MiniPlayer(s: AppState) {
                         }
                         AnimatedContent(
                             targetState = if (s.status.isNotEmpty()) s.status else song.artist,
-                            transitionSpec = { fadeIn(tween(320, delay = 120)) togetherWith fadeOut(tween(140)) },
+                            transitionSpec = { fadeIn(tween(320, delayMillis = 120)) togetherWith fadeOut(tween(140)) },
                             label = "miniartist"
                         ) { t ->
                             Text(t, color = TextDim, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
