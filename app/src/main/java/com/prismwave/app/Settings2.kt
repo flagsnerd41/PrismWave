@@ -1086,25 +1086,25 @@ private fun PfChangelogPage(s: AppState) {
         "8D audio: the sound slowly circles around your head, speed slider",
         "New Transitions page: crossfade, audio blur-out and 8D in one place"
     ))
-    PfChange("v27", a, listOf(
+    PfChange("Added YouTube Music recommendations", a, listOf(
         "Home recommendations come from your own YouTube Music Home: Quick picks, Listen again and more",
         "Not signed in: Picked for you, based on the songs you play most"
     ))
-    PfChange("v26.1", a, listOf(
+    PfChange("Added animated lyrics and Discord sign-in improvements", a, listOf(
         "Lyrics: current line grows, others shrink, blur and fade, smooth glide",
         "Lyrics: finds a synced version when the first one is plain text",
         "Discord sign-in page opens as a desktop page, with a clipboard backup",
         "Less lag when opening the player: one fetch per song, video check waits",
         "No video button for songs, only for real videos"
     ))
-    PfChange("v26", a, listOf(
+    PfChange("Added synchronized video, blurred lyrics and Discord status", a, listOf(
         "Video and its blurred backdrop start and pause together",
         "Discord status: Integration, Discord",
         "New lyrics page: blurred lines, cover-tinted background, big bold text",
         "Opening lyrics: the player sinks down and the lyrics rise up",
         "Faster playback: song links are remembered, quicker start, quicker preload"
     ))
-    PfChange("v25", a, listOf(
+    PfChange("Added moving video backgrounds and liquid glass player", a, listOf(
         "Video: blurred backdrop now moves with the video, high quality by default",
         "Video quality choice in Player and audio",
         "Song/Video pills slide",
@@ -1112,7 +1112,7 @@ private fun PfChangelogPage(s: AppState) {
         "Liquid glass on the mini player",
         "Media notification icon is now your P logo"
     ))
-    PfChange("v24", a, listOf(
+    PfChange("Added gradient background and liquid glass menu", a, listOf(
         "New app background: navy to blue to teal to blue gradient",
         "Liquid glass menu bar (Android 13+), own switch in Appearance",
         "Full player is a sheet with rounded top corners",
@@ -1120,33 +1120,33 @@ private fun PfChangelogPage(s: AppState) {
         "Song and Video pills in the player (experiment)",
         "Safer song cache and recovery if a song stops too early"
     ))
-    PfChange("v23", a, listOf(
+    PfChange("Redesigned Settings and added music integrations", a, listOf(
         "Settings rebuilt in a new style: grouped cards, switches with a check, dotted sliders, value pickers",
         "New Integration page: scrobble to Last.fm, Libre.fm and ListenBrainz",
         "Settings pages regrouped: Appearance, Player and audio, Content, Behavior, Storage"
     ))
-    PfChange("v22.3", a, listOf("New PrismWave logo in the media notification"))
-    PfChange("v22.2", a, listOf("New app background: dark navy to blue to teal gradient, no more yellow tint"))
-    PfChange("v22.1", a, listOf(
+    PfChange("Updated PrismWave notification logo", a, listOf("New PrismWave logo in the media notification"))
+    PfChange("Added the new blue gradient background", a, listOf("New app background: dark navy to blue to teal gradient, no more yellow tint"))
+    PfChange("Added profile header and new app icon", a, listOf(
         "Home header shows your YouTube Music profile picture when you are signed in",
         "Lighter glass blur on the bars",
         "Splash: made by flagsnerd appears letter by letter, blurred to clear",
         "New app icon"
     ))
-    PfChange("v22", a, listOf(
+    PfChange("Redesigned Home and improved glass effects", a, listOf(
         "New Home design: greeting header, Featured card, Recently Played and Speed Dial shelves",
         "Lighter glass on the bars: the blur runs on a quarter-size copy",
         "Softer highlight on the glass edge"
     ))
-    PfChange("v21", a, listOf(
+    PfChange("Added offline song cache and karaoke lyrics", a, listOf(
         "Cache rebuilt: songs are saved as real files and play from there",
         "Lyrics button on the player and a full-screen karaoke view"
     ))
-    PfChange("v20", a, listOf(
+    PfChange("Fixed background playback and song transitions", a, listOf(
         "Fix: audio cutting a few seconds into the next song when the app is in the background",
         "The player now moves to the next song by itself, so playback never stops in between"
     ))
-    PfChange("v19", a, listOf(
+    PfChange("Added themes and redesigned navigation", a, listOf(
         "Themes: Warm, Dark, AMOLED, Midnight",
         "Floating bottom bar with a glowing selected tab",
         "Title bar that fades in as you scroll",
@@ -1154,7 +1154,7 @@ private fun PfChangelogPage(s: AppState) {
         "Gradient cards and bolder titles",
         "Lite mode for low-end phones"
     ))
-    PfChange("v18", a, listOf(
+    PfChange("Added synced lyrics, equalizer and crossfade", a, listOf(
         "Synced lyrics (Options, Lyrics)",
         "In-app equalizer with presets and bass boost",
         "Fade between songs, slider in Behavior",
@@ -1162,7 +1162,7 @@ private fun PfChangelogPage(s: AppState) {
         "Queue: move up/down, remove, Play next, Add to end",
         "Real artist page, Car mode, recap with top songs and artists"
     ))
-    PfChange("v17 and earlier", a, listOf(
+    PfChange("Added offline mode, downloads and player features", a, listOf(
         "Offline mode, preload, fade in and out, headphone smarts",
         "Search filters, cached songs, status bar blur controls",
         "Swipe song rows and the mini player, shimmer loading",
