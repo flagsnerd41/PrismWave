@@ -82,6 +82,7 @@ object Fresh {
             }
             p.edit()
                 .putInt("day", day)
+                .putInt("v", 2)
                 .putString("quick", JSONArray(quick.map { songJson(it) }).toString())
                 .putString("shelves", sh.toString())
                 .putString("seen", seen.entries.joinToString(",") { it.key + "|" + it.value })
@@ -92,7 +93,7 @@ object Fresh {
 
     private fun loadCache(day: Int): Boolean {
         val p = prefs ?: return false
-        if (p.getInt("day", 0) != day) return false
+        if (p.getInt("day", 0) != day || p.getInt("v", 0) != 2) return false
         return try {
             val q = JSONArray(p.getString("quick", "[]") ?: "[]")
             val sh = JSONArray(p.getString("shelves", "[]") ?: "[]")
@@ -146,7 +147,7 @@ object Fresh {
             list.filter { key(it) !in knownIds && key(it) !in recentSeen }.distinctBy { key(it) }
 
         val pool = (s.liked.toList() + s.history.toList() + s.topPlayed()).distinctBy { it.id }
-        val seeds = pool.shuffled(rng)
+        val seeds = pool.filter { it.seconds in 60..900 }.shuffled(rng)
         val used = HashSet<String>()
         val shelves = ArrayList<YtShelf>()
 

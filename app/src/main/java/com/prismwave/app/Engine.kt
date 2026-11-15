@@ -128,9 +128,30 @@ object Engine {
         }
     }
 
+    // Music-only related: the YouTube Mix (radio) for the song, with a YouTube Music search as the fallback.
+    // The plain watch-page suggestions are ordinary YouTube videos (gaming, pranks...), so they are not used any more.
     suspend fun related(url: String): List<Song> = withContext(Dispatchers.IO) {
-        infoFor(url)
-            .relatedItems.filterIsInstance<StreamInfoItem>().filter { it.duration > 0 }.map { it.toSong() }
+        init()
+        val id = url.substringAfter("v=", "").substringBefore("&")
+        val songs = ArrayList<Song>()
+        if (id.length == 11) {
+            try {
+                val mix = PlaylistInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=" + id + "&list=RD" + id)
+                mix.relatedItems.filterIsInstance<StreamInfoItem>()
+                    .filter { it.duration in 60L..900L && it.url != url }
+                    .forEach { songs.add(it.toSong()) }
+            } catch (e: Exception) {
+            }
+        }
+        if (songs.size < 6) {
+            try {
+                val seed = infoFor(url)
+                val q = (seed.uploaderName ?: "").removeSuffix(" - Topic") + " " + seed.name
+                search(q.trim()).filter { it.url != url && it.seconds in 60..900 }.forEach { songs.add(it) }
+            } catch (e: Exception) {
+            }
+        }
+        songs.distinctBy { it.url }
     }
 
     suspend fun collection(url: String): List<Song> = withContext(Dispatchers.IO) {
