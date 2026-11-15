@@ -339,11 +339,12 @@ fun MiniPlayer(s: AppState) {
             32.dp
         ) {
             Box(Modifier.fillMaxWidth()) {
+                Box(Modifier.matchParentSize().graphicsLayer { alpha = 0.5f }.glowBehind(art, s.playing, s.batterySaver, 0f))
                 Row(
                     Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Cover(song, Modifier.size(50.dp).onGloballyPositioned { MiniCover.rect = it.boundsInRoot() }, 12.dp, 20.sp)
+                    Cover(song, Modifier.size(54.dp).onGloballyPositioned { MiniCover.rect = it.boundsInRoot() }, 15.dp, 20.sp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         AnimatedContent(
@@ -372,9 +373,12 @@ fun MiniPlayer(s: AppState) {
                             Text(t, color = TextDim, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    Box(Modifier.bounceClick { s.toggle() }.size(48.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.bounceClick { s.toggle() }.size(46.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.95f)),
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (s.loading) {
-                            CircularProgressIndicator(color = Color.White, strokeWidth = 2.5.dp, modifier = Modifier.size(24.dp))
+                            CircularProgressIndicator(color = Night, strokeWidth = 2.5.dp, modifier = Modifier.size(22.dp))
                         } else {
                             AnimatedContent(
                                 targetState = s.playing,
@@ -387,8 +391,8 @@ fun MiniPlayer(s: AppState) {
                                 Icon(
                                     if (p) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
+                                    tint = Night,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             }
                         }
@@ -401,11 +405,11 @@ fun MiniPlayer(s: AppState) {
                 Box(
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 22.dp, bottom = 3.dp)
+                        .padding(start = 22.dp, bottom = 4.dp)
                         .fillMaxWidth(frac)
-                        .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp))
-                        .background(s.accent.copy(alpha = 0.9f))
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.White)))
                 )
             }
         }
@@ -1794,6 +1798,7 @@ private fun MiniShell(
         val c by animateColorAsState(art, tween(700), label = "miniArt")
         Box(
             modifier
+                .glowRing(c, radius)
                 .clip(RoundedCornerShape(radius))
                 .background(Brush.horizontalGradient(listOf(lerp(Night, c, 0.62f), lerp(Night, c, 0.30f)))),
             content = content

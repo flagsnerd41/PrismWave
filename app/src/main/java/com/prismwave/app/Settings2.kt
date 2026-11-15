@@ -143,12 +143,18 @@ private fun PfRow(
     accent: Color,
     onClick: (() -> Unit)?,
     trailing: @Composable () -> Unit = {},
-    below: @Composable () -> Unit = {}
+    below: @Composable () -> Unit = {},
+    tint: Boolean = false
 ) {
+    val rowBg by androidx.compose.animation.animateColorAsState(
+        if (tint) androidx.compose.ui.graphics.lerp(CardBg, accent, 0.30f) else CardBg,
+        tween(300),
+        label = "pfrowbg"
+    )
     Column(
         Modifier
             .fillMaxWidth()
-            .background(CardBg)
+            .background(rowBg)
             .then(if (onClick != null) Modifier.softClick { onClick() } else Modifier)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
@@ -185,6 +191,7 @@ private fun PfSwitch(
 ) {
     PfRow(
         icon, title, sub, accent, { onChange(!checked) },
+        tint = checked,
         trailing = {
             Spacer(Modifier.width(12.dp))
             Switch(
@@ -224,23 +231,82 @@ private fun PfSlider(
 ) {
     PfRow(
         icon, title, valueText, accent, null,
-        below = {
-            Slider(
-                value = value.coerceIn(range.start, range.endInclusive),
-                onValueChange = onChange,
-                onValueChangeFinished = onFinish,
-                valueRange = range,
-                colors = SliderDefaults.colors(
-                    thumbColor = accent,
-                    activeTrackColor = accent,
-                    inactiveTrackColor = accent.copy(alpha = 0.24f)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        below = { PfDotSlider(value, range, accent, onChange, onFinish) }
     )
 }
 
+// a fat dotted track with a tall bar as the thumb
+@Composable
+private fun PfDotSlider(
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    accent: Color,
+    onChange: (Float) -> Unit,
+    onFinish: () -> Unit
+) {
+    val span = (range.endInclusive - range.start).coerceAtLeast(0.0001f)
+    val frac = ((value - range.start) / span).coerceIn(0f, 1f)
+    var dragging by remember { mutableStateOf(false) }
+    val change by rememberUpdatedState(onChange)
+    val finish by rememberUpdatedState(onFinish)
+    val thumbW by androidx.compose.animation.core.animateDpAsState(if (dragging) 3.dp else 5.dp, tween(150), label = "dsThumb")
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .height(44.dp)
+            .pointerInput(range) {
+                detectTapGestures { o ->
+                    change(range.start + (o.x / size.width).coerceIn(0f, 1f) * span)
+                    finish()
+                }
+            }
+            .pointerInput(range) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragging = true },
+                    onDragEnd = {
+                        dragging = false
+                        finish()
+                    },
+                    onDragCancel = {
+                        dragging = false
+                        finish()
+                    }
+                ) { c, _ ->
+                    c.consume()
+                    change(range.start + (c.position.x / size.width).coerceIn(0f, 1f) * span)
+                }
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+        val trackH = 16.dp.toPx()
+        val top = (h - trackH) / 2f
+        val gap = 7.dp.toPx()
+        val tx = (w * frac).coerceIn(trackH / 2f, w - trackH / 2f)
+        val round = CornerRadius(trackH / 2f)
+        val leftW = (tx - gap).coerceAtLeast(0f)
+        if (leftW > 0.5f) drawRoundRect(accent, Offset(0f, top), Size(leftW, trackH), round)
+        val rx = tx + gap
+        if (w - rx > 0.5f) drawRoundRect(accent.copy(alpha = 0.26f), Offset(rx, top), Size(w - rx, trackH), round)
+        val dot = 1.6f.dp.toPx()
+        val step = 10.dp.toPx()
+        var x = 9.dp.toPx()
+        while (x < leftW - 6.dp.toPx()) {
+            drawCircle(Night.copy(alpha = 0.45f), dot, Offset(x, h / 2f))
+            x += step
+        }
+        x = rx + 9.dp.toPx()
+        while (x < w - 9.dp.toPx()) {
+            drawCircle(accent.copy(alpha = 0.85f), dot, Offset(x, h / 2f))
+            x += step
+        }
+        val tw = thumbW.toPx()
+        drawRoundRect(accent, Offset(tx - tw / 2f, h / 2f - 18.dp.toPx()), Size(tw, 36.dp.toPx()), CornerRadius(tw / 2f))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PfChoice(
     icon: ImageVector?,
@@ -268,39 +334,53 @@ private fun PfChoice(
         }
     )
     if (open) {
-        AlertDialog(
+        // a bottom sheet: big title, one pill per option, the chosen one filled with the accent color
+        val sheet = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val sheetScope = rememberCoroutineScope()
+        androidx.compose.material3.ModalBottomSheet(
             onDismissRequest = { open = false },
-            containerColor = CardBg2,
-            shape = RoundedCornerShape(28.dp),
-            title = { Text(title, color = Color.White) },
-            text = {
-                Column {
-                    options.forEachIndexed { i, o ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable {
-                                    onSelect(i)
+            sheetState = sheet,
+            containerColor = Night,
+            shape = RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp)
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 28.dp)
+            ) {
+                Text(
+                    title,
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 20.dp)
+                )
+                options.forEachIndexed { i, o ->
+                    val chosen = i == selected
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (chosen) accent else CardBg2)
+                            .softClick {
+                                onSelect(i)
+                                sheetScope.launch {
+                                    sheet.hide()
                                     open = false
                                 }
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = i == selected,
-                                onClick = null,
-                                colors = RadioButtonDefaults.colors(selectedColor = accent)
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(o, color = Color.White, fontSize = 17.sp)
-                        }
+                            }
+                            .padding(horizontal = 28.dp, vertical = 22.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(o, color = if (chosen) Night else Color.White, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                        if (chosen) Icon(Icons.Rounded.Check, contentDescription = null, tint = Night)
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Close", color = accent) } }
-        )
+            }
+        }
     }
 }
 
@@ -1166,6 +1246,12 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added new dock, tonal settings and bottom sheet pickers", a, listOf(
+        "Menu bar: one glass bar with Home, Search and Library. The chosen tab grows, gets a bubble and shows its name",
+        "Mini player: a moving glow inside, a ring of light running around the edge, bigger cover and a round play button",
+        "Settings: a switch that is on fills its whole row with the accent color",
+        "Settings: dotted sliders with a tall thumb, and choices open as a bottom sheet with big pills"
+    ))
     PfChange("Added moving glow, Discord on top and smoother settings", a, listOf(
         "Moving glow behind the player controls and the lyrics: bright and dark colors from the cover flow and move. Settings, Appearance",
         "About PrismWave is now the first thing in Settings",

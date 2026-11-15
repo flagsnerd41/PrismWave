@@ -332,7 +332,7 @@ fun Main(s: AppState) {
             ) {
                 NavCatScene(s)
                 MiniPlayer(s)
-                NavBar(s)
+                NavBar2(s)
             }
             BackHandler(enabled = s.screen != Screen.Home || s.libraryOpen != null || s.openPlaylist != null) {
                 when {
