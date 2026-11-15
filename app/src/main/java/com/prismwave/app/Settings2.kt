@@ -1246,6 +1246,12 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added fresh picks, real Mood & Genres and a typing box in the bar", a, listOf(
+        "Home: Fresh for you. New songs every day, built from what you play and like, and songs you already know or saw lately never come back",
+        "More shelves: Because you played, More from your top artist, Discover a new style, and a mood for the time of day. Refresh picks gives a new set",
+        "Mood & Genres from YouTube Music in Search, with colors and covers. Open a category to see its playlists and play them",
+        "Tap Search in the bottom bar and it grows into the typing box, with the keyboard ready"
+    ))
     PfChange("Added new dock, tonal settings and bottom sheet pickers", a, listOf(
         "Menu bar: one glass bar with Home, Search and Library. The chosen tab grows, gets a bubble and shows its name",
         "Mini player: a moving glow inside, a ring of light running around the edge, bigger cover and a round play button",

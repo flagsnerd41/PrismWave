@@ -1,4 +1,5 @@
 package com.prismwave.app
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
@@ -323,10 +324,12 @@ fun Main(s: AppState) {
             if (headerShown(s)) {
                 Box(Modifier.align(Alignment.TopCenter)) { PinnedHeader(s) }
             }
+            MoodsHost(s)
             Column(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
+                    .imePadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -336,6 +339,8 @@ fun Main(s: AppState) {
             }
             BackHandler(enabled = s.screen != Screen.Home || s.libraryOpen != null || s.openPlaylist != null) {
                 when {
+                    MoodNav.playlist != null -> MoodNav.playlist = null
+                    MoodNav.cat != null -> MoodNav.cat = null
                     s.openPlaylist != null -> s.openPlaylist = null
                     s.libraryOpen != null -> s.libraryOpen = null
                     else -> s.screen = Screen.Home

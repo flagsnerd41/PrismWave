@@ -81,7 +81,7 @@ object SettingsNav {
 
 // the "What's new" button in the Home header, with a dot until it is opened
 object WhatsNew {
-    const val ID = "added-dock-tonal-settings"
+    const val ID = "added-fresh-moods-search"
     private var p: SharedPreferences? = null
     var seen by mutableStateOf(true)
 

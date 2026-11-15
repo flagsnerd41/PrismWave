@@ -507,6 +507,7 @@ fun SearchScreen(s: AppState) {
     var tab by remember { mutableStateOf(0) }
     val searchCtx = LocalContext.current
     SearchHistory.init(searchCtx)
+    MoodApi.ensure()
     var sugg by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(s.searchQuery) {
         val sq = s.searchQuery.trim()
@@ -544,27 +545,7 @@ fun SearchScreen(s: AppState) {
     }
     val searching = s.searchQuery.trim().length >= 2
     LazyColumn(contentPadding = PaddingValues(top = statusTop() + PinnedHeaderHeight, bottom = 220.dp)) {
-        item {
-            OutlinedTextField(
-                value = s.searchQuery,
-                onValueChange = { s.searchQuery = it },
-                singleLine = true,
-                shape = RoundedCornerShape(30.dp),
-                placeholder = { Text("Search YouTube Music", color = TextDim) },
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White) },
-                trailingIcon = { Icon(Icons.Rounded.Public, contentDescription = null, tint = Color.White) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedContainerColor = CardBg2,
-                    unfocusedContainerColor = CardBg2,
-                    focusedBorderColor = s.accent,
-                    unfocusedBorderColor = Color.Transparent,
-                    cursorColor = s.accent
-                ),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
-            )
-        }
+        item { Spacer(Modifier.height(4.dp)) }
         if (!searching) {
             if (SearchHistory.items.isNotEmpty() && s.searchQuery.isBlank()) {
                 item { SectionTitle("Recent searches", "Clear") { SearchHistory.clear() } }
@@ -610,7 +591,7 @@ fun SearchScreen(s: AppState) {
             }
             if (tab == 0) {
                 item { SectionTitle("Mood & Genres") }
-                itemsIndexed(Moods.chunked(2)) { ri, pair ->
+                if (MoodApi.cats.isNotEmpty()) moodGridItems(s) else itemsIndexed(Moods.chunked(2)) { ri, pair ->
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -2293,7 +2274,8 @@ fun HomeScreen(s: AppState) {
     }
     val ytQuick = s.ytHome.firstOrNull { it.title.contains("Quick picks", true) }?.songs
     val picks = if (s.signedIn) null else s.feeds["picks"]
-    val bestQuick = ytQuick ?: picks ?: quick
+    FreshEffect(s)
+    val bestQuick = Fresh.quick.takeIf { it.size >= 6 } ?: ytQuick ?: picks ?: quick
     val community = (chill + workout).distinctBy { it.id }.take(20)
     Box(Modifier.fillMaxSize()) {
         HomeTopGlow(s, Modifier.align(Alignment.TopCenter))
@@ -2309,6 +2291,12 @@ fun HomeScreen(s: AppState) {
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item {
+                        Chip("Mood & Genres", true, s.accent) {
+                            s.searchQuery = ""
+                            s.screen = Screen.Search
+                        }
+                    }
                     items(moods) { c ->
                         Chip(c, false, s.accent) {
                             s.searchQuery = c + " music"
@@ -2323,10 +2311,17 @@ fun HomeScreen(s: AppState) {
                     }
                 }
             }
-            item { HomeSection(if (ytQuick == null && picks != null) "Picked for you" else "Quick picks") }
+            item {
+                HomeSection(
+                    if (Fresh.quick.size >= 6) "Fresh for you"
+                    else if (ytQuick == null && picks != null) "Picked for you"
+                    else "Quick picks"
+                )
+            }
             item {
                 if (bestQuick == null) LoadingRow(s) else QuickPickCarousel(bestQuick, s)
             }
+            item { FreshHome(s) }
             if (Opts.showMixes && community.isNotEmpty()) {
                 item { CommunityHeader(s, community) }
                 item { QuickPicksGrid(community, s) }
