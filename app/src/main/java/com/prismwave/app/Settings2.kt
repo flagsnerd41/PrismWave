@@ -1265,6 +1265,10 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Fixed zoomed cover and messy open animation in the player", a, listOf(
+        "The Immersive player cover is nearly square now, so it is no longer blown up and cropped",
+        "Opening the player: the cover flies to its place alone, then the player fades in around it"
+    ))
     PfChange("Added option to hide the volume slider", a, listOf(
         "Settings, Player, Volume: turn the slider off in the player and in the three dots menu"
     ))

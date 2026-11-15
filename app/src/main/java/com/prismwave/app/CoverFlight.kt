@@ -145,7 +145,7 @@ fun CoverFlight(s: AppState) {
             tTo = pt
             tSize1 = PlayerTitle.sizeSp
             from = start
-            to = sr ?: Rect(0f, 0f, wPx, hPx * 0.64f)
+            to = sr ?: Rect(0f, 0f, wPx, minOf(wPx * 1.10f, hPx * 0.60f))
             wide = sr == null
             closing = false
             rad0 = if (tap != null) TapCover.radius else 12f
@@ -167,7 +167,7 @@ fun CoverFlight(s: AppState) {
             // only when the player itself is showing, not the lyrics
             if (!was || mini == null || s.reduceMotion || PlayerStage.stage != 0 || Pages.open == "lyrics") return@LaunchedEffect
             val sr = if (s.playerStyle == 1) null else SharedCover.rect
-            from = sr ?: Rect(0f, 0f, wPx, hPx * 0.64f)
+            from = sr ?: Rect(0f, 0f, wPx, minOf(wPx * 1.10f, hPx * 0.60f))
             to = mini
             wide = sr == null
             closing = true

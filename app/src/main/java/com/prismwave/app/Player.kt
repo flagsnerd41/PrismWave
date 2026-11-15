@@ -853,6 +853,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
                 .graphicsLayer {
                     scaleX = coverScale
                     scaleY = coverScale
+                    alpha = if (FlightState.busy) 0f else 1f
                 }
                 .shadow(22.dp, coverShape, ambientColor = art, spotColor = art)
         ) {
@@ -916,7 +917,7 @@ private fun ImmersiveBody(
         )
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Night)) {
-        val stageHeight = maxHeight * 0.64f
+        val stageHeight = minOf(maxWidth * 1.10f, maxHeight * 0.60f)
         // blurred backdrop that fills the whole screen
         if (VideoSync.showVideo(song) && VideoPrefs.liveBackdrop) {
             VideoStage(s, song, Modifier.fillMaxSize().blur(50.dp), low = true)
@@ -938,6 +939,7 @@ private fun ImmersiveBody(
             Modifier
                 .fillMaxWidth()
                 .height(stageHeight)
+                .graphicsLayer { alpha = if (FlightState.busy) 0f else 1f }
                 .then(
                     if (VideoSync.showVideo(song)) Modifier else Modifier
                         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
