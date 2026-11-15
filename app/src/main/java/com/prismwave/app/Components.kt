@@ -190,7 +190,8 @@ fun Cover(
     modifier: Modifier = Modifier,
     radius: Dp = 14.dp,
     letterSize: TextUnit = 22.sp,
-    quality: Int = 400
+    quality: Int = 400,
+    fixedSize: Boolean = false
 ) {
     val ctx = LocalContext.current
     Box(
@@ -208,8 +209,11 @@ fun Cover(
         val thumb = song.thumb
         if (thumb != null) {
             var failed by remember(thumb, quality) { mutableStateOf(false) }
-            val req = remember(thumb, quality, failed) {
-                ImageRequest.Builder(ctx).data(if (failed) thumb else artUrl(thumb, quality)).crossfade(350).build()
+            val req = remember(thumb, quality, failed, fixedSize) {
+                val b = ImageRequest.Builder(ctx).data(if (failed) thumb else artUrl(thumb, quality))
+                // a fixed request size means the image is not re-requested while the cover is resized in a flight
+                if (fixedSize) b.size(quality, quality).crossfade(false) else b.crossfade(350)
+                b.build()
             }
             AsyncImage(
                 model = req,
@@ -232,6 +236,7 @@ fun Glass(
     val backdrop = LocalBackdrop.current
     val useBlur = backdrop != null && backdrop.enabled && Build.VERSION.SDK_INT >= 31 && alpha < 0.999f
     val blurLayer = rememberGraphicsLayer()
+    val recorded = remember { BooleanArray(1) }
     var pos by remember { mutableStateOf(Offset.Zero) }
     Box(
         Modifier
@@ -243,16 +248,20 @@ fun Glass(
                     // Only the bar's own area is blurred (much cheaper than the whole screen).
                     // blur a quarter-size copy and scale it back up: about 16x less work for the GPU
                     val k = 0.25f
-                    val r = backdrop.radius * 0.4f * k
-                    blurLayer.renderEffect = BlurEffect(r, r, TileMode.Clamp)
-                    blurLayer.clip = true
-                    blurLayer.record(
-                        this, layoutDirection,
-                        IntSize((size.width * k).toInt().coerceAtLeast(1), (size.height * k).toInt().coerceAtLeast(1))
-                    ) {
-                        scale(k, k, Offset.Zero) { translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) } }
+                    // while a cover flight runs, keep showing the last blur instead of re-blurring the screen every frame
+                    if (!FlightState.busy) {
+                        val r = backdrop.radius * 0.4f * k
+                        blurLayer.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+                        blurLayer.clip = true
+                        blurLayer.record(
+                            this, layoutDirection,
+                            IntSize((size.width * k).toInt().coerceAtLeast(1), (size.height * k).toInt().coerceAtLeast(1))
+                        ) {
+                            scale(k, k, Offset.Zero) { translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) } }
+                        }
+                        recorded[0] = true
                     }
-                    scale(1f / k, 1f / k, Offset.Zero) { drawLayer(blurLayer) }
+                    if (recorded[0]) scale(1f / k, 1f / k, Offset.Zero) { drawLayer(blurLayer) }
                 } else {
                     drawRect(Night)
                 }

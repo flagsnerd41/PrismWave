@@ -84,6 +84,7 @@ half4 main(float2 p) {
 """
 
 private class LiquidCache {
+    var rec = false
     var w = 0f
     var h = 0f
     var b = 0f
@@ -139,11 +140,15 @@ private fun LiquidGlassImpl(
                         val fx = RenderEffect.createRuntimeShaderEffect(shader, "content")
                         layer.renderEffect = RenderEffect.createChainEffect(fx, blur).asComposeRenderEffect()
                     }
-                    layer.clip = true
-                    layer.record(this, layoutDirection, IntSize(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1))) {
-                        translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
+                    // while a cover flight runs, keep showing the last frame instead of re-running blur + shader
+                    if (!FlightState.busy) {
+                        layer.clip = true
+                        layer.record(this, layoutDirection, IntSize(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1))) {
+                            translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
+                        }
+                        cache.rec = true
                     }
-                    drawLayer(layer)
+                    if (cache.rec) drawLayer(layer)
                 }
             }
             .background(Color.White.copy(alpha = 0.03f))

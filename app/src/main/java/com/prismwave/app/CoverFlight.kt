@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
@@ -53,6 +54,9 @@ object PlayerTitle {
 
 object FlightState {
     var running by mutableStateOf(false)
+
+    /** true while a cover flight is animating: glass bars stop re-blurring the screen and just show their last frame */
+    var busy by mutableStateOf(false)
 }
 
 // the cover that was tapped on a list or card, so the player can grow out of it
@@ -109,6 +113,7 @@ fun CoverFlight(s: AppState) {
     var tSize1 by remember { mutableStateOf(22f) }
     LaunchedEffect(s.showPlayer) {
         FlightState.running = false
+        FlightState.busy = false
         val mini = MiniCover.rect
         val wPx = density.density * cfg.screenWidthDp
         val hPx = density.density * cfg.screenHeightDp
@@ -148,8 +153,10 @@ fun CoverFlight(s: AppState) {
             p.snapTo(0f)
             active = true
             FlightState.running = titleOn
+            FlightState.busy = true
             p.animateTo(1f, tween(480, easing = FastOutSlowInEasing))
             FlightState.running = false
+            FlightState.busy = false
             active = false
         } else {
             val was = wasOpen[0]
@@ -168,7 +175,9 @@ fun CoverFlight(s: AppState) {
             rad1 = 12f
             p.snapTo(0f)
             active = true
+            FlightState.busy = true
             p.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+            FlightState.busy = false
             active = false
         }
     }
@@ -191,7 +200,7 @@ fun CoverFlight(s: AppState) {
                         val v = p.value
                         shape = RoundedCornerShape((rad0 + (rad1 - rad0) * v).coerceAtLeast(0f).dp)
                         clip = true
-                        compositingStrategy = CompositingStrategy.Offscreen
+                        compositingStrategy = if (wide) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                     }
                     .drawWithContent {
                         drawContent()
@@ -209,24 +218,27 @@ fun CoverFlight(s: AppState) {
                     }
             ) {
                 val song = s.current
-                if (song != null) Cover(song, Modifier.fillMaxSize(), 0.dp, 20.sp, quality = 800)
+                if (song != null) Cover(song, Modifier.fillMaxSize(), 0.dp, 20.sp, quality = 400, fixedSize = true)
             }
             val ta = tFrom
             val tb = tTo
             if (titleOn && !closing && ta != null && tb != null) {
-                val v = p.value
                 Text(
                     s.current?.title ?: "",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = (17f + (tSize1 - 17f) * v).sp,
+                    fontSize = tSize1.sp,
                     maxLines = 1,
                     softWrap = false,
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            (ta.left + (tb.left - ta.left) * p.value).roundToInt(),
-                            (ta.top + (tb.top - ta.top) * p.value).roundToInt()
-                        )
+                    modifier = Modifier.graphicsLayer {
+                        // laid out once at the final size, then only scaled + moved on the GPU
+                        val v = p.value
+                        transformOrigin = TransformOrigin(0f, 0f)
+                        val sc = (17f + (tSize1 - 17f) * v) / tSize1
+                        scaleX = sc
+                        scaleY = sc
+                        translationX = ta.left + (tb.left - ta.left) * v
+                        translationY = ta.top + (tb.top - ta.top) * v
                     }
                 )
             }
