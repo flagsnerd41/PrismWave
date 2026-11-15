@@ -90,6 +90,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -917,6 +918,24 @@ private fun PfPlayerPage(s: AppState) {
         )
     }
     Aod.init(LocalContext.current.applicationContext)
+    VolPrefs.init(LocalContext.current.applicationContext)
+    PfLabel("Volume", a)
+    PfGroup {
+        PfSwitch(
+            Icons.Rounded.VolumeUp, "Volume slider in the player",
+            "Show the volume slider under the controls", VolPrefs.show, a
+        ) {
+            VolPrefs.show = it
+            VolPrefs.save()
+        }
+        PfSwitch(
+            Icons.Rounded.VolumeUp, "Volume in the menu",
+            "Show the volume card in the three dots menu", VolPrefs.showMenu, a
+        ) {
+            VolPrefs.showMenu = it
+            VolPrefs.save()
+        }
+    }
     PfLabel("Idle screen", a)
     PfGroup {
         PfSwitch(
@@ -1246,6 +1265,9 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added option to hide the volume slider", a, listOf(
+        "Settings, Player, Volume: turn the slider off in the player and in the three dots menu"
+    ))
     PfChange("Added fresh picks, real Mood & Genres and a typing box in the bar", a, listOf(
         "Home: Fresh for you. New songs every day, built from what you play and like, and songs you already know or saw lately never come back",
         "More shelves: Because you played, More from your top artist, Discover a new style, and a mood for the time of day. Refresh picks gives a new set",

@@ -524,6 +524,8 @@ private fun PlayerIcon(icon: ImageVector, tint: Color, size: Dp = 26.dp, box: Dp
 @Composable
 private fun VolumeRow() {
     val ctx = LocalContext.current
+    VolPrefs.init(ctx.applicationContext)
+    if (!VolPrefs.show) return
     val am = remember { ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val maxVol = remember { am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
     var vol by remember { mutableStateOf(am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()) }
@@ -1527,6 +1529,7 @@ private fun PlayerMenuSheet(
     var visible by remember { mutableStateOf(false) }
     var details by remember { mutableStateOf(false) }
     var tempoOpen by remember { mutableStateOf(false) }
+    VolPrefs.init(ctx.applicationContext)
     LaunchedEffect(Unit) { visible = true }
     val close: () -> Unit = {
         scope.launch {
@@ -1719,7 +1722,7 @@ private fun PlayerMenuSheet(
                     }
                 }
             }
-            PopItem(1, o) { VolumeCard(s.accent) }
+            if (VolPrefs.showMenu) PopItem(1, o) { VolumeCard(s.accent) }
             PopItem(2, o) {
                 Column(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(8.dp),
