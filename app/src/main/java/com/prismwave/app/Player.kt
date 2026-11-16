@@ -344,7 +344,7 @@ fun MiniPlayer(s: AppState) {
                     Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Cover(song, Modifier.size(54.dp).onGloballyPositioned { MiniCover.rect = it.boundsInRoot() }, 15.dp, 20.sp)
+                    Cover(song, Modifier.size(54.dp).onGloballyPositioned { MiniCover.rect = it.boundsInRoot() }.graphicsLayer { alpha = if (FlightState.busy) 0f else 1f }, 15.dp, 20.sp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         AnimatedContent(
