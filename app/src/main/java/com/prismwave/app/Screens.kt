@@ -2277,6 +2277,7 @@ fun HomeScreen(s: AppState) {
     FreshEffect(s)
     val bestQuick = Fresh.quick.takeIf { it.size >= 6 } ?: ytQuick ?: picks ?: quick
     val community = (chill + workout).distinctBy { it.id }.take(20)
+    val jump = history.distinctBy { it.id }.take(4).ifEmpty { (bestQuick ?: emptyList()).take(4) }
     Box(Modifier.fillMaxSize()) {
         HomeTopGlow(s, Modifier.align(Alignment.TopCenter))
         LazyColumn(
@@ -2286,6 +2287,7 @@ fun HomeScreen(s: AppState) {
             )
         ) {
             item { Spacer(Modifier.height(PinnedHeaderHeight)) }
+            item { HomeGreeting(s, jump) }
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -2419,4 +2421,85 @@ object HeaderPos {
     var logo by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
     var title by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
     var hide by mutableStateOf(false)
+}
+
+// ------------------------------------------------------------ fresh home greeting
+
+@Composable
+private fun HomeGreeting(s: AppState, jump: List<Song>) {
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val hello = when {
+        hour < 5 -> "Late night vibes"
+        hour < 12 -> "Good morning"
+        hour < 18 -> "Good afternoon"
+        else -> "Good evening"
+    }
+    val emoji = when {
+        hour < 5 -> "\uD83C\uDF19"
+        hour < 12 -> "\u2600\uFE0F"
+        hour < 18 -> "\uD83C\uDF24\uFE0F"
+        else -> "\uD83C\uDF06"
+    }
+    val first = ProfilePic.name?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }
+    val shimmer = androidx.compose.animation.core.rememberInfiniteTransition(label = "greet")
+    val shift by shimmer.animateFloat(
+        0f, 600f,
+        androidx.compose.animation.core.infiniteRepeatable(
+            tween(5000, easing = androidx.compose.animation.core.LinearEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "greetShift"
+    )
+    Column(Modifier.padding(horizontal = 20.dp).padding(top = 6.dp, bottom = 4.dp)) {
+        Text(
+            if (first != null) "$hello, $first $emoji" else "$hello $emoji",
+            style = androidx.compose.ui.text.TextStyle(
+                brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(Color.White, s.accent, Color.White),
+                    start = androidx.compose.ui.geometry.Offset(shift, 0f),
+                    end = androidx.compose.ui.geometry.Offset(shift + 500f, 0f)
+                ),
+                fontFamily = PrismFont,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.appear(0)
+        )
+        Text(
+            if (jump.isNotEmpty()) "Jump back in" else "What are we listening to?",
+            color = TextDim,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(top = 2.dp, bottom = 12.dp).appear(1)
+        )
+        jump.chunked(2).forEachIndexed { row, pair ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                pair.forEachIndexed { col, sg ->
+                    val cref = remember { CoverRef() }
+                    val cur = s.current?.id == sg.id
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            .appear(2 + row * 2 + col)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color.White.copy(alpha = if (cur) 0.16f else 0.08f))
+                            .softClick { openFrom(s, sg, jump, cref, 14f) }
+                            .padding(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Cover(sg, Modifier.size(52.dp).trackCover(cref), 14.dp, 20.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            sg.title,
+                            color = if (cur) s.accent else Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
 }

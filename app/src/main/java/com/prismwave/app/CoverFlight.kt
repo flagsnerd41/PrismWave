@@ -122,7 +122,7 @@ fun CoverFlight(s: AppState) {
             wasOpen[0] = true
             val tap = TapCover.rect
             TapCover.rect = null
-            val start = tap ?: mini
+            val start = tap
             if (start == null || s.reduceMotion) return@LaunchedEffect
             // the Immersive player has a full-width cover stage, the others report where their cover is
             if (s.playerStyle != 1) {
@@ -165,7 +165,7 @@ fun CoverFlight(s: AppState) {
             titleOn = false
             PlayerTitle.rect = null
             // only when the player itself is showing, not the lyrics
-            if (!was || mini == null || s.reduceMotion || PlayerStage.stage != 0 || Pages.open == "lyrics") return@LaunchedEffect
+            if (!was || true || mini == null || s.reduceMotion || PlayerStage.stage != 0 || Pages.open == "lyrics") return@LaunchedEffect
             val sr = if (s.playerStyle == 1) null else SharedCover.rect
             from = sr ?: Rect(0f, 0f, wPx, minOf(wPx * 1.10f, hPx * 0.60f))
             to = mini
