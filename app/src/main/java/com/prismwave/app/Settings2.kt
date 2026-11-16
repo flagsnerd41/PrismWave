@@ -784,7 +784,7 @@ private fun PfAppearancePage(s: AppState) {
     PfLabel("Player", a)
     PfGroup {
         PfChoice(
-            Icons.Rounded.PlayArrow, "Player design style", listOf("Album", "Immersive", "Vinyl"), s.playerStyle, a,
+            Icons.Rounded.PlayArrow, "Player design style", listOf("Album", "Immersive", "Vinyl", "Aurora", "Poster"), s.playerStyle, a,
             "Vinyl: a spinning record with lyrics underneath"
         ) {
             s.playerStyle = it

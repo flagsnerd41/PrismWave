@@ -1,5 +1,9 @@
 package com.prismwave.app
 
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.border
 
 import androidx.compose.foundation.layout.requiredSize
@@ -641,7 +645,11 @@ fun FullPlayer(s: AppState) {
             transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },
             label = "pstyle"
         ) { style ->
-            if (style == 2) {
+            if (style == 4) {
+                PosterBody(s, song, { menuDialog = true }, { addDialog = true }, { sleepDialog = true })
+            } else if (style == 3) {
+                AuroraBody(s, song, { menuDialog = true }, { addDialog = true }, { sleepDialog = true })
+            } else if (style == 2) {
                 VinylBody(
                     s, song,
                     { menuDialog = true }, { addDialog = true }, { sleepDialog = true }, { queueDialog = true }
@@ -866,7 +874,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
         Spacer(Modifier.height(26.dp))
         TitleRow(s, song, 22.sp, 19.sp, true, onMenu)
         Spacer(Modifier.weight(1f))
-        GlowSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth())
+        WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth(), s.playing)
         TimeLabels(s, total)
         Spacer(Modifier.weight(1f))
         TransportRow(s, 44.dp, 78.dp)
@@ -1009,7 +1017,7 @@ private fun ImmersiveBody(
             Spacer(Modifier.weight(1f))
             TitleRow(s, song, 27.sp, 19.sp, false, onMenu)
             Spacer(Modifier.height(18.dp))
-            GlowSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth())
+            WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth(), s.playing)
             TimeLabels(s, total)
             Spacer(Modifier.height(6.dp))
             TransportRow(s, 50.dp, 72.dp, true)
@@ -1810,5 +1818,209 @@ private fun MiniShell(
         )
     } else {
         LiquidGlass(alpha, modifier, radius, content)
+    }
+}
+
+
+// ------------------------------------------------------------ new player styles: Aurora and Poster
+
+@Composable
+private fun PlayerBottomIcons(s: AppState, onAdd: () -> Unit, onSleep: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.7f)) { s.shuffle = !s.shuffle }
+        PlayerIcon(Icons.Rounded.Add, Color.White.copy(alpha = 0.7f)) { onAdd() }
+        PlayerIcon(Icons.Rounded.Subtitles, Color.White.copy(alpha = 0.7f)) { Pages.show("lyrics") }
+        PlayerIcon(Icons.Rounded.Bedtime, if (s.sleepLeft > 0) s.accent else Color.White.copy(alpha = 0.7f)) { onSleep() }
+        PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.7f)) { s.repeat = !s.repeat }
+    }
+}
+
+/** Aurora: two slowly turning blurred copies of the cover as the background, a breathing glow behind a big cover */
+@Composable
+private fun AuroraBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> Unit, onSleep: () -> Unit) {
+    val art = rememberArtColor(song)
+    val total = song.seconds.coerceAtLeast(1).toFloat()
+    val still = s.batterySaver || s.reduceMotion
+    val inf = androidx.compose.animation.core.rememberInfiniteTransition(label = "aurora")
+    val rot by inf.animateFloat(
+        0f, 360f,
+        androidx.compose.animation.core.infiniteRepeatable(tween(70000, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "aRot"
+    )
+    val breathe by inf.animateFloat(
+        0.96f, 1.08f,
+        androidx.compose.animation.core.infiniteRepeatable(tween(3800, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "aBreathe"
+    )
+    val coverScale by animateFloatAsState(
+        if (s.playing) 1f else 0.9f,
+        spring(dampingRatio = 0.6f, stiffness = 260f),
+        label = "aCover"
+    )
+    Box(Modifier.fillMaxSize().background(Night)) {
+        if (!s.batterySaver) {
+            Cover(
+                song,
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        rotationZ = if (still) 0f else rot
+                        scaleX = 2.3f
+                        scaleY = 2.3f
+                        alpha = 0.9f
+                    }
+                    .blur(70.dp),
+                0.dp, 90.sp, quality = 300
+            )
+            Cover(
+                song,
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        rotationZ = if (still) 0f else -rot * 0.7f
+                        scaleX = 1.7f
+                        scaleY = 1.7f
+                        translationX = 160f
+                        alpha = 0.45f
+                    }
+                    .blur(90.dp),
+                0.dp, 90.sp, quality = 300
+            )
+        }
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.25f), Color.Black.copy(alpha = 0.40f), Color.Black.copy(alpha = 0.72f)))
+            )
+        )
+        Column(
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier
+                    .padding(top = 10.dp, bottom = 20.dp)
+                    .width(44.dp)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.45f))
+                    .clickable { s.showPlayer = false }
+            )
+            Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .fillMaxSize(0.86f)
+                        .graphicsLayer {
+                            val b = if (s.playing && !still) breathe else 1f
+                            scaleX = b * 1.12f
+                            scaleY = b * 1.12f
+                            alpha = 0.55f
+                        }
+                        .clip(RoundedCornerShape(40.dp))
+                        .background(lerp(art, Color.White, 0.15f))
+                        .blur(36.dp)
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize(0.88f)
+                        .shareCover()
+                        .graphicsLayer {
+                            scaleX = coverScale
+                            scaleY = coverScale
+                            alpha = if (FlightState.busy) 0f else 1f
+                        }
+                        .shadow(24.dp, RoundedCornerShape(32.dp), ambientColor = art, spotColor = art)
+                        .clip(RoundedCornerShape(32.dp))
+                ) {
+                    TransitionCover(s, song, Modifier.fillMaxSize(), 32.dp, 96.sp, 1000)
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            TitleRow(s, song, 24.sp, 19.sp, true, onMenu)
+            Spacer(Modifier.weight(1f))
+            WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.6f), Modifier.fillMaxWidth(), s.playing)
+            TimeLabels(s, total)
+            Spacer(Modifier.weight(1f))
+            TransportRow(s, 44.dp, 78.dp, true)
+            Spacer(Modifier.weight(1f))
+            PlayerBottomIcons(s, onAdd, onSleep)
+            Spacer(Modifier.height(10.dp))
+        }
+    }
+}
+
+/** Poster: a full-bleed cover that melts into the background, with a huge title like a record poster */
+@Composable
+private fun PosterBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> Unit, onSleep: () -> Unit) {
+    val art = rememberArtColor(song)
+    val total = song.seconds.coerceAtLeast(1).toFloat()
+    val bg = lerp(art, Night, 0.80f)
+    Box(Modifier.fillMaxSize().background(bg)) {
+        TransitionCover(
+            s, song,
+            Modifier.fillMaxWidth().fillMaxHeight(0.74f).graphicsLayer { alpha = if (FlightState.busy) 0f else 1f },
+            0.dp, 96.sp, 1000
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.34f to Color.Transparent,
+                    0.62f to bg.copy(alpha = 0.80f),
+                    0.78f to bg
+                )
+            )
+        )
+        Column(
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 26.dp)
+        ) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .padding(top = 10.dp)
+                        .width(44.dp)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.White.copy(alpha = 0.55f))
+                        .clickable { s.showPlayer = false }
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                song.title,
+                color = Color.White,
+                fontFamily = PrismFont,
+                fontSize = 38.sp,
+                lineHeight = 42.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                song.artist,
+                color = lerp(art, Color.White, 0.65f),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(16.dp))
+            WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.6f), Modifier.fillMaxWidth(), s.playing)
+            TimeLabels(s, total)
+            Spacer(Modifier.height(8.dp))
+            TransportRow(s, 40.dp, 70.dp, true)
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                PlayerIcon(Icons.Rounded.Shuffle, if (s.shuffle) s.accent else Color.White.copy(alpha = 0.7f)) { s.shuffle = !s.shuffle }
+                PlayerIcon(Icons.Rounded.Subtitles, Color.White.copy(alpha = 0.7f)) { Pages.show("lyrics") }
+                PlayerIcon(Icons.Rounded.MoreHoriz, Color.White.copy(alpha = 0.7f)) { onMenu() }
+                PlayerIcon(Icons.Rounded.Repeat, if (s.repeat) s.accent else Color.White.copy(alpha = 0.7f)) { s.repeat = !s.repeat }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
     }
 }
