@@ -285,7 +285,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = (st() - 1f).coerceIn(0f, 1f) }
-                .background(Brush.verticalGradient(0f to gradTop, 0.55f to lerp(gradTop, gradBottom, 0.25f), 1f to gradBottom))
+                .then(if (Opts.lite) Modifier.liteGradient(art) else Modifier.background(Brush.verticalGradient(0f to gradTop, 0.55f to lerp(gradTop, gradBottom, 0.25f), 1f to gradBottom)))
         )
         if (!Opts.lite) {
             Cover(

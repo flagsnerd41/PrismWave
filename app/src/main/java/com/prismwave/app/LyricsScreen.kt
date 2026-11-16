@@ -71,6 +71,7 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
@@ -212,7 +213,7 @@ fun LyricsScreen(s: AppState) {
                 .graphicsLayer { alpha = if (shared != null) (fly.value * 2f).coerceIn(0f, 1f) else 1f }
                 .background(Brush.verticalGradient(listOf(topC, botC)))
         ) {
-            if (!Opts.lite && !s.batterySaver) LyricsBackdrop(art, reduce)
+            if (!Opts.lite && !s.batterySaver) LyricsBackdrop(art, reduce) else Box(Modifier.fillMaxSize().liteGradient(art))
         }
         Column(Modifier.fillMaxSize().padding(top = lyTop).navigationBarsPadding()) {
             Row(
@@ -569,4 +570,25 @@ private fun LyricsBackdrop(art: Color, still: Boolean) {
         blob(w * (0.80f + 0.15f * cos(a + 1f)), h * (0.55f + 0.15f * sin(a + 2f)), w * 1.0f, art, 0.38f)
         blob(w * (0.40f + 0.25f * sin(a + 4f)), h * (0.90f + 0.06f * cos(a)), w * 1.1f, lerp(art, Color(0xFF8AB4F8), 0.35f), 0.30f)
     }
+}
+
+/** the lite lyrics background: a still, layered gradient of the cover colors (no blur, no animation, so it stays cheap) */
+fun Modifier.liteGradient(art: androidx.compose.ui.graphics.Color): Modifier = this.drawBehind {
+    val top = lerp(art, androidx.compose.ui.graphics.Color.Black, 0.55f)
+    val bottom = lerp(art, androidx.compose.ui.graphics.Color.Black, 0.80f)
+    drawRect(Brush.verticalGradient(listOf(top, bottom)))
+    drawRect(
+        Brush.radialGradient(
+            listOf(lerp(art, androidx.compose.ui.graphics.Color.White, 0.10f).copy(alpha = 0.60f), androidx.compose.ui.graphics.Color.Transparent),
+            center = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.10f),
+            radius = size.width * 1.15f
+        )
+    )
+    drawRect(
+        Brush.radialGradient(
+            listOf(lerp(art, androidx.compose.ui.graphics.Color.White, 0.30f).copy(alpha = 0.26f), androidx.compose.ui.graphics.Color.Transparent),
+            center = androidx.compose.ui.geometry.Offset(size.width * 0.95f, size.height * 0.88f),
+            radius = size.width * 1.0f
+        )
+    )
 }

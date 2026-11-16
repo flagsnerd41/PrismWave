@@ -9,17 +9,60 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-val AppFont = FontFamily(
+val DefaultFont = FontFamily(
     Font(R.font.inter, FontWeight.Normal, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(400))),
     Font(R.font.inter, FontWeight.Medium, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(500))),
     Font(R.font.inter, FontWeight.SemiBold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(600))),
     Font(R.font.inter, FontWeight.Bold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(700)))
 )
-val PrismFont = AppFont
+val AppFont: FontFamily get() = CustomFont.family ?: DefaultFont
+val PrismFont: FontFamily get() = AppFont
 
-private val AppTypography: androidx.compose.material3.Typography by lazy {
+/** a font the person uploaded (.ttf / .otf), kept in the app files */
+object CustomFont {
+    var family by androidx.compose.runtime.mutableStateOf<FontFamily?>(null)
+    var name by androidx.compose.runtime.mutableStateOf<String?>(null)
+
+    private fun file(ctx: android.content.Context) = java.io.File(ctx.filesDir, "custom_font.ttf")
+
+    fun load(ctx: android.content.Context) {
+        val f = file(ctx)
+        if (!f.exists()) return
+        try {
+            android.graphics.Typeface.createFromFile(f)
+            family = FontFamily(Font(f, FontWeight.Normal), Font(f, FontWeight.Medium), Font(f, FontWeight.SemiBold), Font(f, FontWeight.Bold))
+            name = ctx.getSharedPreferences("prism_font", 0).getString("name", "Custom font")
+        } catch (e: Exception) {
+            family = null
+            f.delete()
+        }
+    }
+
+    fun import(ctx: android.content.Context, uri: android.net.Uri, label: String): Boolean {
+        return try {
+            val f = file(ctx)
+            ctx.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
+            android.graphics.Typeface.createFromFile(f)
+            ctx.getSharedPreferences("prism_font", 0).edit().putString("name", label).apply()
+            load(ctx)
+            family != null
+        } catch (e: Exception) {
+            file(ctx).delete()
+            family = null
+            false
+        }
+    }
+
+    fun reset(ctx: android.content.Context) {
+        file(ctx).delete()
+        family = null
+        name = null
+    }
+}
+
+private fun buildTypography(AppFont: FontFamily): androidx.compose.material3.Typography {
     val d = androidx.compose.material3.Typography()
-    d.copy(
+    return d.copy(
         displayLarge = d.displayLarge.copy(fontFamily = AppFont),
         displayMedium = d.displayMedium.copy(fontFamily = AppFont),
         displaySmall = d.displaySmall.copy(fontFamily = AppFont),
@@ -70,7 +113,7 @@ fun PrismTheme(accent: Color = Gold, content: @Composable () -> Unit) {
             surfaceVariant = Surface2,
             onSurfaceVariant = TextDim
         ),
-        typography = AppTypography,
+        typography = androidx.compose.runtime.remember(CustomFont.family) { buildTypography(AppFont) },
         content = content
     )
 }

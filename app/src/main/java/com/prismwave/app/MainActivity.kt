@@ -100,6 +100,7 @@ class MainActivity : ComponentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
+        CustomFont.load(applicationContext)
         setContent {
             val appCtx = LocalContext.current.applicationContext
             remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }

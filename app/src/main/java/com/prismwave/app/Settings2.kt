@@ -74,6 +74,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -643,6 +644,7 @@ fun SettingsScreen(s: AppState) {
                     .padding(bottom = 220.dp)
             ) {
                 if (pg == null) {
+                    PfProfileHeader(s) { page = "account" }
                     PfAboutBanner(acc) { page = "about" }
                     PfMainGroup(
                         listOf(
@@ -742,6 +744,25 @@ private fun PfStatsPage(s: AppState) {
 @Composable
 private fun PfAppearancePage(s: AppState) {
     val a = s.accent
+    val fctx = LocalContext.current
+    val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val label = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "Custom font"
+            val ok = CustomFont.import(fctx, uri, label)
+            android.widget.Toast.makeText(fctx, if (ok) "Font added" else "That file is not a usable font", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    PfLabel("Font", a)
+    PfGroup {
+        PfAction(
+            Icons.Rounded.Palette, "Upload a font",
+            if (CustomFont.family != null) "Using: " + (CustomFont.name ?: "custom font") else "Pick a .ttf or .otf file",
+            a
+        ) { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream", "*/*")) }
+        if (CustomFont.family != null) {
+            PfAction(Icons.Rounded.Sync, "Back to the default font", null, a) { CustomFont.reset(fctx) }
+        }
+    }
     PfLabel("Theme", a)
     PfGroup {
         PfChoice(
@@ -1527,5 +1548,58 @@ private fun PfTransitionsPage(s: AppState) {
             "Blurred video behind the player. Looks great, but can make video stutter on some phones",
             VideoPrefs.liveBackdrop, a
         ) { VideoPrefs.set(it) }
+    }
+}
+
+// ------------------------------------------------------------ settings header: the account picture
+
+@Composable
+private fun PfProfileHeader(s: AppState, onOpen: () -> Unit) {
+    val ctx = LocalContext.current
+    LaunchedEffect(s.cookie) {
+        if (s.signedIn && ProfilePic.url == null) ProfilePic.url = YtAccount.profilePhoto(s.cookie)
+    }
+    val url = ProfilePic.url
+    val accent = s.accent
+    Column(
+        Modifier
+            .appear(0)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(32.dp))
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(accent.copy(alpha = 0.38f), CardBg)))
+            .softClick { onOpen() }
+            .padding(vertical = 22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier
+                .size(112.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.10f))
+                .border(3.dp, accent, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (s.signedIn && url != null) {
+                val req = remember(url) { coil.request.ImageRequest.Builder(ctx).data(artUrl(url, 400)).crossfade(300).build() }
+                coil.compose.AsyncImage(
+                    model = req,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            } else {
+                AppLogo(64.dp)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            if (s.signedIn) (ProfilePic.name ?: "Your account") else "PrismWave",
+            color = Color.White,
+            fontFamily = PrismFont,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(if (s.signedIn) "Tap to manage your account" else "Tap to sign in", color = TextDim, fontSize = 14.sp)
     }
 }
