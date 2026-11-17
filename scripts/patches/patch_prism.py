@@ -1,5 +1,5 @@
 import os, re
-path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app/src/main/java/com/prismwave/app/Screens.kt")
+path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app/src/main/java/com/prismwave/app/Screens.kt")
 src = open(path, encoding="utf-8").read()
 pat = r'\) \{ AppLogo\(42\.dp\) \}'
 n = len(re.findall(pat, src))

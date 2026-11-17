@@ -1,6 +1,6 @@
 import os, sys
 
-here = os.path.dirname(os.path.abspath(__file__))
+here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 app = os.path.join(here, "app", "src", "main", "java", "com", "prismwave", "app")
 
 def fail(msg):

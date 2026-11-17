@@ -1,6 +1,6 @@
 import os, re, sys
 
-base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app/src/main/java/com/prismwave/app")
+base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app/src/main/java/com/prismwave/app")
 bad = 0
 
 def edit(name, pairs):

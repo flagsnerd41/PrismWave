@@ -1,9 +1,16 @@
-import os, subprocess, sys
+import os
+import subprocess
+import sys
+from pathlib import Path
 
-here = os.path.dirname(os.path.abspath(__file__))
+ROOT = Path(__file__).resolve().parent
+PATCH_DIR = ROOT / "scripts" / "patches"
+
 for name in ("patch_fix_build.py", "patch_added_cover_morph.py"):
-    r = subprocess.run([sys.executable, os.path.join(here, name)])
-    if r.returncode != 0:
-        print("Stopped at", name)
-        sys.exit(1)
+    script = PATCH_DIR / name
+    result = subprocess.run([sys.executable, str(script)], cwd=ROOT)
+    if result.returncode != 0:
+        print("Stopped at", script.name)
+        sys.exit(result.returncode)
+
 print("ALL DONE. Now: git add -A && git commit && git push")

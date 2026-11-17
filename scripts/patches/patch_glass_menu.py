@@ -1,6 +1,6 @@
 import os, re
 
-path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app/src/main/java/com/prismwave/app/Player.kt")
+path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app/src/main/java/com/prismwave/app/Player.kt")
 src = open(path, encoding="utf-8").read()
 bad = 0
 
