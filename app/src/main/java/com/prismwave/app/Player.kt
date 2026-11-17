@@ -249,6 +249,8 @@ fun NavBar(s: AppState) {
                                 .fillMaxHeight()
                                 .clip(RoundedCornerShape(31.dp))
                                 .softClick {
+                                    MoodNav.cat = null
+                                    MoodNav.playlist = null
                                     s.screen = screen
                                     s.libraryOpen = null
                                     s.openPlaylist = null
@@ -272,6 +274,8 @@ fun NavBar(s: AppState) {
                     .fillMaxSize()
                     .background(sbg)
                     .softClick {
+                        MoodNav.cat = null
+                        MoodNav.playlist = null
                         s.screen = Screen.Search
                         s.libraryOpen = null
                         s.openPlaylist = null
@@ -724,6 +728,7 @@ private fun TitleRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.graphicsLayer { alpha = if (FlightState.running) 0f else 1f }.basicMarquee()
             )
+            StreamLine(song, Color.White.copy(alpha = 0.45f))
         }
         val liked = s.isLiked(song)
         val likePop = remember { Animatable(1f) }
@@ -2008,6 +2013,7 @@ private fun PosterBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () ->
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            StreamLine(song, Color.White.copy(alpha = 0.5f))
             Spacer(Modifier.height(16.dp))
             WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.6f), Modifier.fillMaxWidth(), s.playing)
             TimeLabels(s, total)

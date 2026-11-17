@@ -215,6 +215,7 @@ object Engine {
         val best = audio.filter { it.format == MediaFormat.M4A }.maxByOrNull { it.averageBitrate }
             ?: audio.maxByOrNull { it.averageBitrate }
         val link = best?.content ?: throw IOException("No audio stream found")
+        if (best != null) StreamMeta.set(videoUrl, best.format, best.averageBitrate)
         synchronized(urlCache) { urlCache[videoUrl] = Pair(link, nowMs) }
         link
     }
@@ -230,3 +231,22 @@ data class Hit(
     val url: String,
     val song: Song? = null
 )
+
+
+// What the playing stream really is, shown in the player. YouTube only serves compressed audio, so this says so.
+object StreamMeta {
+    val byUrl = androidx.compose.runtime.mutableStateMapOf<String, String>()
+
+    fun set(url: String, format: MediaFormat?, bitrate: Int) {
+        val n = format?.name ?: ""
+        val codec = when {
+            n.contains("OPUS") -> "Opus"
+            n == "M4A" -> "AAC"
+            n.contains("WEBMA") -> "Vorbis"
+            n.contains("MP3") -> "MP3"
+            n.contains("FLAC") -> "FLAC"
+            else -> "Audio"
+        }
+        byUrl[url] = if (bitrate > 0) "$codec · $bitrate kbps" else codec
+    }
+}

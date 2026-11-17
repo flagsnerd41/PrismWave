@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -386,6 +389,28 @@ fun LoginScreen(s: AppState) {
                     .background(s.accent)
                     .padding(horizontal = 18.dp, vertical = 10.dp)
             ) { Text("Done", color = Color.Black, fontWeight = FontWeight.SemiBold) }
+        }
+        var help by remember { mutableStateOf(true) }
+        if (help) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.White.copy(alpha = 0.08f))
+                    .padding(14.dp)
+            ) {
+                Text("Before you sign in", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("1. Sign in below with your Google account", color = TextDim, fontSize = 13.sp)
+                Text("2. Wait until YouTube Music opens, it signs you in by itself", color = TextDim, fontSize = 13.sp)
+                Text("3. Your playlists and liked songs come over, and Home gets your picks", color = TextDim, fontSize = 13.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("You type your password on Google's own page. PrismWave never sees it, it only keeps a session on this phone. Sign out any time in Settings.", color = TextDim, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+                Text("Got it", color = s.accent, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.clickable { help = false })
+            }
+            Spacer(Modifier.height(8.dp))
         }
         AndroidView(
             modifier = Modifier.fillMaxSize(),

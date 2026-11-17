@@ -141,20 +141,7 @@ private fun Modifier.pressable(scaleTo: Float, onClick: () -> Unit): Modifier = 
 val LocalReduceMotion = compositionLocalOf { false }
 
 /** Fade + rise-in with a small stagger (skipped when Reduce motion is on). */
-fun Modifier.appear(index: Int): Modifier = composed {
-    val reduce = LocalReduceMotion.current
-    val a = remember { Animatable(if (reduce) 1f else 0f) }
-    LaunchedEffect(Unit) {
-        if (!reduce) {
-            delay((index * 60L).coerceAtMost(420L))
-            a.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 200f))
-        }
-    }
-    this.graphicsLayer {
-        alpha = a.value
-        translationY = (1f - a.value) * 60f
-    }
-}
+fun Modifier.appear(index: Int): Modifier = this
 
 /** Holds a recorded copy of the screen content so bars can draw a blurred version of it. */
 class Backdrop(val layer: GraphicsLayer) {
@@ -175,7 +162,7 @@ fun AppLogo(size: Dp) {
 }
 
 @Composable
-fun PLogo(size: Dp, color: Color = Gold) {
+fun PLogo(size: Dp, color: Color = PrismBlue) {
     Box(
         Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center
@@ -322,7 +309,7 @@ fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}
     ) {
         Text(text, color = Color.White, fontFamily = PrismFont, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         if (action != null) {
-            Text(action, color = Gold, fontSize = 14.sp, modifier = Modifier.clickable(onClick = onAction))
+            Text(action, color = PrismBlue, fontSize = 14.sp, modifier = Modifier.clickable(onClick = onAction))
         }
     }
 }

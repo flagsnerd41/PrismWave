@@ -13,14 +13,14 @@ import androidx.compose.ui.graphics.toArgb
 // "Follow music theme": the app takes the colors of the cover that is playing.
 object AppColors {
     private var p: SharedPreferences? = null
-    var palette by mutableStateOf(Gold)
+    var palette by mutableStateOf(PrismBlue)
     var ver by mutableStateOf(0)
 
     fun init(ctx: Context) {
         if (p != null) return
         val sp = ctx.applicationContext.getSharedPreferences("prismwave_extras", Context.MODE_PRIVATE)
         p = sp
-        palette = Color(sp.getInt("paletteAccent", Gold.toArgb()))
+        palette = Color(sp.getInt("paletteAccent", PrismBlue.toArgb())).let { if (it.toArgb() == OldGold.toArgb()) PrismBlue else it }
     }
 
     // picking a color means you want the palette mode

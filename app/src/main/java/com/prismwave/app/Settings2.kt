@@ -727,6 +727,15 @@ private fun PfAccountPage(s: AppState) {
             ) { s.showLogin = true }
         }
     }
+    if (!s.signedIn) {
+        PfLabel("What signing in gives you", a)
+        PfGroup {
+            PfInfo(Icons.Rounded.Folder, "Your playlists", "Brought over", a)
+            PfInfo(Icons.Rounded.AutoAwesome, "Liked songs", "Brought over", a)
+            PfInfo(Icons.Rounded.Sync, "Home picks", "Made for you", a)
+            PfInfo(Icons.Rounded.Lock, "Your password", "Never stored", a)
+        }
+    }
 }
 
 @Composable
@@ -780,6 +789,16 @@ private fun PfAppearancePage(s: AppState) {
             s.saveSettings()
         }
         PfAccent(s)
+    }
+    val navCtx = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    PfLabel("Menu bar", a)
+    PfGroup {
+        PfChoice(
+            Icons.Rounded.Palette, "Menu bar style", listOf("Classic", "Pill", "Apple Music"), NavPrefs.style, a,
+            "Classic: the old bar with the round Search button. Pill: one bar with a typing box. Apple Music: icon over name, light capsule on the chosen tab"
+        ) {
+            NavPrefs.set(navCtx, it)
+        }
     }
     PfLabel("Player", a)
     PfGroup {

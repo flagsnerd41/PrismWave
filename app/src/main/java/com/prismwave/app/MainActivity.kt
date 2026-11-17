@@ -103,11 +103,11 @@ class MainActivity : ComponentActivity() {
         CustomFont.load(applicationContext)
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
+            remember { NavPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
-                var splashDone by remember { mutableStateOf(false) }
-                val blur = remember { Animatable(BLUR0) }
+                var splashDone by remember { mutableStateOf(true) }
+                val blur = remember { Animatable(0f) }
                 val shown = remember { Animatable(0f) }
                 val logoIn = remember { Animatable(0f) }
                 val titleIn = remember { Animatable(0f) }
@@ -117,37 +117,14 @@ class MainActivity : ComponentActivity() {
                 var titleC by remember { mutableStateOf<LayoutCoordinates?>(null) }
                 var logoS by remember { mutableStateOf<Rect?>(null) }
                 var titleS by remember { mutableStateOf<Rect?>(null) }
-                remember { HeaderPos.hide = true }
+                remember { HeaderPos.hide = false }
                 LaunchedEffect(Unit) {
                     while (true) {
                         delay(1000)
                         s.tick()
                     }
                 }
-                LaunchedEffect(Unit) {
-                    launch { shown.animateTo(1f, tween(350)) }
-                    launch { logoIn.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 180f)) }
-                    delay(350)
-                    launch { titleIn.animateTo(1f, tween(600)) }
-                    delay(2300)
-                    logoS = logoC?.takeIf { it.isAttached }?.boundsInRoot()
-                    titleS = titleC?.takeIf { it.isAttached }?.boundsInRoot()
-                    val canFly = logoS != null && titleS != null && HeaderPos.logo != null && HeaderPos.title != null
-                    launch { byOut.animateTo(0f, tween(300)) }
-                    if (canFly) {
-                        launch { fly.animateTo(1f, tween(850, easing = FastOutSlowInEasing)) }
-                        launch {
-                            delay(600)
-                            HeaderPos.hide = false
-                        }
-                    } else {
-                        launch { shown.animateTo(0f, tween(450)) }
-                        HeaderPos.hide = false
-                    }
-                    blur.animateTo(0f, tween(1400, easing = FastOutSlowInEasing))
-                    HeaderPos.hide = false
-                    splashDone = true
-                }
+                LaunchedEffect(Unit) { HeaderPos.hide = false }
                 Box(Modifier.fillMaxSize().background(Night)) {
                     Box(
                         Modifier.fillMaxSize().graphicsLayer {
@@ -332,11 +309,11 @@ fun Main(s: AppState) {
                     .navigationBarsPadding()
                     .imePadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(NavPrefs.gap())
             ) {
                 NavCatScene(s)
                 MiniPlayer(s)
-                NavBar2(s)
+                DockNav(s)
             }
             BackHandler(enabled = s.screen != Screen.Home || s.libraryOpen != null || s.openPlaylist != null) {
                 when {
