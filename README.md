@@ -1,4 +1,5 @@
 <div align="center">
+<img width="1513" height="1513" alt="image_19" src="https://github.com/user-attachments/assets/0aec643f-c100-4c25-a60f-d58ad10af49c" />
 
 # PrismWave 🌊
 
