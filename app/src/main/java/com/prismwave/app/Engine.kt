@@ -238,13 +238,14 @@ object StreamMeta {
     val byUrl = androidx.compose.runtime.mutableStateMapOf<String, String>()
 
     fun set(url: String, format: MediaFormat?, bitrate: Int) {
+        val mime = (format?.mimeType ?: "").lowercase()
         val n = format?.name ?: ""
         val codec = when {
-            n.contains("OPUS") -> "Opus"
-            n == "M4A" -> "AAC"
-            n.contains("WEBMA") -> "Vorbis"
-            n.contains("MP3") -> "MP3"
-            n.contains("FLAC") -> "FLAC"
+            mime.contains("webm") || n.contains("OPUS") -> "Opus"
+            mime.contains("mp4") || mime.contains("m4a") || n == "M4A" -> "AAC"
+            mime.contains("mpeg") || n.contains("MP3") -> "MP3"
+            mime.contains("flac") || n.contains("FLAC") -> "FLAC"
+            mime.contains("ogg") -> "Vorbis"
             else -> "Audio"
         }
         byUrl[url] = if (bitrate > 0) "$codec · $bitrate kbps" else codec

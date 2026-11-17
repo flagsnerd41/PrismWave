@@ -103,7 +103,7 @@ class MainActivity : ComponentActivity() {
         CustomFont.load(applicationContext)
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { NavPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
+            remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
             val s = remember { AppState(appCtx) }
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(true) }

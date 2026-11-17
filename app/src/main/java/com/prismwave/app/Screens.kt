@@ -170,9 +170,12 @@ fun Header(s: AppState) {
             "PrismWave",
             color = Color.White,
             fontFamily = PrismFont,
-            fontSize = 27.sp,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.4.sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier
                 .weight(1f)
                 .onGloballyPositioned { HeaderPos.title = it.boundsInRoot() }
@@ -200,27 +203,7 @@ fun Header(s: AppState) {
 
 @Composable
 fun LoadingRow(s: AppState) {
-    val tr = androidx.compose.animation.core.rememberInfiniteTransition(label = "sk")
-    val a by tr.animateFloat(
-        0.05f, 0.16f,
-        androidx.compose.animation.core.infiniteRepeatable(tween(850), androidx.compose.animation.core.RepeatMode.Reverse),
-        label = "ska"
-    )
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        repeat(4) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = a)))
-                Spacer(Modifier.width(12.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.width(180.dp).height(14.dp).clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = a)))
-                    Box(Modifier.width(110.dp).height(12.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = a)))
-                }
-            }
-        }
-    }
+    LoaderBox(180.dp)
 }
 
 @Composable
@@ -2137,24 +2120,44 @@ private fun HomeScreenV22(s: AppState) {
 // ------------------------------------------------------------ home (ArchiveTune style layout)
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickPickCarousel(songs: List<Song>, s: AppState) {
     val list = songs.take(12)
     if (list.isEmpty()) return
     val cfg = LocalConfiguration.current
-    val cardW = (cfg.screenWidthDp * 0.74f).dp
-    val cardH = cardW * 1.1f
-    val side = (cfg.screenWidthDp.dp - cardW) / 2
-    val state = rememberLazyListState()
-    val fling = rememberSnapFlingBehavior(state)
-    LazyRow(
+    val state = androidx.compose.material3.carousel.rememberCarouselState { list.size }
+    androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel(
         state = state,
-        flingBehavior = fling,
-        contentPadding = PaddingValues(horizontal = side),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        itemsIndexed(list) { i, sg -> QuickPickCard(sg, list, s, i, state, cardW, cardH) }
+        preferredItemWidth = (cfg.screenWidthDp * 0.78f).dp,
+        modifier = Modifier.fillMaxWidth().height(430.dp),
+        itemSpacing = 10.dp,
+        contentPadding = PaddingValues(horizontal = 16.dp)
+    ) { i ->
+        val song = list[i]
+        val shape = RoundedCornerShape(32.dp)
+        val cref = remember { CoverRef() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .maskClip(shape)
+                .softClick { openFrom(s, song, list, cref, 32f) }
+        ) {
+            Cover(song, Modifier.fillMaxSize().trackCover(cref), 0.dp, 90.sp, quality = 800)
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        0.45f to Color.Transparent,
+                        0.75f to Color.Black.copy(alpha = 0.40f),
+                        1f to Color.Black.copy(alpha = 0.85f)
+                    )
+                )
+            )
+            Column(Modifier.align(Alignment.BottomStart).padding(start = 22.dp, end = 22.dp, bottom = 22.dp)) {
+                Text(song.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Clip, softWrap = true)
+                Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Clip)
+            }
+        }
     }
 }
 
@@ -2287,32 +2290,6 @@ fun HomeScreen(s: AppState) {
             )
         ) {
             item { Spacer(Modifier.height(PinnedHeaderHeight)) }
-            item { HomeGreeting(s, jump) }
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    item {
-                        Chip("Mood & Genres", true, s.accent) {
-                            s.searchQuery = ""
-                            s.screen = Screen.Search
-                        }
-                    }
-                    items(moods) { c ->
-                        Chip(c, false, s.accent) {
-                            s.searchQuery = c + " music"
-                            s.screen = Screen.Search
-                        }
-                    }
-                    item {
-                        Chip("Offline", Opts.offline, s.accent) {
-                            Opts.offline = !Opts.offline
-                            Opts.save()
-                        }
-                    }
-                }
-            }
             item {
                 HomeSection(
                     if (Fresh.quick.size >= 6) "Fresh for you"
@@ -2321,7 +2298,7 @@ fun HomeScreen(s: AppState) {
                 )
             }
             item {
-                if (bestQuick == null) LoadingRow(s) else QuickPickCarousel(bestQuick, s)
+                if (bestQuick == null) LoaderBox() else QuickPickCarousel(bestQuick, s)
             }
             item { FreshHome(s) }
             if (Opts.showMixes && community.isNotEmpty()) {

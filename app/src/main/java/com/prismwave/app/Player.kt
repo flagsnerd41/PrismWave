@@ -731,7 +731,6 @@ private fun TitleRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.graphicsLayer { alpha = if (FlightState.running) 0f else 1f }.basicMarquee()
             )
-            StreamLine(song, Color.White.copy(alpha = 0.45f))
         }
         val liked = s.isLiked(song)
         val likePop = remember { Animatable(1f) }
@@ -882,7 +881,7 @@ private fun AlbumBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () -> 
         Spacer(Modifier.height(26.dp))
         TitleRow(s, song, 22.sp, 19.sp, true, onMenu)
         Spacer(Modifier.weight(1f))
-        WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth(), s.playing)
+        StyledSeekBar(s, total, lerp(art, Color.White, 0.55f))
         TimeLabels(s, total)
         Spacer(Modifier.weight(1f))
         TransportRow(s, 44.dp, 78.dp)
@@ -1025,7 +1024,7 @@ private fun ImmersiveBody(
             Spacer(Modifier.weight(1f))
             TitleRow(s, song, 27.sp, 19.sp, false, onMenu)
             Spacer(Modifier.height(18.dp))
-            WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.55f), Modifier.fillMaxWidth(), s.playing)
+            StyledSeekBar(s, total, lerp(art, Color.White, 0.55f))
             TimeLabels(s, total)
             Spacer(Modifier.height(6.dp))
             TransportRow(s, 50.dp, 72.dp, true)
@@ -1949,7 +1948,7 @@ private fun AuroraBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () ->
             Spacer(Modifier.height(24.dp))
             TitleRow(s, song, 24.sp, 19.sp, true, onMenu)
             Spacer(Modifier.weight(1f))
-            WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.6f), Modifier.fillMaxWidth(), s.playing)
+            StyledSeekBar(s, total, lerp(art, Color.White, 0.6f))
             TimeLabels(s, total)
             Spacer(Modifier.weight(1f))
             TransportRow(s, 44.dp, 78.dp, true)
@@ -2016,9 +2015,8 @@ private fun PosterBody(s: AppState, song: Song, onMenu: () -> Unit, onAdd: () ->
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            StreamLine(song, Color.White.copy(alpha = 0.5f))
             Spacer(Modifier.height(16.dp))
-            WaveSeekBar({ s.position }, total, { s.seekTo(it) }, lerp(art, Color.White, 0.6f), Modifier.fillMaxWidth(), s.playing)
+            StyledSeekBar(s, total, lerp(art, Color.White, 0.6f))
             TimeLabels(s, total)
             Spacer(Modifier.height(8.dp))
             TransportRow(s, 40.dp, 70.dp, true)

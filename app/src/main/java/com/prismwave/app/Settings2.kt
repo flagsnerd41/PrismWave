@@ -684,7 +684,7 @@ fun SettingsScreen(s: AppState) {
                     ) { page = it }
                 } else {
                     when (pg) {
-                        "account" -> PfAccountPage(s)
+                        "account" -> PfAccountPage(s) { page = it }
                         "stats" -> PfStatsPage(s)
                         "appearance" -> PfAppearancePage(s)
                         "player" -> PfPlayerPage(s)
@@ -710,30 +710,91 @@ fun SettingsScreen(s: AppState) {
 // ------------------------------------------------------------ pages
 
 @Composable
-private fun PfAccountPage(s: AppState) {
+private fun PfAccountPage(s: AppState, onOpen: (String) -> Unit) {
     val a = s.accent
-    PfIntro(if (s.signedIn) "You are signed in to YouTube Music. Playlists and liked songs sync from your account." else "Sign in to YouTube Music to bring over your playlists and liked songs.")
-    PfLabel("YouTube Music", a)
-    PfGroup {
-        if (s.signedIn) {
+    val ctx = LocalContext.current
+    LaunchedEffect(s.cookie) {
+        if (s.signedIn && ProfilePic.url == null) ProfilePic.url = YtAccount.profilePhoto(s.cookie)
+    }
+    if (s.signedIn) {
+        val url = ProfilePic.url
+        Column(
+            Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(32.dp))
+                .background(CardBg2)
+                .padding(22.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(84.dp)) {
+                    Box(
+                        Modifier.fillMaxSize().clip(CircleShape).background(Color.White.copy(alpha = 0.10f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (url != null) {
+                            val req = remember(url) { coil.request.ImageRequest.Builder(ctx).data(artUrl(url, 300)).crossfade(300).build() }
+                            coil.compose.AsyncImage(
+                                model = req, contentDescription = null,
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            AppLogo(48.dp)
+                        }
+                    }
+                    Box(
+                        Modifier.align(Alignment.BottomEnd).size(28.dp).clip(CircleShape).background(a),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp)) }
+                }
+                Spacer(Modifier.width(18.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(ProfilePic.name ?: "Your account", color = Color.White, fontFamily = PrismFont, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("YouTube Music", color = a, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(50)).background(a.copy(alpha = 0.25f))
+                        .softClick { s.importAccount() }.padding(horizontal = 20.dp, vertical = 12.dp)
+                ) { Text(if (s.importing) "Syncing..." else "Sync now", color = a, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "Log out", color = Color(0xFFFF8A8A), fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).softClick { s.signOut() }.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
+            }
+            if (s.accountMsg.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(s.accountMsg, color = TextDim, fontSize = 13.sp)
+            }
+        }
+        PfLabel("General", a)
+        PfGroup {
+            PfSwitch(
+                Icons.Rounded.Sync, "Auto sync with account",
+                "Brings over new playlists and liked songs every 6 hours", AccountPrefs.autoSync, a
+            ) { AccountPrefs.set(ctx, it) }
             PfAction(
-                Icons.Rounded.Sync,
-                if (s.importing) "Importing..." else "Import playlists",
-                if (s.accountMsg.isNotEmpty()) s.accountMsg else "Bring over playlists and liked songs",
-                a,
-                !s.importing
+                Icons.Rounded.Sync, if (s.importing) "Importing..." else "Import playlists now",
+                "Bring over playlists and liked songs", a, !s.importing
             ) { s.importAccount() }
-            PfAction(Icons.Rounded.Lock, "Sign out", "You are signed in", a) { s.signOut() }
-        } else {
+        }
+        PfLabel("Integration", a)
+        PfGroup {
+            PfAction(Icons.Rounded.AutoAwesome, "Integration", "Discord, Last.fm, Libre.fm, ListenBrainz", a) { onOpen("integration") }
+        }
+    } else {
+        PfIntro("Sign in to YouTube Music to bring over your playlists and liked songs.")
+        PfLabel("YouTube Music", a)
+        PfGroup {
             PfAction(
-                Icons.Rounded.AccountCircle,
-                "Sign in",
-                if (s.accountMsg.isNotEmpty()) s.accountMsg else "Bring over your playlists and liked songs",
-                a
+                Icons.Rounded.AccountCircle, "Sign in",
+                if (s.accountMsg.isNotEmpty()) s.accountMsg else "Bring over your playlists and liked songs", a
             ) { s.showLogin = true }
         }
-    }
-    if (!s.signedIn) {
         PfLabel("What signing in gives you", a)
         PfGroup {
             PfInfo(Icons.Rounded.Folder, "Your playlists", "Brought over", a)
@@ -811,6 +872,15 @@ private fun PfAppearancePage(s: AppState) {
             NavPrefs.set(navCtx, it)
         }
     }
+    PfLabel("Progress bar", a)
+    PfGroup {
+        PfChoice(
+            Icons.Rounded.Speed, "Progress bar style", listOf("Wave", "Material 3", "Line", "Pill", "Dotted"), SeekPrefs.style, a,
+            "Wave moves while music plays. Material 3 is the standard slider. Line, Pill and Dotted are PrismWave's own"
+        ) {
+            SeekPrefs.set(navCtx, it)
+        }
+    }
     PfLabel("Player", a)
     PfGroup {
         PfChoice(
@@ -864,26 +934,6 @@ private fun PfAppearancePage(s: AppState) {
             Icons.Rounded.Palette, "Status bar darkness", (Opts.blurDark * 100).toInt().toString() + "%",
             Opts.blurDark, 0f..0.9f, a, { Opts.blurDark = it }, { Opts.save() }
         )
-    }
-    GlowPrefs.init(LocalContext.current.applicationContext)
-    PfLabel("Moving glow", a)
-    PfGroup {
-        PfSwitch(
-            Icons.Rounded.AutoAwesome, "Moving glow",
-            "Bright and dark colors from the cover flow behind the player and the lyrics. Off in Lite mode and Battery saver",
-            GlowPrefs.on, a
-        ) {
-            GlowPrefs.on = it
-            GlowPrefs.save()
-        }
-        PfChoice(Icons.Rounded.Palette, "Glow strength", listOf("Soft", "Normal", "Strong"), GlowPrefs.intensity, a) {
-            GlowPrefs.intensity = it
-            GlowPrefs.save()
-        }
-        PfChoice(Icons.Rounded.Speed, "Glow speed", listOf("Slow", "Normal", "Fast"), GlowPrefs.speed, a) {
-            GlowPrefs.speed = it
-            GlowPrefs.save()
-        }
     }
     PfLabel("Extras", a)
     PfGroup {

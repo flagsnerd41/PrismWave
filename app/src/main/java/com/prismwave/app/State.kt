@@ -158,7 +158,7 @@ class AppState(private val ctx: Context) {
         }
         connect()
         watchHeadphones()
-        if (signedIn && System.currentTimeMillis() - prefs.getLong("lastImport", 0L) > 6L * 3600 * 1000) {
+        if (signedIn && AccountPrefs.autoSync && System.currentTimeMillis() - prefs.getLong("lastImport", 0L) > 6L * 3600 * 1000) {
             importAccount()
         }
     }
@@ -839,7 +839,7 @@ class AppState(private val ctx: Context) {
             MuffleMix.ramp(StudioPrefs.mixStrength, 0f, ms)
             fade(0.3f, 1f, ms)
         } else if (Opts.crossfade > 0 || prevLead != null) {
-            AudioShape.rampGain(0.35f, 1f, ((prevLead ?: Opts.crossfade.toFloat()) * 1000f).toLong())
+            AudioShape.rampGain(0f, 1f, ((prevLead ?: Opts.crossfade.toFloat()) * 1000f).toLong())
         } else {
             fadeJob?.cancel()
             controller?.volume = 1f
@@ -997,7 +997,7 @@ class AppState(private val ctx: Context) {
                 val cf = (if (AutoMix.on) AutoMix.leadFor(current?.id ?: "") else null) ?: Opts.crossfade.toFloat()
                 if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
                     fading = true
-                    AudioShape.rampGain(1f, 0.35f, (left * 1000).toLong() - 150)
+                    AudioShape.rampGain(1f, 0f, (left * 1000).toLong() - 150)
                 }
             }
             if (dur > 0 && !repeat) {
