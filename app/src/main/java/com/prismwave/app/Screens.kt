@@ -2119,8 +2119,10 @@ private fun HomeScreenV22(s: AppState) {
 
 // ------------------------------------------------------------ home (ArchiveTune style layout)
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
 @Composable
 private fun QuickPickCarousel(songs: List<Song>, s: AppState) {
     val list = songs.take(12)
