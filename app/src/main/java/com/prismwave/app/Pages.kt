@@ -221,6 +221,7 @@ object Pages {
     fun show(key: String, song: Song? = null, playlistId: String? = null) {
         if (key == "lyrics" && PlayerStage.open) {
             // the lyrics happen on the player itself: the cover moves up and the lyrics come in
+            if (PlayerStage.stage == 0) PlayerStage.direct = true
             PlayerStage.stage = 2
             return
         }

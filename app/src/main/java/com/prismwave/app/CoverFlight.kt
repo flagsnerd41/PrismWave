@@ -122,7 +122,7 @@ fun CoverFlight(s: AppState) {
             wasOpen[0] = true
             val tap = TapCover.rect
             TapCover.rect = null
-            val start = tap
+            val start = tap ?: mini
             if (start == null || s.reduceMotion) return@LaunchedEffect
             // the Immersive player has a full-width cover stage, the others report where their cover is
             if ((s.playerStyle != 1 && s.playerStyle != 4)) {

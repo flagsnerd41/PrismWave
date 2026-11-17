@@ -2,6 +2,7 @@ package com.prismwave.app
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -78,12 +79,12 @@ fun WaveSeekBar(
             path.moveTo(0f, cy)
             var px = 0f
             while (px <= x) {
-                path.lineTo(px, cy + a * sin(px * k - phase))
+                path.lineTo(px, cy + a * kotlin.math.sin((px * k - phase).toDouble()).toFloat())
                 px += 3f
             }
             drawPath(path, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
             val r = if (dragging) 10.dp.toPx() else 7.dp.toPx()
-            drawCircle(color, r, Offset(x, cy + a * sin(x * k - phase)))
+            drawCircle(color, r, Offset(x, cy + a * kotlin.math.sin((x * k - phase).toDouble()).toFloat()))
         }
     }
 }

@@ -105,6 +105,8 @@ import kotlin.math.roundToInt
 object PlayerStage {
     var stage by mutableStateOf(0)
     var open = false
+    // set when the lyrics button jumps from the player straight to the full lyrics (no half view in between)
+    var direct = false
 
     var half: Boolean
         get() = stage >= 1

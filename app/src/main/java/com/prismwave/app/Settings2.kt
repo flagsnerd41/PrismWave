@@ -410,6 +410,11 @@ private fun PfInfo(icon: ImageVector?, title: String, value: String, accent: Col
 }
 
 @Composable
+private fun PfIntro(text: String) {
+    Text(text, color = TextDim, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp))
+}
+
+@Composable
 private fun PfNote(text: String) {
     Column(
         Modifier
@@ -707,6 +712,7 @@ fun SettingsScreen(s: AppState) {
 @Composable
 private fun PfAccountPage(s: AppState) {
     val a = s.accent
+    PfIntro(if (s.signedIn) "You are signed in to YouTube Music. Playlists and liked songs sync from your account." else "Sign in to YouTube Music to bring over your playlists and liked songs.")
     PfLabel("YouTube Music", a)
     PfGroup {
         if (s.signedIn) {
@@ -741,10 +747,15 @@ private fun PfAccountPage(s: AppState) {
 @Composable
 private fun PfStatsPage(s: AppState) {
     val a = s.accent
+    val ctxS = LocalContext.current
+    val mins = (s.listenSeconds / 60).toInt()
+    PfIntro("Everything here is counted on this phone only. Back up from Backup and restore to keep it.")
     PfLabel("Your numbers", a)
     PfGroup {
         PfInfo(Icons.Rounded.MusicNote, "Songs played", s.playCount.toString(), a)
-        PfInfo(Icons.Rounded.History, "Listening time", (s.listenSeconds / 60).toString() + " min", a)
+        PfInfo(Icons.Rounded.History, "Listening time", (if (mins >= 60) (mins / 60).toString() + " h " + (mins % 60).toString() + " min" else mins.toString() + " min"), a)
+        PfInfo(Icons.Rounded.Speed, "Average per song", (if (s.playCount > 0) (s.listenSeconds / s.playCount / 60).toString() + " min" else "-"), a)
+        PfInfo(Icons.Rounded.Download, "Cached songs size", SongCache.usedMb(ctxS, 0).toString() + " MB", a)
         PfInfo(Icons.Rounded.AutoAwesome, "Liked songs", s.liked.size.toString(), a)
         PfInfo(Icons.Rounded.Folder, "Playlists", s.playlists.size.toString(), a)
     }
@@ -1019,6 +1030,7 @@ private fun PfPlayerPage(s: AppState) {
 @Composable
 private fun PfContentPage(s: AppState) {
     val a = s.accent
+    PfIntro("Pick what shows on Home. Turned off sections are hidden, nothing is deleted.")
     PfLabel("Home sections", a)
     PfGroup {
         PfSwitch(Icons.Rounded.History, "Recently played", "Your recent songs", Opts.showKeep, a) {
@@ -1043,6 +1055,22 @@ private fun PfContentPage(s: AppState) {
 @Composable
 private fun PfBehaviorPage(s: AppState) {
     val a = s.accent
+    PfIntro("How PrismWave feels and how much power it uses.")
+    PfLabel("Power", a)
+    PfGroup {
+        PfSwitch(Icons.Rounded.Speed, "Battery saver", "Solid bars instead of blur, lighter visuals", s.batterySaver, a) {
+            s.batterySaver = it
+            s.saveSettings()
+        }
+        PfSwitch(Icons.Rounded.Sync, "Reduce motion", "Fewer animations everywhere", s.reduceMotion, a) {
+            s.reduceMotion = it
+            s.saveSettings()
+        }
+        PfSwitch(Icons.Rounded.Speed, "Lite mode", "For low-end phones: no heavy effects", Opts.lite, a) {
+            Opts.lite = it
+            Opts.save()
+        }
+    }
     PfLabel("Feel", a)
     PfGroup {
         PfSwitch(Icons.Rounded.TouchApp, "Haptic feedback", "A small tick when you tap", Opts.haptics, a) {
@@ -1062,6 +1090,7 @@ private fun PfStoragePage(s: AppState) {
     val ctx = LocalContext.current
     var tick by remember { mutableStateOf(0) }
     val sizes = listOf(256, 512, 1024, 2048)
+    PfIntro("Songs you play are kept here so they replay instantly and work offline.")
     PfLabel("Cached songs", a)
     PfGroup {
         PfInfo(Icons.Rounded.Download, "Using", SongCache.usedMb(ctx, tick).toString() + " MB of " + Opts.cacheMb + " MB", a)
@@ -1230,12 +1259,13 @@ private fun PfIntegrationPage(s: AppState) {
         Scrobbler.librefm, a,
         "Use your Libre.fm username and password. Enter an API key and secret the same way as for Last.fm."
     )
-    PfNote("A song is scrobbled after half of it has played (or 4 minutes), and only if it is longer than 30 seconds.")
+    PfIntro("A song is scrobbled after half of it has played (or 4 minutes), and only if it is longer than 30 seconds.")
 }
 
 @Composable
 private fun PfBackupPage(s: AppState, onBackup: () -> Unit, onRestore: () -> Unit) {
     val a = s.accent
+    PfIntro("Backups are plain files you choose where to save. Your login is never in them.")
     PfLabel("Backup", a)
     PfGroup {
         PfAction(

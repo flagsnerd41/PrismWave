@@ -571,7 +571,11 @@ fun FullPlayer(s: AppState) {
     var upExtra by remember { mutableStateOf(0f) }
     val halfVisible by remember { derivedStateOf { halfP.value > 0.001f } }
     LaunchedEffect(PlayerStage.stage) {
-        if (Aod.auto) {
+        if (PlayerStage.direct && PlayerStage.stage == 2) {
+            PlayerStage.direct = false
+            // races through the half step so it never shows, then settles on the full lyrics
+            halfP.animateTo(2f, tween(620, easing = androidx.compose.animation.core.CubicBezierEasing(0.04f, 0.8f, 0.1f, 1f)))
+        } else if (Aod.auto) {
             halfP.animateTo(PlayerStage.stage.toFloat(), tween(1100, easing = FastOutSlowInEasing))
         } else {
             halfP.animateTo(PlayerStage.stage.toFloat(), spring(dampingRatio = 0.9f, stiffness = 150f))
