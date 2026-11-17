@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" alt="PrismWave app icon" width="128" />
-
 # PrismWave 🌊
 
 ### A different way to experience music.
