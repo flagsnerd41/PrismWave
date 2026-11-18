@@ -50,7 +50,7 @@ object Lyrics {
     // lyrics are also kept on the phone, so they show at once and work offline
     fun init(ctx: Context) {
         if (dir != null) return
-        val d = File(ctx.applicationContext.cacheDir, "lyrics2")
+        val d = File(ctx.applicationContext.cacheDir, "lyrics3")
         d.mkdirs()
         dir = d
     }
@@ -240,6 +240,7 @@ object Lyrics {
             }
         } catch (e: Exception) {
         }
+        if (best.isNotEmpty()) best = withPauseDots(best)
         if (best.isNotEmpty()) cache[song.id] = best
         if (best.isNotEmpty()) save(song.id, best)
         best

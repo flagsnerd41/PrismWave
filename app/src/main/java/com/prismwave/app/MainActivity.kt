@@ -50,6 +50,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -331,11 +332,45 @@ fun Main(s: AppState) {
                 }
             }
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            AnimatedVisibility(
-                visible = s.showPlayer,
-                enter = if (TapCover.rect != null && !s.reduceMotion) fadeIn(tween(300, delayMillis = 140)) else slideInVertically(tween(480, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
-                exit = slideOutVertically(tween(420, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(320))
-            ) { FullPlayer(s) }
+            // the full player grows out of the mini player (same width, same rounded shape) and shrinks back into it
+            val morph by animateFloatAsState(
+                if (s.showPlayer) 1f else 0f,
+                if (s.reduceMotion) tween(150) else tween(560, easing = FastOutSlowInEasing),
+                label = "pmorph"
+            )
+            val flight = TapCover.rect != null && !s.reduceMotion
+            if (s.showPlayer || morph > 0.001f) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val p = morph
+                            if (flight && s.showPlayer) {
+                                alpha = ((p - 0.25f) / 0.5f).coerceIn(0f, 1f)
+                            } else {
+                                val mx = 14.dp.toPx() * (1f - p)
+                                val mh = 72.dp.toPx()
+                                val mb = 112.dp.toPx()
+                                val top = (size.height - mb - mh) * (1f - p)
+                                val bottom = size.height - mb * (1f - p)
+                                val r = 34.dp.toPx() * (1f - p) + 34.dp.toPx() * p
+                                val rect = androidx.compose.ui.geometry.RoundRect(
+                                    mx, top, size.width - mx, bottom,
+                                    androidx.compose.ui.geometry.CornerRadius(r, r)
+                                )
+                                clip = true
+                                shape = object : androidx.compose.ui.graphics.Shape {
+                                    override fun createOutline(
+                                        size: androidx.compose.ui.geometry.Size,
+                                        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                                        density: androidx.compose.ui.unit.Density
+                                    ) = androidx.compose.ui.graphics.Outline.Rounded(rect)
+                                }
+                                alpha = (p * 4f).coerceIn(0f, 1f)
+                            }
+                        }
+                ) { FullPlayer(s) }
+            }
             }
             CoverFlight(s)
             PagesHost(s)

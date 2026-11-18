@@ -115,17 +115,24 @@ object Ttml {
         } catch (e: Exception) {
             return emptyList()
         }
-        val sorted = out.sortedBy { it.ms }
-        // a long gap between two lines becomes an empty line, so the three dots show during the pause
-        val withGaps = ArrayList<LyricLine>()
-        for (i in sorted.indices) {
-            withGaps.add(sorted[i])
-            val w = sorted[i].words
-            val endMs = if (w != null && w.isNotEmpty()) w.last().endMs else sorted[i].ms + 3000L
-            if (i + 1 < sorted.size && sorted[i + 1].ms - endMs >= 6000L) withGaps.add(LyricLine(endMs + 400L, ""))
-        }
-        return withGaps
+        return withPauseDots(out.sortedBy { it.ms })
     }
+}
+
+// an instrumental part (long gap between two lines, or a long intro) becomes an empty line: the three dots show there
+fun withPauseDots(lines: List<LyricLine>): List<LyricLine> {
+    if (lines.isEmpty() || lines[0].ms < 0) return lines
+    val out = ArrayList<LyricLine>()
+    if (lines[0].text.isNotEmpty() && lines[0].ms >= 5000L) out.add(LyricLine(500L, ""))
+    for (i in lines.indices) {
+        val l = lines[i]
+        out.add(l)
+        if (l.text.isEmpty() || i + 1 >= lines.size || lines[i + 1].text.isEmpty()) continue
+        val w = l.words
+        val endMs = if (w != null && w.isNotEmpty()) w.last().endMs else l.ms + (l.text.length * 95L).coerceIn(1800L, 6000L)
+        if (lines[i + 1].ms - endMs >= 4500L) out.add(LyricLine(endMs + 400L, ""))
+    }
+    return out
 }
 
 /**

@@ -185,7 +185,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
     }
     val active by remember(lines, synced, off) {
         derivedStateOf {
-            if (!synced) -1 else if (playing < 0) 0 else if (ended && playing + 1 < lines.size && lines[playing + 1].ms - lines[playing].ms > 2500L) playing + 1 else playing
+            if (!synced) -1 else if (playing < 0) 0 else if (ended && playing + 1 < lines.size && smoothMs + off >= lines[playing + 1].ms - 1100L) playing + 1 else playing
         }
     }
     val litIdx by remember(lines, synced, off) {
@@ -624,6 +624,9 @@ private fun tone(c: Color, turn: Float, maxSat: Float, bright: Float): Color {
 
 // how long a line is sung: a guess from its length, never longer than the gap to the next line
 private fun sungMs(lines: List<LyricLine>, i: Int): Long {
+    if (lines[i].text.isEmpty()) {
+        return if (i + 1 < lines.size) (lines[i + 1].ms - lines[i].ms - 100L).coerceAtLeast(500L) else 6000L
+    }
     val real = lines[i].words
     if (real != null && real.isNotEmpty()) return (real.last().endMs - lines[i].ms + 200L).coerceAtLeast(500L)
     val gap = if (i + 1 < lines.size) lines[i + 1].ms - lines[i].ms else 6000L

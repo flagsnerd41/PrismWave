@@ -2128,36 +2128,72 @@ private fun QuickPickCarousel(songs: List<Song>, s: AppState) {
     val list = songs.take(12)
     if (list.isEmpty()) return
     val cfg = LocalConfiguration.current
-    val state = androidx.compose.material3.carousel.rememberCarouselState { list.size }
-    androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel(
-        state = state,
-        preferredItemWidth = (cfg.screenWidthDp * 0.78f).dp,
-        modifier = Modifier.fillMaxWidth().height(430.dp),
-        itemSpacing = 10.dp,
-        contentPadding = PaddingValues(horizontal = 16.dp)
+    val w = (cfg.screenWidthDp * 0.74f).dp
+    val side = ((cfg.screenWidthDp.dp - w) / 2)
+    val pager = androidx.compose.foundation.pager.rememberPagerState { list.size }
+    val scope = rememberCoroutineScope()
+    // like ArchiveTune: one big cover in the middle, the other covers are a small pile on both sides
+    androidx.compose.foundation.pager.HorizontalPager(
+        state = pager,
+        pageSize = androidx.compose.foundation.pager.PageSize.Fixed(w),
+        contentPadding = PaddingValues(horizontal = side),
+        pageSpacing = 0.dp,
+        beyondViewportPageCount = 2,
+        modifier = Modifier.fillMaxWidth().height(390.dp)
     ) { i ->
         val song = list[i]
-        val shape = RoundedCornerShape(32.dp)
         val cref = remember { CoverRef() }
         Box(
             Modifier
                 .fillMaxSize()
-                .maskClip(shape)
-                .softClick { openFrom(s, song, list, cref, 32f) }
+                .graphicsLayer {
+                    val off = (pager.currentPage - i) + pager.currentPageOffsetFraction
+                    val d = kotlin.math.abs(off).coerceIn(0f, 1f)
+                    val sign = if (off < 0f) -1f else 1f
+                    val slim = 0.28f
+                    val shown = 1f - (1f - slim) * d
+                    translationX = -sign * (w.toPx() * (1f - slim) / 2f - 8.dp.toPx()) * d * -1f
+                    scaleY = 1f - 0.12f * d
+                    alpha = if (kotlin.math.abs(off) <= 1f) 1f else (2f - kotlin.math.abs(off)).coerceIn(0f, 1f) * 0.7f
+                    clip = true
+                    val cw = size.width * shown
+                    val r = 32.dp.toPx().coerceAtMost(cw / 2f)
+                    shape = object : androidx.compose.ui.graphics.Shape {
+                        override fun createOutline(
+                            size: androidx.compose.ui.geometry.Size,
+                            layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                            density: androidx.compose.ui.unit.Density
+                        ): androidx.compose.ui.graphics.Outline {
+                            val l = (size.width - cw) / 2f
+                            return androidx.compose.ui.graphics.Outline.Rounded(
+                                androidx.compose.ui.geometry.RoundRect(l, 0f, l + cw, size.height, androidx.compose.ui.geometry.CornerRadius(r, r))
+                            )
+                        }
+                    }
+                }
+                .softClick {
+                    if (pager.currentPage == i) openFrom(s, song, list, cref, 32f)
+                    else scope.launch { pager.animateScrollToPage(i) }
+                }
         ) {
             Cover(song, Modifier.fillMaxSize().trackCover(cref), 0.dp, 90.sp, quality = 800)
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
-                        0.45f to Color.Transparent,
-                        0.75f to Color.Black.copy(alpha = 0.40f),
+                        0.50f to Color.Transparent,
+                        0.78f to Color.Black.copy(alpha = 0.40f),
                         1f to Color.Black.copy(alpha = 0.85f)
                     )
                 )
             )
-            Column(Modifier.align(Alignment.BottomStart).padding(start = 22.dp, end = 22.dp, bottom = 22.dp)) {
-                Text(song.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Clip, softWrap = true)
-                Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Clip)
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp)
+                    .graphicsLayer { alpha = 1f - kotlin.math.abs((pager.currentPage - i) + pager.currentPageOffsetFraction).coerceIn(0f, 1f) * 1.6f }
+            ) {
+                Text(song.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Clip, softWrap = true)
+                Text(song.artist, color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Clip)
             }
         }
     }
@@ -2280,7 +2316,10 @@ fun HomeScreen(s: AppState) {
     val ytQuick = s.ytHome.firstOrNull { it.title.contains("Quick picks", true) }?.songs
     val picks = if (s.signedIn) null else s.feeds["picks"]
     FreshEffect(s)
-    val bestQuick = Fresh.quick.takeIf { it.size >= 6 } ?: ytQuick ?: picks ?: quick
+    // 1) the Quick picks of your own YouTube Music account, 2) a hero carousel with fresh songs
+    val ytList = ytQuick?.takeIf { it.size >= 4 }
+    val heroList = Fresh.quick.takeIf { it.size >= 6 } ?: (if (ytList == null) (picks ?: quick) else null)
+    val bestQuick = heroList ?: ytList
     val community = (chill + workout).distinctBy { it.id }.take(20)
     val jump = history.distinctBy { it.id }.take(4).ifEmpty { (bestQuick ?: emptyList()).take(4) }
     Box(Modifier.fillMaxSize()) {
@@ -2292,15 +2331,21 @@ fun HomeScreen(s: AppState) {
             )
         ) {
             item { Spacer(Modifier.height(PinnedHeaderHeight)) }
-            item {
-                HomeSection(
-                    if (Fresh.quick.size >= 6) "Fresh for you"
-                    else if (ytQuick == null && picks != null) "Picked for you"
-                    else "Quick picks"
-                )
+            if (ytList != null) {
+                item { HomeSection("Quick picks") }
+                item { QuickPicksGrid(ytList, s) }
             }
-            item {
-                if (bestQuick == null) LoaderBox() else QuickPickCarousel(bestQuick, s)
+            if (heroList != null || ytList == null) {
+                item {
+                    HomeSection(
+                        if (Fresh.quick.size >= 6) "Fresh for you"
+                        else if (picks != null) "Picked for you"
+                        else "Quick picks"
+                    )
+                }
+                item {
+                    if (heroList == null) LoaderBox() else QuickPickCarousel(heroList, s)
+                }
             }
             item { FreshHome(s) }
             if (Opts.showMixes && community.isNotEmpty()) {
