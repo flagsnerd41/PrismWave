@@ -162,13 +162,10 @@ private fun PfRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
-                Box(
-                    Modifier.size(44.dp).clip(CircleShape).background(accent.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
+                Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
                 }
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(14.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
@@ -606,41 +603,35 @@ fun SettingsScreen(s: AppState) {
         },
         label = "settingsPage2"
     ) { pg ->
-        val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
         Column(
             Modifier
                 .fillMaxSize()
-                .nestedScroll(bar.nestedScrollConnection)
                 .padding(top = statusTop())
         ) {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        if (pg == null) "Settings" else (titles[pg] ?: "Settings"),
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    FilledTonalIconButton(
-                        onClick = { if (pg == null) s.screen = Screen.Home else page = null },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Color.White.copy(alpha = 0.12f),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = null)
-                    }
-                },
-                windowInsets = WindowInsets(0.dp),
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
-                ),
-                scrollBehavior = bar
-            )
+            // one small fixed header like ArchiveTune: back arrow and title in a row, it does not move with the scrolling
+            Row(
+                Modifier.fillMaxWidth().padding(start = 12.dp, end = 20.dp, top = 8.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable { if (pg == null) s.screen = Screen.Home else page = null },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    if (pg == null) "Settings" else (titles[pg] ?: "Settings"),
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -847,7 +838,7 @@ private fun PfAppearancePage(s: AppState) {
     PfLabel("Theme", a)
     PfGroup {
         PfChoice(
-            Icons.Rounded.Palette, "Theme", listOf("Warm", "Dark", "AMOLED", "Midnight"), Opts.theme, a
+            Icons.Rounded.Palette, "Theme", listOf("Warm", "Dark", "AMOLED", "Midnight", "ArchiveTune"), Opts.theme, a
         ) {
             Opts.theme = it
             Opts.save()

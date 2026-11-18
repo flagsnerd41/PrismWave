@@ -529,11 +529,14 @@ class AppState(private val ctx: Context) {
             radio = false
         }
         MuffleMix.clear()
+        XFade.stop()
         fading = false
         queuedId = null
         pausedByUnplug = false
         current = song
         queue = from
+        // one song alone (from search for example): the songs after it come from YouTube Music's radio for this song
+        if (from.size == 1 && from[0].id == song.id) radio = true
         position = 0f
         playing = true
         status = "Loading..."
@@ -571,6 +574,8 @@ class AppState(private val ctx: Context) {
                 c.prepare()
                 val soft = false
                 autoAdvance = false
+                // a skip during the end fade must not leave the new song silent
+                AudioShape.rampGain(1f, 1f, 1L)
                 if (soft) c.volume = 0f
                 c.play()
                 if (soft) fade(0f, 1f, if (Opts.crossfade > 0) Opts.crossfade * 1000L else 450L) else c.volume = 1f
@@ -591,6 +596,7 @@ class AppState(private val ctx: Context) {
         val c = controller ?: return
         if (current == null) return
         if (playing) {
+            XFade.stop()
             if (Opts.fade && c.playbackState == Player.STATE_READY) {
                 playing = false
                 fade(c.volume, 0f, 260) {
@@ -615,6 +621,8 @@ class AppState(private val ctx: Context) {
     fun seekTo(sec: Float) {
         position = sec
         if (fading) {
+            XFade.stop()
+            AudioShape.rampGain(1f, 1f, 1L)
             fading = false
             fadeJob?.cancel()
             controller?.volume = 1f
@@ -838,6 +846,8 @@ class AppState(private val ctx: Context) {
             val ms = ((prevLead ?: StudioPrefs.mixSecs.toFloat()) * 1000f).toLong()
             MuffleMix.ramp(StudioPrefs.mixStrength, 0f, ms)
             fade(0.3f, 1f, ms)
+        } else if (XFade.active && XFade.songId == sg.id) {
+            takeOverFromOverlap()
         } else if (Opts.crossfade > 0 || prevLead != null) {
             AudioShape.rampGain(0f, 1f, ((prevLead ?: Opts.crossfade.toFloat()) * 1000f).toLong())
         } else {
@@ -969,6 +979,49 @@ class AppState(private val ctx: Context) {
         CoverPreload.warm(ctx, listOfNotNull(next) + pool, q)
     }
 
+    // the next song starts on a second player while the end of this one fades out, so they really overlap
+    private fun startOverlap(leftSec: Float) {
+        val nid = queuedId ?: return
+        val nxt = queue.firstOrNull { it.id == nid } ?: known[nid] ?: return
+        scope.launch {
+            try {
+                val url = DownloadStore.localUri(nxt) ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
+                if (!fading || current == null) return@launch
+                XFade.start(ctx, nxt.id, url, (leftSec * 1000).toLong() - 150L)
+            } catch (e: Exception) {
+                XFade.stop()
+            }
+        }
+    }
+
+    // the first song has ended: the main player continues the next song at the spot the helper player reached
+    private fun takeOverFromOverlap() {
+        scope.launch {
+            try {
+                val c = controller ?: return@launch
+                c.seekTo(XFade.position() + 150L)
+                var w = 0
+                while (w < 20 && c.playbackState != Player.STATE_READY) {
+                    delay(40)
+                    w++
+                }
+                // one more small correction, the helper player kept moving while the main one loaded
+                c.seekTo(XFade.position() + 90L)
+                w = 0
+                delay(60)
+                while (w < 10 && c.playbackState != Player.STATE_READY) {
+                    delay(40)
+                    w++
+                }
+                AudioShape.rampGain(0f, 1f, 240L)
+                XFade.fadeOutAndStop(240L)
+            } catch (e: Exception) {
+                AudioShape.rampGain(0f, 1f, 200L)
+                XFade.stop()
+            }
+        }
+    }
+
     fun tick() {
         val c = controller
         if (c != null && current != null && c.playbackState == Player.STATE_ENDED && c.currentMediaItem?.mediaId == current?.id) onEnded()
@@ -998,6 +1051,7 @@ class AppState(private val ctx: Context) {
                 if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
                     fading = true
                     AudioShape.rampGain(1f, 0f, (left * 1000).toLong() - 150)
+                    startOverlap(left)
                 }
             }
             if (dur > 0 && !repeat) {

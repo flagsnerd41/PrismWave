@@ -134,6 +134,15 @@ object Engine {
         init()
         val id = url.substringAfter("v=", "").substringBefore("&")
         val songs = ArrayList<Song>()
+        // first choice: the YouTube Music radio of the song (music only, taste based, no other versions of the same song)
+        if (id.length == 11) {
+            try {
+                val yt = YtRadio.next(id)
+                if (yt.size >= 5) return@withContext yt
+                songs.addAll(yt)
+            } catch (e: Exception) {
+            }
+        }
         if (id.length == 11) {
             try {
                 val mix = PlaylistInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=" + id + "&list=RD" + id)
@@ -151,7 +160,12 @@ object Engine {
             } catch (e: Exception) {
             }
         }
-        songs.distinctBy { it.url }
+        val seedTitle = try {
+            infoFor(url).name
+        } catch (e: Exception) {
+            null
+        }
+        songs.distinctBy { it.url }.filter { seedTitle == null || !YtRadio.sameSong(seedTitle, it.title) }
     }
 
     suspend fun collection(url: String): List<Song> = withContext(Dispatchers.IO) {

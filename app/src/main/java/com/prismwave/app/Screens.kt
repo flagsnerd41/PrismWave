@@ -637,10 +637,10 @@ fun SearchScreen(s: AppState) {
                 if (hits.isEmpty() && err.isEmpty()) {
                     item { Text("Nothing found", color = TextDim, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) }
                 }
-                val songList = hits.mapNotNull { it.song }
                 items(hits) { h ->
                     val sg = h.song
-                    if (sg != null) SongRow(sg, s, songList) else HitRow(h, s)
+                    // a song from search plays alone, then YouTube Music style recommendations follow (not the rest of the search list)
+                    if (sg != null) SongRow(sg, s, listOf(sg)) else HitRow(h, s)
                 }
             }
         }

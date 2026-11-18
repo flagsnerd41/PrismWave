@@ -95,7 +95,8 @@ private val palettes = listOf(
     Palette(Color(0xFF0B1220), Color(0xFF141C2E), Color(0xFF1C2740), Color(0xFFA9B4CC)), // Warm (now blue, no yellow)
     Palette(Color(0xFF121212), Color(0xFF1E1E1E), Color(0xFF2A2A2A), Color(0xFFB0B0B0)), // Dark
     Palette(Color(0xFF000000), Color(0xFF0D0D0D), Color(0xFF1A1A1A), Color(0xFFA8A8A8)), // AMOLED
-    Palette(Color(0xFF0B1220), Color(0xFF141C2E), Color(0xFF1C2740), Color(0xFFA9B4CC))  // Midnight
+    Palette(Color(0xFF0B1220), Color(0xFF141C2E), Color(0xFF1C2740), Color(0xFFA9B4CC)), // Midnight
+    Palette(Color(0xFF121411), Color(0xFF1B1D19), Color(0xFF252822), Color(0xFFC3C8BA))  // ArchiveTune: calm neutral dark, only a light tint of the cover
 )
 
 private fun pal(): Palette = palettes[Opts.theme.coerceIn(0, palettes.size - 1)]

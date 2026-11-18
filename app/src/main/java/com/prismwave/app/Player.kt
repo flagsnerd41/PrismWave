@@ -342,6 +342,15 @@ fun MiniPlayer(s: AppState) {
                         onDragStart = { dx = 0f },
                         onDragEnd = { if (dx > 120f) s.prev() else if (dx < -120f) s.next() }
                     ) { _, d -> dx += d }
+                }
+                .pointerInput(Unit) {
+                    // swipe up on the mini player: the full screen player opens
+                    var dy = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { dy = 0f },
+                        onDragEnd = { if (dy < -50f) s.showPlayer = true },
+                        onDragCancel = { dy = 0f }
+                    ) { _, d -> dy += d }
                 },
             32.dp
         ) {
@@ -924,15 +933,14 @@ private fun ImmersiveBody(
     val stageFade = remember {
         Brush.verticalGradient(
             0f to Color.Black,
-            0.44f to Color.Black,
-            0.58f to Color.Black.copy(alpha = 0.96f),
-            0.70f to Color.Black.copy(alpha = 0.70f),
-            0.82f to Color.Black.copy(alpha = 0.28f),
+            0.76f to Color.Black,
+            0.84f to Color.Black.copy(alpha = 0.82f),
+            0.92f to Color.Black.copy(alpha = 0.38f),
             1f to Color.Transparent
         )
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Night)) {
-        val stageHeight = minOf(maxWidth * 1.10f, maxHeight * 0.60f)
+        val stageHeight = maxHeight * 0.60f
         // blurred backdrop that fills the whole screen
         if (VideoSync.showVideo(song) && VideoPrefs.liveBackdrop) {
             VideoStage(s, song, Modifier.fillMaxSize().blur(50.dp), low = true)
@@ -976,7 +984,7 @@ private fun ImmersiveBody(
                             .drawWithContent {
                                 drawContent()
                                 drawRect(
-                                    brush = Brush.verticalGradient(0.46f to Color.Transparent, 0.78f to Color.Black),
+                                    brush = Brush.verticalGradient(0.70f to Color.Transparent, 0.92f to Color.Black),
                                     blendMode = BlendMode.DstIn
                                 )
                             }
@@ -986,7 +994,7 @@ private fun ImmersiveBody(
                 }
                 Box(
                     Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(0.50f to Color.Transparent, 1f to bottom.copy(alpha = 0.85f))
+                        Brush.verticalGradient(0.76f to Color.Transparent, 1f to bottom.copy(alpha = 0.85f))
                     )
                 )
             } else {

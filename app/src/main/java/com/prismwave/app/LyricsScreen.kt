@@ -432,7 +432,11 @@ fun LyricsScreen(s: AppState) {
                                 if (ln.text.isEmpty()) {
                                     PauseDots(ln.ms, endMs, on && synced, { smoothMs + off })
                                 } else {
-                                    LyricText(ln.text, ln.ms, endMs, on && synced, { smoothMs + off }, fontSize, lineHeight, center)
+                                    if (ln.words != null) {
+                                        WordLyricText(ln, on && synced, { smoothMs + off }, fontSize, lineHeight, center)
+                                    } else {
+                                        LyricText(ln.text, ln.ms, endMs, on && synced, { smoothMs + off }, fontSize, lineHeight, center)
+                                    }
                                 }
                             }
                         }

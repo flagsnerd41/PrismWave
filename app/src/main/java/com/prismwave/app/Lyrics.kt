@@ -15,7 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 // ms = -1 means the lyrics are not synced (plain text only)
-class LyricLine(val ms: Long, val text: String)
+class LyricLine(val ms: Long, val text: String, val words: List<LyricWord>? = null)
 
 // look of the lyrics page and the sync fix for each song
 object LyricsPrefs {
@@ -50,7 +50,7 @@ object Lyrics {
     // lyrics are also kept on the phone, so they show at once and work offline
     fun init(ctx: Context) {
         if (dir != null) return
-        val d = File(ctx.applicationContext.cacheDir, "lyrics")
+        val d = File(ctx.applicationContext.cacheDir, "lyrics2")
         d.mkdirs()
         dir = d
     }
@@ -66,7 +66,17 @@ object Lyrics {
             val out = ArrayList<LyricLine>()
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONArray(i)
-                out.add(LyricLine(o.getLong(0), o.getString(1)))
+                var ws: List<LyricWord>? = null
+                if (o.length() > 2) {
+                    val wa = o.getJSONArray(2)
+                    val tmp = ArrayList<LyricWord>()
+                    for (k in 0 until wa.length()) {
+                        val w = wa.getJSONArray(k)
+                        tmp.add(LyricWord(w.getLong(0), w.getLong(1), w.getString(2)))
+                    }
+                    if (tmp.isNotEmpty()) ws = tmp
+                }
+                out.add(LyricLine(o.getLong(0), o.getString(1), ws))
             }
             if (out.isEmpty()) null else out
         } catch (e: Exception) {
@@ -78,7 +88,16 @@ object Lyrics {
         val f = fileFor(id) ?: return
         try {
             val arr = JSONArray()
-            for (l in lines) arr.put(JSONArray().put(l.ms).put(l.text))
+            for (l in lines) {
+                val row = JSONArray().put(l.ms).put(l.text)
+                val ws = l.words
+                if (ws != null) {
+                    val wa = JSONArray()
+                    for (w in ws) wa.put(JSONArray().put(w.startMs).put(w.endMs).put(w.text))
+                    row.put(wa)
+                }
+                arr.put(row)
+            }
             f.writeText(arr.toString())
         } catch (e: Exception) {
         }
@@ -161,6 +180,27 @@ object Lyrics {
         }
         val cands = candidates(song)
         var best: List<LyricLine> = emptyList()
+        // 1) real word-by-word lyrics (Apple Music style files from BetterLyrics)
+        try {
+            for ((t, a) in cands.take(2)) {
+                val q = "s=" + enc(t) + "&a=" + enc(a) + (if (song.seconds > 1) "&d=" + song.seconds else "")
+                val body = get("https://lyrics-api.boidu.dev/getLyrics?" + q) ?: continue
+                val ttml = JSONObject(body).optString("ttml", "")
+                if (ttml.isBlank()) continue
+                val r = Ttml.parse(ttml)
+                if (r.count { it.words != null } >= 3) {
+                    best = r
+                    break
+                }
+            }
+        } catch (e: Exception) {
+        }
+        if (best.isNotEmpty()) {
+            cache[song.id] = best
+            save(song.id, best)
+            return@withContext best
+        }
+        // 2) line-by-line lyrics from LRCLIB
         try {
             for ((t, a) in cands) {
                 val q = "track_name=" + enc(t) + "&artist_name=" + enc(a) +

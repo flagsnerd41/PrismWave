@@ -573,7 +573,11 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                                     if (ln.text.isEmpty()) {
                                         PauseDots(ln.ms, endMs, on && synced, { smoothMs + off })
                                     } else {
-                                        BounceText(ln.text, on && synced, synced, fontSize, lineHeight, center)
+                                        if (ln.words != null) {
+                                            WordLyricText(ln, on && synced, { smoothMs + off }, fontSize, lineHeight, center)
+                                        } else {
+                                            BounceText(ln.text, on && synced, synced, fontSize, lineHeight, center)
+                                        }
                                     }
                                 }
                             }
@@ -620,6 +624,8 @@ private fun tone(c: Color, turn: Float, maxSat: Float, bright: Float): Color {
 
 // how long a line is sung: a guess from its length, never longer than the gap to the next line
 private fun sungMs(lines: List<LyricLine>, i: Int): Long {
+    val real = lines[i].words
+    if (real != null && real.isNotEmpty()) return (real.last().endMs - lines[i].ms + 200L).coerceAtLeast(500L)
     val gap = if (i + 1 < lines.size) lines[i + 1].ms - lines[i].ms else 6000L
     return (lines[i].text.length * 95L).coerceIn(1800L, 8000L).coerceAtMost((gap - 200L).coerceAtLeast(500L))
 }

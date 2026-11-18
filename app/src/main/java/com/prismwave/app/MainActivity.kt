@@ -219,7 +219,7 @@ fun Main(s: AppState) {
     }
     val cur = s.current
     val artC = if (cur != null && Opts.livingBg) rememberArtColor(cur) else s.accent
-    val strength = (if (cur != null && Opts.livingBg) 1f else 0.5f) * (if (Opts.theme == 2) 0.35f else 1f)
+    val strength = (if (cur != null && Opts.livingBg) 1f else 0.5f) * (if (Opts.theme == 2) 0.35f else if (Opts.theme == 4) 0.22f else 1f)
     val tintTop by animateColorAsState(lerp(Night, artC, 0.42f * strength), tween(900), label = "tintTop")
     val tintBot by animateColorAsState(lerp(Night, artC, 0.16f * strength), tween(900), label = "tintBot")
     LaunchedEffect(artC, AppColors.ver, AppColors.palette) {

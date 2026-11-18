@@ -1,6 +1,12 @@
 package com.prismwave.app
 
 import android.content.Context
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -163,23 +169,55 @@ fun AppleNavBar(s: AppState) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         LiquidGlass(s.glassAlpha(), Modifier.weight(1f).height(68.dp), 34.dp) {
-            Row(Modifier.fillMaxSize().padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                tabs.forEach { t ->
-                    val sel = s.screen == t.screen
-                    val bg by animateColorAsState(if (sel) Color.White.copy(alpha = 0.16f) else Color.Transparent, tween(260), label = "apbg")
-                    val fg by animateColorAsState(if (sel) s.accent else Color.White.copy(alpha = 0.8f), tween(260), label = "apfg")
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(29.dp))
-                            .background(bg)
-                            .softClick { goTo(s, t.screen) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(if (sel) t.filled else t.outlined, contentDescription = null, tint = fg, modifier = Modifier.size(25.dp))
-                        Text(t.label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            BoxWithConstraints(Modifier.fillMaxSize().padding(5.dp)) {
+                val gap = 4.dp
+                val tabW = (maxWidth - gap * (tabs.size - 1)) / tabs.size
+                val idx = tabs.indexOfFirst { it.screen == s.screen }
+                var lastIdx by remember { mutableStateOf(0) }
+                val shownIdx = if (idx >= 0) idx else lastIdx
+                androidx.compose.runtime.SideEffect { lastIdx = shownIdx }
+                // the capsule slides to the chosen tab with a soft bounce, and stretches a little while it travels
+                val pillX by animateDpAsState(
+                    (tabW + gap) * shownIdx,
+                    if (s.reduceMotion) tween(120) else spring(dampingRatio = 0.72f, stiffness = 420f),
+                    label = "appillx"
+                )
+                val pillA by animateFloatAsState(if (idx >= 0) 1f else 0f, tween(240), label = "appilla")
+                val stretch = remember { androidx.compose.animation.core.Animatable(0f) }
+                LaunchedEffect(shownIdx) {
+                    if (!s.reduceMotion) {
+                        stretch.snapTo(1f)
+                        stretch.animateTo(0f, tween(480, easing = FastOutSlowInEasing))
+                    }
+                }
+                Box(
+                    Modifier
+                        .width(tabW)
+                        .fillMaxHeight()
+                        .graphicsLayer {
+                            translationX = pillX.toPx()
+                            scaleX = 1f + 0.16f * stretch.value
+                            alpha = pillA
+                        }
+                        .clip(RoundedCornerShape(29.dp))
+                        .background(Color.White.copy(alpha = 0.16f))
+                )
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    tabs.forEach { t ->
+                        val sel = s.screen == t.screen
+                        val fg by animateColorAsState(if (sel) s.accent else Color.White.copy(alpha = 0.8f), tween(260), label = "apfg")
+                        Column(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(29.dp))
+                                .softClick { goTo(s, t.screen) },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(if (sel) t.filled else t.outlined, contentDescription = null, tint = fg, modifier = Modifier.size(25.dp))
+                            Text(t.label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        }
                     }
                 }
             }

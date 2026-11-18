@@ -170,7 +170,11 @@ object Opts {
         eqOn = p.getBoolean("eqOn", false)
         eqLevels = p.getString("eqLevels", "") ?: ""
         bassBoost = p.getInt("bassBoost", 0)
-        theme = p.getInt("theme", 0)
+        // everyone moves once to the ArchiveTune theme, after that the choice is theirs
+        if (!p.getBoolean("themeAt", false)) {
+            p.edit().putInt("theme", 4).putBoolean("themeAt", true).apply()
+        }
+        theme = p.getInt("theme", 4)
         lite = p.getBoolean("lite", false)
     }
 
