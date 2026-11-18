@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.drawWithContent
@@ -333,11 +334,13 @@ fun Main(s: AppState) {
             }
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
             // the full player grows out of the mini player (same width, same rounded shape) and shrinks back into it
-            val morph by animateFloatAsState(
-                if (s.showPlayer) 1f else 0f,
-                if (s.reduceMotion) tween(150) else tween(560, easing = FastOutSlowInEasing),
-                label = "pmorph"
-            )
+            LaunchedEffect(s.showPlayer) {
+                PlayerMorph.p.animateTo(
+                    if (s.showPlayer) 1f else 0f,
+                    if (s.reduceMotion) tween(150) else tween(560, easing = FastOutSlowInEasing)
+                )
+            }
+            val morph = PlayerMorph.p.value
             val flight = TapCover.rect != null && !s.reduceMotion
             if (s.showPlayer || morph > 0.001f) {
                 Box(
@@ -369,7 +372,23 @@ fun Main(s: AppState) {
                                 alpha = (p * 4f).coerceIn(0f, 1f)
                             }
                         }
-                ) { FullPlayer(s) }
+                ) {
+                    // inside the reveal the whole player really shrinks toward the mini player, then fades into it
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val p = morph
+                                if (!(flight && s.showPlayer)) {
+                                    val sc = 0.30f + 0.70f * p
+                                    scaleX = sc
+                                    scaleY = sc
+                                    transformOrigin = TransformOrigin(0.5f, 1f - (112.dp.toPx() + 36.dp.toPx()) / size.height)
+                                    alpha = (p * 2.2f).coerceIn(0f, 1f)
+                                }
+                            }
+                    ) { FullPlayer(s) }
+                }
             }
             }
             CoverFlight(s)

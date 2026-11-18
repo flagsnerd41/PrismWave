@@ -1,5 +1,6 @@
 package com.prismwave.app
 
+import androidx.compose.ui.text.style.TextOverflow
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.Arrangement
@@ -280,12 +281,14 @@ fun FreshHome(s: AppState) {
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 12.dp)
             )
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) { itemsIndexed(sh.songs.take(15)) { i, sg -> RecentCard(sg, s, sh.songs, Modifier.appear(i)) } }
+            ) { itemsIndexed(sh.songs.take(15)) { i, sg -> RecentCard(sg, s, listOf(sg), Modifier.appear(i)) } }
         }
     }
 }

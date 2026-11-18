@@ -287,7 +287,7 @@ private fun QuickPicksGrid(songs: List<Song>, s: AppState) {
                     .height(66.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(if (cur) s.accent.copy(alpha = 0.18f) else Color.Transparent)
-                    .clickable { openFrom(s, sg, songs, cref, 12f) }
+                    .clickable { openFrom(s, sg, listOf(sg), cref, 12f) }
                     .padding(horizontal = 6.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -2174,7 +2174,7 @@ private fun QuickPickCarousel(songs: List<Song>, s: AppState) {
                     }
                 }
                 .softClick {
-                    if (pager.currentPage == i) openFrom(s, song, list, cref, 32f)
+                    if (pager.currentPage == i) openFrom(s, song, listOf(song), cref, 32f)
                     else scope.launch { pager.animateScrollToPage(i) }
                 }
         ) {
@@ -2320,7 +2320,8 @@ fun HomeScreen(s: AppState) {
     FreshEffect(s)
     // 1) the Quick picks of your own YouTube Music account, 2) a hero carousel with fresh songs
     val ytList = ytQuick?.takeIf { it.size >= 4 }
-    val heroList = Fresh.quick.takeIf { it.size >= 6 } ?: (if (ytList == null) (picks ?: quick) else null)
+    val freshList = Fresh.quick.takeIf { it.size >= 6 } ?: (if (ytList == null) (picks ?: quick) else null)
+    val heroList = if (ytList != null) (ytList.take(8) + (freshList ?: emptyList())).distinctBy { it.id }.take(14) else freshList
     val bestQuick = heroList ?: ytList
     val community = (chill + workout).distinctBy { it.id }.take(20)
     val jump = history.distinctBy { it.id }.take(4).ifEmpty { (bestQuick ?: emptyList()).take(4) }
@@ -2333,14 +2334,11 @@ fun HomeScreen(s: AppState) {
             )
         ) {
             item { Spacer(Modifier.height(PinnedHeaderHeight)) }
-            if (ytList != null) {
-                item { HomeSection("Quick picks") }
-                item { QuickPicksGrid(ytList, s) }
-            }
             if (heroList != null || ytList == null) {
                 item {
                     HomeSection(
-                        if (Fresh.quick.size >= 6) "Fresh for you"
+                        if (ytList != null) "Quick picks"
+                        else if (Fresh.quick.size >= 6) "Fresh for you"
                         else if (picks != null) "Picked for you"
                         else "Quick picks"
                     )

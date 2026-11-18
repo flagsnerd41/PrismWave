@@ -309,6 +309,15 @@ fun MiniPlayer(s: AppState) {
         delay(350)
         glow.animateTo(0f, tween(1500))
     }
+    // when the full player has shrunk into the mini player, the mini player bounces
+    val bounce = remember { Animatable(1f) }
+    LaunchedEffect(s.showPlayer) {
+        if (!s.showPlayer && PlayerMorph.p.value > 0.02f) {
+            while (PlayerMorph.p.value > 0.06f) delay(16)
+            bounce.snapTo(0.92f)
+            bounce.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.35f, stiffness = 380f))
+        }
+    }
     AnimatedVisibility(
         visible = shown,
         enter = slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(350))
@@ -318,8 +327,12 @@ fun MiniPlayer(s: AppState) {
             art,
             Modifier
                 .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = bounce.value
+                    scaleY = bounce.value
+                }
                 .drawBehind {
-                    val a = if (Opts.lite) 0f else maxOf(glow.value * 0.6f, if (s.playing) pulseA else 0f)
+                    val a = 0f
                     if (a > 0.01f) {
                         val padX = 36.dp.toPx()
                         val padY = 26.dp.toPx()
@@ -560,6 +573,11 @@ private fun VolumeRow() {
     }
 }
 
+// how far the full player is open: 1 = full screen, 0 = shrunk into the mini player (follows the finger while dragging)
+object PlayerMorph {
+    val p = androidx.compose.animation.core.Animatable(0f)
+}
+
 @Composable
 fun FullPlayer(s: AppState) {
     val song = s.current ?: return
@@ -615,7 +633,6 @@ fun FullPlayer(s: AppState) {
                 translationY = if (SharedCover.rect != null) 0f else lyShift * size.height * 0.18f
                 alpha = if (SharedCover.rect != null) (1f - LyricsMorph.p * 1.8f).coerceAtLeast(0f) else (1f - lyShift * 0.9f).coerceAtLeast(0f)
             }
-            .offset { IntOffset(0, dragY.value.roundToInt()) }
             .draggable(
                 state = rememberDraggableState { d ->
                     scope.launch {
@@ -624,6 +641,8 @@ fun FullPlayer(s: AppState) {
                             halfP.snapTo((halfP.value - d / 650f).coerceIn(0f, 2f))
                         } else {
                             dragY.snapTo((dragY.value + d).coerceAtLeast(0f))
+                            // the player follows the finger and shrinks into the mini player
+                            PlayerMorph.p.snapTo((1f - dragY.value / 900f).coerceIn(0f, 1f))
                         }
                     }
                 },
@@ -638,10 +657,12 @@ fun FullPlayer(s: AppState) {
                         ).coerceIn(0f, 2f).toInt()
                         PlayerStage.stage = target
                         halfP.animateTo(target.toFloat(), spring(dampingRatio = 0.9f, stiffness = 150f))
-                    } else if (dragY.value > 300f) {
+                    } else if (dragY.value > 0f && (PlayerMorph.p.value < 0.8f || vel > 900f)) {
+                        dragY.snapTo(0f)
                         s.showPlayer = false
                     } else {
-                        dragY.animateTo(0f, spring(dampingRatio = 0.7f))
+                        dragY.snapTo(0f)
+                        PlayerMorph.p.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 400f))
                     }
                 }
             )
