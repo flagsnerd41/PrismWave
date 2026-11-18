@@ -17,6 +17,17 @@ object YtRadio {
     private const val ORIGIN = "https://music.youtube.com"
     private const val CLIENT_VERSION = "1.20250310.01.00"
     private val http = OkHttpClient()
+
+    // the cookie of the signed in account: with it YouTube Music tunes the radio to your own taste
+    @Volatile var cookie: String = ""
+
+    private fun auth(cookie: String): String? {
+        val sid = Regex("(?:^|;\\s*)SAPISID=([^;]+)").find(cookie)?.groupValues?.get(1)
+            ?: Regex("(?:^|;\\s*)__Secure-3PAPISID=([^;]+)").find(cookie)?.groupValues?.get(1) ?: return null
+        val ts = System.currentTimeMillis() / 1000
+        val digest = java.security.MessageDigest.getInstance("SHA-1").digest(("$ts $sid $ORIGIN").toByteArray())
+        return "SAPISIDHASH " + ts + "_" + digest.joinToString("") { "%02x".format(it) }
+    }
     private val clean = Regex("\\(.*?\\)|\\[.*?\\]")
     private val notWord = Regex("[^\\p{L}\\p{N} ]")
     private val spaces = Regex("\\s+")
@@ -90,6 +101,15 @@ object YtRadio {
             .header("X-Origin", ORIGIN)
             .header("Referer", "$ORIGIN/")
             .header("User-Agent", YtAccount.UA)
+            .apply {
+                val c = cookie
+                val a = if (c.isNotEmpty()) auth(c) else null
+                if (a != null) {
+                    header("Cookie", c)
+                    header("Authorization", a)
+                    header("X-Goog-AuthUser", "0")
+                }
+            }
             .build()
         val json = http.newCall(req).execute().use { r ->
             if (!r.isSuccessful) return@withContext emptyList<Song>()

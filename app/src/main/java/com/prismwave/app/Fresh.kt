@@ -152,14 +152,39 @@ object Fresh {
         val shelves = ArrayList<YtShelf>()
 
         // the main picks: songs related to a few of your own songs
-        val quickAll = ArrayList<Song>()
-        for (sd in seeds.take(4)) {
+        // Ranked by taste, not random: every seed has a weight (liked > often played > recently played),
+        // each seed's radio gives scored candidates, and songs that several of your seeds agree on rise to the top
+        val liked = s.liked.map { it.id }.toSet()
+        val top = s.topPlayed().map { it.id }
+        val recent = s.history.map { it.id }
+        val artistFans = s.topArtists().map { it.first }.toSet()
+        fun weight(sd: Song): Float {
+            var w = 1f
+            if (sd.id in liked) w += 2f
+            val ti = top.indexOf(sd.id)
+            if (ti >= 0) w += (50 - ti) / 25f
+            val ri = recent.indexOf(sd.id)
+            if (ri >= 0) w += (30 - ri) / 15f
+            return w
+        }
+        val ranked = pool.filter { it.seconds in 60..900 }.sortedByDescending { weight(it) }.take(8)
+        val scores = HashMap<String, Float>()
+        val byKey = HashMap<String, Song>()
+        for (sd in ranked) {
             try {
-                quickAll.addAll(Engine.related(sd.url).take(14))
+                val w = weight(sd)
+                Engine.related(sd.url).take(30).forEachIndexed { i, r ->
+                    val k = key(r)
+                    var sc = w / (1f + i * 0.08f)
+                    if (r.artist in artistFans) sc *= 1.25f
+                    scores[k] = (scores[k] ?: 0f) + sc
+                    byKey[k] = r
+                }
             } catch (e: Exception) {
             }
         }
-        val quickList = fresh(quickAll).shuffled(rng).take(20)
+        val quickAll = fresh(byKey.values.toList()).sortedByDescending { (scores[key(it)] ?: 0f) * (0.9f + 0.2f * rng.nextFloat()) }
+        val quickList = quickAll.take(20)
         quickList.forEach { used.add(key(it)) }
 
         // "because you played ..."

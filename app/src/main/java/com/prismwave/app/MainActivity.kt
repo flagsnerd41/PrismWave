@@ -234,6 +234,7 @@ fun Main(s: AppState) {
             s.accent = AppColors.palette
         }
     }
+    LaunchedEffect(s.cookie) { YtRadio.cookie = s.cookie }
     var scrolled by remember { mutableStateOf(0f) }
     LaunchedEffect(s.screen, s.openPlaylist, s.libraryOpen) { scrolled = 0f }
     val showBar by remember { derivedStateOf { scrolled > 6f } }
