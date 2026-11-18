@@ -557,6 +557,61 @@ private fun PfAboutBanner(accent: Color, onOpen: () -> Unit) {
     }
 }
 
+// the big About card on top of Settings: while you scroll, the picture slowly blurs, shrinks and settles back
+@Composable
+private fun PfHero(scroll: androidx.compose.foundation.ScrollState, onOpen: () -> Unit) {
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    val h = (cfg.screenHeightDp * 0.44f).dp
+    Box(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .height(h)
+            .graphicsLayer {
+                val t = (scroll.value / size.height).coerceIn(0f, 1f)
+                translationY = scroll.value * 0.55f
+                scaleX = 1f - 0.10f * t
+                scaleY = 1f - 0.10f * t
+                alpha = 1f - 0.55f * t
+            }
+            .clip(RoundedCornerShape(32.dp))
+            .softClick { onOpen() }
+    ) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(R.drawable.about_cat),
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val t = (scroll.value / size.height).coerceIn(0f, 1f)
+                    val r = 28f * t
+                    renderEffect = if (android.os.Build.VERSION.SDK_INT >= 31 && r > 0.5f)
+                        androidx.compose.ui.graphics.BlurEffect(r, r, androidx.compose.ui.graphics.TileMode.Clamp) else null
+                }
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    0.40f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = 0.80f)
+                )
+            )
+        )
+        Column(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AppLogo(72.dp)
+            Spacer(Modifier.height(12.dp))
+            Text("PrismWave", color = Color.White, fontFamily = RetroBlendy, fontSize = 38.sp, letterSpacing = 0.6.sp)
+            Text("made by flagsnerd", color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp)
+            Spacer(Modifier.height(6.dp))
+            Text("Version 1.5  |  About and updates", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        }
+    }
+}
+
 // ------------------------------------------------------------ the screen (Material 3 large top bar)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -631,16 +686,16 @@ fun SettingsScreen(s: AppState) {
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            val mainScroll = rememberScrollState()
             Column(
                 Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(mainScroll)
                     .padding(bottom = 220.dp)
             ) {
                 if (pg == null) {
-                    PfProfileHeader(s) { page = "account" }
-                    PfAboutBanner(acc) { page = "about" }
+                    PfHero(mainScroll) { page = "about" }
                     PfMainGroup(
                         listOf(
                             PfItem("account", "Account", "Sign in and manage account sync", Icons.Rounded.AccountCircle),
