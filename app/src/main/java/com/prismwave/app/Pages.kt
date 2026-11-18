@@ -147,6 +147,8 @@ object Opts {
     var bassBoost by mutableStateOf(0)
     var theme by mutableStateOf(0)
     var lite by mutableStateOf(false)
+    var materialYou by mutableStateOf(true)
+    var paletteStyle by mutableStateOf(1)
 
     fun init(c: Context) {
         val p = c.getSharedPreferences("prismwave_opts", Context.MODE_PRIVATE)
@@ -176,6 +178,8 @@ object Opts {
         }
         theme = p.getInt("theme", 4)
         lite = p.getBoolean("lite", false)
+        materialYou = p.getBoolean("materialYou", true)
+        paletteStyle = p.getInt("paletteStyle", 1)
     }
 
     fun save() {
@@ -201,6 +205,8 @@ object Opts {
             ?.putInt("bassBoost", bassBoost)
             ?.putInt("theme", theme)
             ?.putBoolean("lite", lite)
+            ?.putBoolean("materialYou", materialYou)
+            ?.putInt("paletteStyle", paletteStyle)
             ?.apply()
     }
 }

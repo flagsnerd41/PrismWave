@@ -4,6 +4,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.ColorScheme
+import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamicColorScheme
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
@@ -83,8 +87,20 @@ private fun buildTypography(AppFont: FontFamily): androidx.compose.material3.Typ
     )
 }
 
-val CardBg = Color.White.copy(alpha = 0.07f)
-val CardBg2 = Color.White.copy(alpha = 0.11f)
+/** the generated Material color scheme (like ArchiveTune), null when "Material You" is off */
+object ThemeState {
+    var scheme by mutableStateOf<ColorScheme?>(null)
+    val styleNames = listOf("Tonal spot", "Vibrant", "Expressive", "Rainbow", "Fruit salad", "Monochrome", "Neutral", "Content")
+    private val styles = listOf(
+        PaletteStyle.TonalSpot, PaletteStyle.Vibrant, PaletteStyle.Expressive, PaletteStyle.Rainbow,
+        PaletteStyle.FruitSalad, PaletteStyle.Monochrome, PaletteStyle.Neutral, PaletteStyle.Content
+    )
+    fun make(seed: Color, style: Int): ColorScheme =
+        dynamicColorScheme(seed, true, false, styles[style.coerceIn(0, styles.size - 1)])
+}
+
+val CardBg: Color get() = ThemeState.scheme?.surfaceContainerHigh ?: Color.White.copy(alpha = 0.07f)
+val CardBg2: Color get() = ThemeState.scheme?.surfaceContainerHighest ?: Color.White.copy(alpha = 0.11f)
 
 val OldGold = Color(0xFFE3C96B)
 val PrismBlue = Color(0xFF8FB8FF)
@@ -97,19 +113,20 @@ private val palettes = listOf(
     Palette(Color(0xFF000000), Color(0xFF0D0D0D), Color(0xFF1A1A1A), Color(0xFFA8A8A8)), // AMOLED
     Palette(Color(0xFF0B1220), Color(0xFF141C2E), Color(0xFF1C2740), Color(0xFFA9B4CC)), // Midnight
     Palette(Color(0xFF121411), Color(0xFF1B1D19), Color(0xFF252822), Color(0xFFC3C8BA))  // ArchiveTune: calm neutral dark, only a light tint of the cover
+    ,Palette(Color(0xFF0F0720), Color(0xFF1B1038), Color(0xFF2A1A52), Color(0xFFCDBBF5))  // Vibrant: deep violet, strong cover colors
 )
 
 private fun pal(): Palette = palettes[Opts.theme.coerceIn(0, palettes.size - 1)]
 
-val Night: Color get() = pal().night
-val Surface1: Color get() = pal().s1
-val Surface2: Color get() = pal().s2
-val TextDim: Color get() = pal().dim
+val Night: Color get() = ThemeState.scheme?.surface ?: pal().night
+val Surface1: Color get() = ThemeState.scheme?.surfaceContainer ?: pal().s1
+val Surface2: Color get() = ThemeState.scheme?.surfaceContainerHigh ?: pal().s2
+val TextDim: Color get() = ThemeState.scheme?.onSurfaceVariant ?: pal().dim
 
 @Composable
 fun PrismTheme(accent: Color = PrismBlue, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = darkColorScheme(
+        colorScheme = ThemeState.scheme ?: darkColorScheme(
             primary = accent,
             onPrimary = Color.Black,
             background = Night,

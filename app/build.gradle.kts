@@ -64,5 +64,6 @@ dependencies {
     implementation("androidx.media3:media3-common:1.4.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.materialkolor:material-kolor:1.6.1")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 }

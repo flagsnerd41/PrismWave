@@ -219,11 +219,16 @@ fun Main(s: AppState) {
     }
     val cur = s.current
     val artC = if (cur != null && Opts.livingBg) rememberArtColor(cur) else s.accent
-    val strength = (if (cur != null && Opts.livingBg) 1f else 0.5f) * (if (Opts.theme == 2) 0.35f else if (Opts.theme == 4) 0.22f else 1f)
+    val seed = if (cur != null && Opts.livingBg) artC else AppColors.palette
+    val generated = if (Opts.materialYou) remember(seed, Opts.paletteStyle) { ThemeState.make(seed, Opts.paletteStyle) } else null
+    SideEffect { ThemeState.scheme = generated }
+    val strength = if (generated != null) 0f else (if (cur != null && Opts.livingBg) 1f else 0.5f) * (if (Opts.theme == 2) 0.35f else if (Opts.theme == 4) 0.22f else if (Opts.theme == 5) 1.5f else 1f)
     val tintTop by animateColorAsState(lerp(Night, artC, 0.42f * strength), tween(900), label = "tintTop")
     val tintBot by animateColorAsState(lerp(Night, artC, 0.16f * strength), tween(900), label = "tintBot")
-    LaunchedEffect(artC, AppColors.ver, AppColors.palette) {
-        if (Opts.livingBg) {
+    LaunchedEffect(artC, AppColors.ver, AppColors.palette, generated) {
+        if (generated != null) {
+            s.accent = generated.primary
+        } else if (Opts.livingBg) {
             if (cur != null) s.accent = lerp(artC, Color.White, 0.35f)
         } else {
             s.accent = AppColors.palette
