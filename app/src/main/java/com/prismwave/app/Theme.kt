@@ -96,7 +96,7 @@ object ThemeState {
         PaletteStyle.FruitSalad, PaletteStyle.Monochrome, PaletteStyle.Neutral, PaletteStyle.Content
     )
     fun make(seed: Color, style: Int): ColorScheme =
-        dynamicColorScheme(seed, true, false, styles[style.coerceIn(0, styles.size - 1)])
+        dynamicColorScheme(seedColor = seed, isDark = true, style = styles[style.coerceIn(0, styles.size - 1)])
 }
 
 val CardBg: Color get() = ThemeState.scheme?.surfaceContainerHigh ?: Color.White.copy(alpha = 0.07f)
