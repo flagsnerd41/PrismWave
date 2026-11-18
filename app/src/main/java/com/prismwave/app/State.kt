@@ -91,6 +91,7 @@ class AppState(private val ctx: Context) {
     private var pausedAt = 0L
     private var fading = false
     private var queuedId: String? = null
+    private var warmingFor: String? = null
     private var autoAdvance = false
     var radio = false
     var coverPool: List<Song> = emptyList()
@@ -532,6 +533,7 @@ class AppState(private val ctx: Context) {
         XFade.stop()
         fading = false
         queuedId = null
+        warmingFor = null
         pausedByUnplug = false
         current = song
         queue = from
@@ -834,6 +836,7 @@ class AppState(private val ctx: Context) {
         endedFor = null
         retriedId = null
         queuedId = null
+        warmingFor = null
         playCount++
         known[sg.id] = sg
         counts[sg.id] = (counts[sg.id] ?: 0) + 1
@@ -987,9 +990,29 @@ class AppState(private val ctx: Context) {
             try {
                 val url = DownloadStore.localUri(nxt) ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
                 if (!fading || current == null) return@launch
-                XFade.start(ctx, nxt.id, url, (leftSec * 1000).toLong() - 150L)
+                XFade.begin(ctx, nxt.id, url, (leftSec * 1000).toLong() - 150L)
             } catch (e: Exception) {
                 XFade.stop()
+            }
+        }
+    }
+
+    // a few seconds before the crossfade: load the next song silently on the helper player
+    private fun warmOverlap() {
+        val nid = queuedId ?: return
+        if (warmingFor == nid || XFade.preparedId == nid || XFade.active) return
+        val nxt = queue.firstOrNull { it.id == nid } ?: known[nid] ?: return
+        warmingFor = nid
+        scope.launch {
+            try {
+                val url = DownloadStore.localUri(nxt) ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
+                if (current == null || queuedId != nid) {
+                    warmingFor = null
+                    return@launch
+                }
+                XFade.prepare(ctx, nid, url)
+            } catch (e: Exception) {
+                warmingFor = null
             }
         }
     }
@@ -1048,6 +1071,12 @@ class AppState(private val ctx: Context) {
             if ((Opts.crossfade > 0 || AutoMix.smart(current?.id)) && dur > 0 && !fading && !repeat) {
                 val left = dur / 1000f - position
                 val cf = (if (AutoMix.on) AutoMix.leadFor(current?.id ?: "") else null) ?: Opts.crossfade.toFloat()
+                if (dur / 1000f > cf * 3 && left > cf && left <= cf + 8f) {
+                    warmOverlap()
+                } else if (left > cf + 10f && XFade.preparedId != null) {
+                    XFade.stop()
+                    warmingFor = null
+                }
                 if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
                     fading = true
                     AudioShape.rampGain(1f, 0f, (left * 1000).toLong() - 150)
