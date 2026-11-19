@@ -393,6 +393,7 @@ fun Main(s: AppState) {
             PagesHost(s)
             VideoWarmup(s)
             ScrobbleWatcher(s)
+            BehaviorEffects(s)
             if (s.showLogin) LoginScreen(s)
         }
     }

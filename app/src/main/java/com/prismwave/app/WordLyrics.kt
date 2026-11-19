@@ -156,19 +156,27 @@ fun WordLyricText(
         val now = clock()
         buildAnnotatedString {
             words.forEachIndexed { i, w ->
-                val len = (w.endMs - w.startMs).coerceAtLeast(80L).toFloat()
+                val len = (w.endMs - w.startMs).coerceAtLeast(120L).toFloat()
                 val f = ((now - w.startMs) / len).coerceIn(0f, 1f)
-                // glow: strong while the word is sung, fades away in a third of a second after it
-                val glow = if (now < w.startMs) 0f else if (now <= w.endMs) 1f else (1f - (now - w.endMs) / 350f).coerceIn(0f, 1f)
-                val style = if (glow > 0.01f) {
-                    SpanStyle(
-                        color = lerp(dim, Color.White, f),
-                        shadow = Shadow(Color.White.copy(alpha = 0.85f * glow), Offset.Zero, 26f * glow)
-                    )
-                } else {
-                    SpanStyle(color = lerp(dim, Color.White, f))
+                val n = w.text.length.coerceAtLeast(1)
+                val edge = 1.8f
+                val after = if (now <= w.endMs) 0f else ((now - w.endMs) / 500f).coerceIn(0f, 1f)
+                for (c in 0 until n) {
+                    // each letter fills one after the other with a soft edge, and the edge glows
+                    val cf = ((f * (n + edge) - c) / edge).coerceIn(0f, 1f)
+                    val lit = if (cf <= 0f) 0f
+                    else if (now <= w.endMs) kotlin.math.sin(Math.PI * cf).toFloat().coerceAtLeast(0.30f)
+                    else 0.30f * (1f - after)
+                    val st = if (lit > 0.02f) {
+                        SpanStyle(
+                            color = lerp(dim, Color.White, cf),
+                            shadow = Shadow(Color.White.copy(alpha = 0.9f * lit), Offset.Zero, 28f * lit)
+                        )
+                    } else {
+                        SpanStyle(color = lerp(dim, Color.White, cf))
+                    }
+                    withStyle(st) { append(w.text[c].toString()) }
                 }
-                withStyle(style) { append(w.text) }
                 if (i < words.lastIndex) append(" ")
             }
         }

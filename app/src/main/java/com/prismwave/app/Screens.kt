@@ -2311,7 +2311,11 @@ fun HomeScreen(s: AppState) {
     // 1) the Quick picks of your own YouTube Music account, 2) a hero carousel with fresh songs
     val ytList = ytQuick?.takeIf { it.size >= 4 }
     val freshList = Fresh.quick.takeIf { it.size >= 6 } ?: (if (ytList == null) (picks ?: quick) else null)
-    val heroList = if (ytList != null) (ytList.take(8) + (freshList ?: emptyList())).distinctBy { it.id }.take(14) else freshList
+    val heroList = if (ytList != null) {
+        // fresh songs first, then a different handful of your YouTube Music picks each time
+        (freshList.orEmpty().take(8) + ytList.shuffled(java.util.Random(Fresh.stamp)).take(6) + freshList.orEmpty())
+            .distinctBy { it.id }.take(14)
+    } else freshList
     val bestQuick = heroList ?: ytList
     val community = (chill + workout).distinctBy { it.id }.take(20)
     val jump = history.distinctBy { it.id }.take(4).ifEmpty { (bestQuick ?: emptyList()).take(4) }

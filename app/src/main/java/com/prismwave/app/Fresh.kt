@@ -41,6 +41,8 @@ object Fresh {
     val shelves = mutableStateListOf<YtShelf>()
     var quick by mutableStateOf<List<Song>>(emptyList())
     var busy by mutableStateOf(false)
+    var stamp by mutableStateOf(0L)
+    private var lastAt = 0L
 
     private var prefs: SharedPreferences? = null
     private val seen = LinkedHashMap<String, Long>()
@@ -83,6 +85,7 @@ object Fresh {
             }
             p.edit()
                 .putInt("day", day)
+                .putLong("ts", System.currentTimeMillis())
                 .putInt("v", 2)
                 .putString("quick", JSONArray(quick.map { songJson(it) }).toString())
                 .putString("shelves", sh.toString())
@@ -94,7 +97,8 @@ object Fresh {
 
     private fun loadCache(day: Int): Boolean {
         val p = prefs ?: return false
-        if (p.getInt("day", 0) != day || p.getInt("v", 0) != 2) return false
+        val ts = p.getLong("ts", 0L)
+        if (System.currentTimeMillis() - ts > 10L * 60L * 1000L || p.getInt("v", 0) != 2) return false
         return try {
             val q = JSONArray(p.getString("quick", "[]") ?: "[]")
             val sh = JSONArray(p.getString("shelves", "[]") ?: "[]")
@@ -108,6 +112,8 @@ object Fresh {
             quick = qs
             shelves.clear()
             shelves.addAll(ss)
+            lastAt = ts
+            stamp = ts
             true
         } catch (e: Exception) {
             false
@@ -118,7 +124,7 @@ object Fresh {
         init(ctx)
         if (busy) return
         val day = dayKey()
-        if (!force && quick.isNotEmpty()) return
+        if (!force && quick.isNotEmpty() && System.currentTimeMillis() - lastAt < 10L * 60L * 1000L) return
         if (!force && loadCache(day)) return
         busy = true
         scope.launch {
@@ -128,6 +134,8 @@ object Fresh {
                     quick = built.first
                     shelves.clear()
                     shelves.addAll(built.second)
+                    lastAt = System.currentTimeMillis()
+                    stamp = lastAt
                     save(day)
                 }
             } catch (e: Exception) {
@@ -137,13 +145,13 @@ object Fresh {
     }
 
     private suspend fun build(s: AppState, force: Boolean): Pair<List<Song>, List<YtShelf>> {
-        val rng = if (force) Random(System.nanoTime()) else Random(dayKey().toLong() * 7919L)
+        val rng = Random(System.nanoTime())
         val now = System.currentTimeMillis()
         val knownIds = HashSet<String>()
         s.history.forEach { knownIds.add(key(it)) }
         s.liked.forEach { knownIds.add(key(it)) }
         s.topPlayed().forEach { knownIds.add(key(it)) }
-        val recentSeen = seen.filter { now - it.value < 14L * 24 * 3600 * 1000 }.keys
+        val recentSeen = seen.filter { now - it.value < 6L * 3600 * 1000 }.keys
         fun fresh(list: List<Song>): List<Song> =
             list.filter { key(it) !in knownIds && key(it) !in recentSeen }.distinctBy { key(it) }
 
@@ -255,6 +263,16 @@ fun FreshEffect(s: AppState) {
     val ctx = LocalContext.current
     LaunchedEffect(s.signedIn, Opts.offline, s.history.size > 0) {
         if (!Opts.offline) Fresh.refresh(ctx, s)
+    }
+    // a new set of picks every 10 minutes, so the Home never shows the same songs for days
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(10L * 60L * 1000L)
+            if (BehaviorPrefs.autoRefresh && !Opts.offline) {
+                Fresh.refresh(ctx, s, true)
+                s.reloadYtHome()
+            }
+        }
     }
 }
 

@@ -57,7 +57,12 @@ object SeekPrefs {
     fun init(ctx: Context) {
         if (loaded) return
         loaded = true
-        style = ctx.getSharedPreferences("prismwave", 0).getInt("seekStyle", 0)
+        val sp = ctx.getSharedPreferences("prismwave", 0)
+        // everyone moves once to the Material 3 progress bar, after that the choice is theirs
+        if (!sp.getBoolean("seekM3", false)) {
+            sp.edit().putInt("seekStyle", 1).putBoolean("seekM3", true).apply()
+        }
+        style = sp.getInt("seekStyle", 1)
     }
 
     fun set(ctx: Context, v: Int) {

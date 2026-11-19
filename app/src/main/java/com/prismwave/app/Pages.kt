@@ -176,7 +176,11 @@ object Opts {
         if (!p.getBoolean("themeAt", false)) {
             p.edit().putInt("theme", 4).putBoolean("themeAt", true).apply()
         }
-        theme = p.getInt("theme", 4)
+        // everyone moves once to the Vibrant theme, after that the choice is theirs
+        if (!p.getBoolean("themeVibrant", false)) {
+            p.edit().putInt("theme", 5).putBoolean("themeVibrant", true).apply()
+        }
+        theme = p.getInt("theme", 5)
         lite = p.getBoolean("lite", false)
         materialYou = p.getBoolean("materialYou", true)
         paletteStyle = p.getInt("paletteStyle", 1)

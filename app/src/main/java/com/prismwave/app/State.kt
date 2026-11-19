@@ -541,6 +541,11 @@ class AppState(private val ctx: Context) {
     fun topPlayed(): List<Song> =
         counts.entries.sortedByDescending { it.value }.take(50).mapNotNull { known[it.key] }
 
+    fun reloadYtHome() {
+        ytHomeLoaded = false
+        loadYtHome()
+    }
+
     // the real YouTube Music Home of the signed-in account
     fun loadYtHome() {
         if (!signedIn || ytHomeLoaded) return

@@ -1406,6 +1406,8 @@ private fun PfContentPage(s: AppState) {
 @Composable
 private fun PfBehaviorPage(s: AppState) {
     val a = s.accent
+    val bctx = LocalContext.current
+    remember { BehaviorPrefs.init(bctx); 0 }
     PfIntro("How PrismWave feels and how much power it uses.")
     PfLabel("Power", a)
     PfGroup {
@@ -1431,6 +1433,37 @@ private fun PfBehaviorPage(s: AppState) {
         PfSwitch(Icons.Rounded.TouchApp, "Bounce on tap", "Buttons squish when pressed", Opts.bounce, a) {
             Opts.bounce = it
             Opts.save()
+        }
+        PfSwitch(Icons.Rounded.TouchApp, "Buzz on new song", "A small vibration when the next song starts", BehaviorPrefs.buzz, a) {
+            BehaviorPrefs.buzz = it
+            BehaviorPrefs.save(bctx)
+        }
+    }
+    PfLabel("While listening", a)
+    PfGroup {
+        PfSwitch(Icons.Rounded.Speed, "Keep screen on", "The screen stays awake while a song plays", BehaviorPrefs.keepAwake, a) {
+            BehaviorPrefs.keepAwake = it
+            BehaviorPrefs.save(bctx)
+        }
+        PfSwitch(Icons.Rounded.TouchApp, "Shake to skip", "Shake your phone to go to the next song while PrismWave is open", BehaviorPrefs.shake, a) {
+            BehaviorPrefs.shake = it
+            BehaviorPrefs.save(bctx)
+        }
+        if (BehaviorPrefs.shake) {
+            PfChoice(
+                Icons.Rounded.TouchApp, "Shake strength", listOf("Gentle", "Normal", "Hard"), BehaviorPrefs.shakeLevel, a,
+                "How hard you need to shake"
+            ) {
+                BehaviorPrefs.shakeLevel = it
+                BehaviorPrefs.save(bctx)
+            }
+        }
+    }
+    PfLabel("Home", a)
+    PfGroup {
+        PfSwitch(Icons.Rounded.Sync, "Refresh Home every 10 minutes", "New picks without tapping Refresh", BehaviorPrefs.autoRefresh, a) {
+            BehaviorPrefs.autoRefresh = it
+            BehaviorPrefs.save(bctx)
         }
     }
 }
@@ -1681,11 +1714,50 @@ private fun PfAboutPage(s: AppState) {
         ) { uscope.launch { Updater.checkNow(uctx) } }
         PfNote("Private build, made from scratch. Build " + build)
     }
+    PfLabel("Your account", a)
+    PfGroup {
+        PfInfo(Icons.Rounded.AccountCircle, "Account", if (s.signedIn) (ProfilePic.name ?: "YouTube Music") else "Not signed in", a)
+        PfInfo(Icons.Rounded.PlayArrow, "Songs played", s.playCount.toString(), a)
+        PfInfo(
+            Icons.Rounded.Speed, "Listening time",
+            (s.listenSeconds / 3600).toString() + " h " + ((s.listenSeconds / 60) % 60).toString() + " min", a
+        )
+        PfInfo(Icons.Rounded.MusicNote, "Liked songs", s.liked.size.toString(), a)
+        PfInfo(Icons.Rounded.Folder, "Playlists", s.playlists.size.toString(), a)
+    }
+    PfLabel("Community", a)
+    PfGroup {
+        PfAction(Icons.Rounded.AutoAwesome, "Join Telegram", "Updates, help and new builds", a) {
+            try {
+                uctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/+1A-2I7QrBFIzMTU0")))
+            } catch (e: Exception) {
+            }
+        }
+        PfAction(Icons.Rounded.Info, "Report a problem", "Tell us in the Telegram group", a) {
+            try {
+                uctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/+1A-2I7QrBFIzMTU0")))
+            } catch (e: Exception) {
+            }
+        }
+    }
+    PfLabel("Credits", a)
+    PfGroup {
+        PfInfo(Icons.Rounded.Info, "Made by", "flagsnerd", a)
+        PfInfo(Icons.Rounded.MusicNote, "Songs and search", "NewPipeExtractor", a)
+        PfInfo(Icons.Rounded.Palette, "Design", "Material 3 + ArchiveTune style", a)
+    }
 }
 
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added letter by letter lyrics glow, new defaults, auto refresh and more behavior", a, listOf(
+        "Lyrics: every letter fills when it is sung, with a soft moving glow",
+        "Material 3 progress bar and the Vibrant theme are the new defaults",
+        "Home picks refresh by themselves every 10 minutes (Behavior, Home)",
+        "Behavior: keep screen on, shake to skip, buzz on new song",
+        "About: your account numbers, Join Telegram and credits"
+    ))
     PfChange("Added new Settings, Listening Stats ranges, header menu and morphing icons", a, listOf(
         "Settings: profile card with Manage account, Essentials tiles with morphing shape icons, Player and Content list",
         "Listening Stats: time ranges (1 week to All time), total time, plays, unique songs and artists, top songs and artists",
