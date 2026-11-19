@@ -96,6 +96,9 @@ class AppState(private val ctx: Context) {
     var radio = false
     var coverPool: List<Song> = emptyList()
     private var warmedFor: String? = null
+    // listening time per day (yyyyMMdd to seconds) and every play with its time, for the stats ranges
+    val dayLog = HashMap<String, Int>()
+    private val playLog = ArrayList<Pair<Long, String>>()
 
     var screen by mutableStateOf(Screen.Home)
     var current by mutableStateOf<Song?>(null)
@@ -157,6 +160,7 @@ class AppState(private val ctx: Context) {
             obj.keys().forEach { counts[it] = obj.getInt(it) }
         } catch (e: Exception) {
         }
+        loadStats()
         connect()
         watchHeadphones()
         if (signedIn && AccountPrefs.autoSync && System.currentTimeMillis() - prefs.getLong("lastImport", 0L) > 6L * 3600 * 1000) {
@@ -230,6 +234,8 @@ class AppState(private val ctx: Context) {
             val countsSnap = HashMap(counts)
             val pc = playCount
             val ls = listenSeconds
+            val dl = dayLogJson()
+            val pl = playLogJson()
             withContext(Dispatchers.Default) {
                 prefs.edit()
                     .putString("liked", JSONArray(likedSnap.map { it.toJson() }).toString())
@@ -238,6 +244,8 @@ class AppState(private val ctx: Context) {
                     .putString("counts", JSONObject(countsSnap as Map<*, *>).toString())
                     .putInt("playCount", pc)
                     .putInt("listenSeconds", ls)
+                    .putString("dayLog", dl)
+                    .putString("playLog", pl)
                     .apply()
             }
         }
@@ -467,6 +475,62 @@ class AppState(private val ctx: Context) {
         replaceQueue(queue.filter { it.id != song.id } + song)
     }
 
+    // ---------- listening stats ----------
+    private fun dayKey(ms: Long): String =
+        java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(ms))
+
+    private fun loadStats() {
+        try {
+            val o = JSONObject(prefs.getString("dayLog", "{}") ?: "{}")
+            o.keys().forEach { dayLog[it] = o.getInt(it) }
+        } catch (e: Exception) {
+        }
+        try {
+            val a = JSONArray(prefs.getString("playLog", "[]") ?: "[]")
+            for (i in 0 until a.length()) {
+                val r = a.getJSONArray(i)
+                playLog.add(Pair(r.getLong(0), r.getString(1)))
+            }
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun dayLogJson(): String {
+        val cut = dayKey(System.currentTimeMillis() - 400L * 86400000L)
+        dayLog.keys.removeAll { it < cut }
+        return JSONObject(HashMap(dayLog) as Map<*, *>).toString()
+    }
+
+    private fun playLogJson(): String {
+        val a = JSONArray()
+        for (p in playLog) a.put(JSONArray().put(p.first).put(p.second))
+        return a.toString()
+    }
+
+    private fun logPlay(id: String) {
+        playLog.add(Pair(System.currentTimeMillis(), id))
+        while (playLog.size > 3000) playLog.removeAt(0)
+    }
+
+    // days = 0 means all time
+    fun statSeconds(days: Int): Int {
+        if (days == 0) return listenSeconds
+        var sum = 0
+        val now = System.currentTimeMillis()
+        for (i in 0 until days) sum += dayLog[dayKey(now - i * 86400000L)] ?: 0
+        return sum
+    }
+
+    fun statCounts(days: Int): Map<String, Int> {
+        if (days == 0) return HashMap(counts)
+        val cut = System.currentTimeMillis() - days * 86400000L
+        val m = HashMap<String, Int>()
+        for (p in playLog) if (p.first >= cut) m[p.second] = (m[p.second] ?: 0) + 1
+        return m
+    }
+
+    fun songOf(id: String): Song? = known[id]
+
     fun topArtists(): List<Pair<String, Int>> =
         counts.entries.mapNotNull { e -> known[e.key]?.let { it.artist to e.value } }
             .groupBy({ it.first }, { it.second })
@@ -547,6 +611,7 @@ class AppState(private val ctx: Context) {
         playCount++
         known[song.id] = song
         counts[song.id] = (counts[song.id] ?: 0) + 1
+        logPlay(song.id)
         history.removeAll { it.id == song.id }
         history.add(0, song)
         while (history.size > 30) history.removeAt(history.size - 1)
@@ -840,6 +905,7 @@ class AppState(private val ctx: Context) {
         playCount++
         known[sg.id] = sg
         counts[sg.id] = (counts[sg.id] ?: 0) + 1
+        logPlay(sg.id)
         history.removeAll { it.id == sg.id }
         history.add(0, sg)
         while (history.size > 30) history.removeAt(history.size - 1)
@@ -1092,6 +1158,8 @@ class AppState(private val ctx: Context) {
                 }
             }
             listenSeconds++
+            val dk = dayKey(System.currentTimeMillis())
+            dayLog[dk] = (dayLog[dk] ?: 0) + 1
             ticks++
             if (ticks % 30 == 0) saveAll()
         }

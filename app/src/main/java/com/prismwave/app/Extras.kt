@@ -81,7 +81,7 @@ object SettingsNav {
 
 // the "What's new" button in the Home header, with a dot until it is opened
 object WhatsNew {
-    const val ID = "fixed-player-cover-flight"
+    const val ID = "added-settings-stats-header"
     private var p: SharedPreferences? = null
     var seen by mutableStateOf(true)
 

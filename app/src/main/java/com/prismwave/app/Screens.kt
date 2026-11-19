@@ -166,7 +166,7 @@ fun Header(s: AppState) {
             Modifier
                 .onGloballyPositioned { HeaderPos.logo = it.boundsInRoot() }
                 .graphicsLayer { alpha = hdrA }
-        ) { AppLogo(42.dp) }
+        ) { MorphBadge(50.dp, s.accent.copy(alpha = 0.40f)) { AppLogo(34.dp) } }
         Spacer(Modifier.width(12.dp))
         Text(
             "PrismWave",
@@ -183,17 +183,7 @@ fun Header(s: AppState) {
                 .onGloballyPositioned { HeaderPos.title = it.boundsInRoot() }
                 .graphicsLayer { alpha = hdrA }
         )
-        RoundBtn(Icons.Rounded.History, 0.9f, {
-            s.openPlaylist = null
-            s.libraryOpen = "History"
-            s.screen = Screen.Library
-        }, 46.dp)
-        Spacer(Modifier.width(8.dp))
-        RoundBtn(Icons.Rounded.BarChart, 0.9f, { stats = true }, 46.dp)
-        Spacer(Modifier.width(8.dp))
-        WhatsNewButton(s)
-        Spacer(Modifier.width(8.dp))
-        RoundBtn(Icons.Rounded.Settings, 0.9f, { s.screen = Screen.Settings }, 46.dp)
+        HeaderMenuButton(s)
     }
     if (stats) {
         LaunchedEffect(Unit) {
