@@ -380,10 +380,8 @@ fun Main(s: AppState) {
                             .graphicsLayer {
                                 val p = morph
                                 if (!(flight && s.showPlayer)) {
-                                    val sc = 0.30f + 0.70f * p
-                                    scaleX = sc
-                                    scaleY = sc
-                                    transformOrigin = TransformOrigin(0.5f, 1f - (112.dp.toPx() + 36.dp.toPx()) / size.height)
+                                    // the player keeps its real layout the whole time (no shrinking), the growing
+                                    // rounded shape only reveals it, so nothing jumps when the animation ends
                                     alpha = (p * 2.2f).coerceIn(0f, 1f)
                                 }
                             }
