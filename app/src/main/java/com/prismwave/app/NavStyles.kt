@@ -70,7 +70,10 @@ object NavPrefs {
     fun init(ctx: Context) {
         if (loaded) return
         loaded = true
-        style = ctx.getSharedPreferences("prismwave", 0).getInt("navStyle", 0)
+        val p = ctx.getSharedPreferences("prismwave", 0)
+        // Apple Music bar becomes the choice once, you can still change it in Settings
+        if (!p.getBoolean("navAppleSet", false)) p.edit().putInt("navStyle", 2).putBoolean("navAppleSet", true).apply()
+        style = p.getInt("navStyle", 2)
     }
 
     fun set(ctx: Context, v: Int) {
@@ -215,7 +218,7 @@ fun AppleNavBar(s: AppState) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(if (sel) t.filled else t.outlined, contentDescription = null, tint = fg, modifier = Modifier.size(25.dp))
+                            LiveNavIcon(tabs.indexOf(t), sel, fg)
                             Text(t.label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }
                     }
