@@ -159,20 +159,20 @@ fun Header(s: AppState) {
     var titleFs by remember { mutableStateOf(26f) }
     val hdrA by animateFloatAsState(if (HeaderPos.hide) 0f else 1f, tween(250), label = "hdr")
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             Modifier
                 .onGloballyPositioned { HeaderPos.logo = it.boundsInRoot() }
                 .graphicsLayer { alpha = hdrA }
-        ) { MorphBadge(50.dp, s.accent.copy(alpha = 0.40f)) { AppLogo(34.dp) } }
-        Spacer(Modifier.width(12.dp))
+        ) { MorphBadge(58.dp, s.accent.copy(alpha = 0.40f)) { AppLogo(40.dp) } }
+        Spacer(Modifier.width(14.dp))
         Text(
             "PrismWave",
             color = Color.White,
             fontFamily = PrismFont,
-            fontSize = 24.sp,
+            fontSize = 31.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.4.sp,
             maxLines = 1,
@@ -1958,7 +1958,7 @@ private fun HomeSection(title: String, onClick: (() -> Unit)? = null) {
             Modifier.clip(RoundedCornerShape(12.dp)).clickable(enabled = onClick != null) { onClick?.invoke() },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(title, color = Color.White, fontFamily = PrismFont, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = Color.White, fontFamily = PrismFont, fontSize = 31.sp, fontWeight = FontWeight.Bold)
             if (onClick != null) {
                 Icon(
                     Icons.Rounded.KeyboardArrowRight,
@@ -2328,6 +2328,7 @@ fun HomeScreen(s: AppState) {
             )
         ) {
             item { Spacer(Modifier.height(PinnedHeaderHeight)) }
+            item { HomeHello(s) }
             if (heroList != null || ytList == null) {
                 item {
                     HomeSection(
@@ -2439,6 +2440,41 @@ object HeaderPos {
     var logo by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
     var title by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
     var hide by mutableStateOf(false)
+}
+
+// the greeting under the header
+@Composable
+private fun HomeHello(s: AppState) {
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val hello = when {
+        hour < 5 -> "Late night vibes"
+        hour < 12 -> "Good morning"
+        hour < 18 -> "Good afternoon"
+        else -> "Good evening"
+    }
+    val emoji = when {
+        hour < 5 -> "\uD83C\uDF19"
+        hour < 12 -> "\u2600\uFE0F"
+        hour < 18 -> "\uD83C\uDF24\uFE0F"
+        else -> "\uD83C\uDF06"
+    }
+    val first = ProfilePic.name?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }
+    Column(Modifier.padding(horizontal = 20.dp).padding(top = 6.dp, bottom = 2.dp)) {
+        Text(
+            if (first != null) "$hello, $first $emoji" else "$hello $emoji",
+            color = Color.White,
+            fontFamily = PrismFont,
+            fontSize = 34.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.appear(0)
+        )
+        Text(
+            if (s.history.isNotEmpty()) "Jump back in" else "What are we listening to?",
+            color = TextDim,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(top = 2.dp).appear(1)
+        )
+    }
 }
 
 // ------------------------------------------------------------ fresh home greeting

@@ -90,8 +90,8 @@ import androidx.compose.ui.unit.sp
 
 // ------------------------------------------------------------ pinned header with a fading blur
 
-// height of the Home / Search / Library header row (14 dp padding, 46 dp buttons, 14 dp padding)
-val PinnedHeaderHeight = 74.dp
+// height of the Home / Search / Library header row (12 dp padding, 58 dp badge, 12 dp padding)
+val PinnedHeaderHeight = 82.dp
 
 // the header stays on top while Home, Search and the Library main page scroll under it
 fun headerShown(s: AppState): Boolean =

@@ -130,7 +130,7 @@ fun HeaderMenuButton(s: AppState) {
     val accent = s.accent
     val menuBg = androidx.compose.ui.graphics.lerp(Night, accent, 0.14f)
     Box {
-        RoundBtn(Icons.Rounded.MoreHoriz, 0.9f, { open = true }, 46.dp)
+        RoundBtn(Icons.Rounded.MoreHoriz, 0.9f, { open = true }, 54.dp)
         if (!WhatsNew.seen) {
             Box(
                 Modifier
