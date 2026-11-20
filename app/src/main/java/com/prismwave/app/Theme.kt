@@ -16,10 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 val DefaultFont = FontFamily(
-    Font(R.font.inter, FontWeight.Normal, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(400))),
-    Font(R.font.inter, FontWeight.Medium, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(500))),
-    Font(R.font.inter, FontWeight.SemiBold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(600))),
-    Font(R.font.inter, FontWeight.Bold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(700)))
+    Font(R.font.fraunces, FontWeight.Normal, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(400), androidx.compose.ui.text.font.FontVariation.Setting("opsz", 28f), androidx.compose.ui.text.font.FontVariation.Setting("SOFT", 40f), androidx.compose.ui.text.font.FontVariation.Setting("WONK", 0f))),
+    Font(R.font.fraunces, FontWeight.Medium, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(500), androidx.compose.ui.text.font.FontVariation.Setting("opsz", 28f), androidx.compose.ui.text.font.FontVariation.Setting("SOFT", 40f), androidx.compose.ui.text.font.FontVariation.Setting("WONK", 0f))),
+    Font(R.font.fraunces, FontWeight.SemiBold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(600), androidx.compose.ui.text.font.FontVariation.Setting("opsz", 28f), androidx.compose.ui.text.font.FontVariation.Setting("SOFT", 40f), androidx.compose.ui.text.font.FontVariation.Setting("WONK", 0f))),
+    Font(R.font.fraunces, FontWeight.Bold, variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(700), androidx.compose.ui.text.font.FontVariation.Setting("opsz", 28f), androidx.compose.ui.text.font.FontVariation.Setting("SOFT", 40f), androidx.compose.ui.text.font.FontVariation.Setting("WONK", 0f)))
 )
 val AppFont: FontFamily get() = CustomFont.family ?: DefaultFont
 val PrismFont: FontFamily get() = AppFont
