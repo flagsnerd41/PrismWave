@@ -191,8 +191,11 @@ class AppState(private val ctx: Context) {
                     }
 
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) return
-                        val sg = mediaItem?.mediaId?.let { known[it] } ?: return
+                        if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                            syncFromPlayer()
+                            return
+                        }
+                        val sg = mediaItem?.mediaId?.let { id -> known[id] ?: queue.firstOrNull { q -> q.id == id } } ?: return
                         if (sg.id == current?.id) return
                         onAutoAdvance(sg)
                     }
@@ -612,6 +615,7 @@ class AppState(private val ctx: Context) {
         playing = true
         status = "Loading..."
         loading = true
+        switchCount++
         endedFor = null
         playCount++
         known[song.id] = song
@@ -660,7 +664,26 @@ class AppState(private val ctx: Context) {
                 status = "Can't play this one: " + (e.message ?: "error").take(50)
                 loading = false
                 skipBroken()
+            } finally {
+                if (switchCount > 0) switchCount--
             }
+        }
+    }
+
+    // songs being switched by play() right now: the player still holds the old song for a moment, so do not sync
+    private var switchCount = 0
+
+    // The UI always follows the song that is really playing (also after the app was in the background).
+    fun syncFromPlayer() {
+        val c = controller ?: return
+        if (switchCount > 0) return
+        val id = c.currentMediaItem?.mediaId ?: return
+        if (id != current?.id) {
+            val sg = known[id] ?: queue.firstOrNull { it.id == id } ?: return
+            onAutoAdvance(sg)
+        }
+        if (fadeJob?.isActive != true && c.playbackState != Player.STATE_IDLE && playing != c.playWhenReady) {
+            playing = c.playWhenReady
         }
     }
 
@@ -907,6 +930,8 @@ class AppState(private val ctx: Context) {
         retriedId = null
         queuedId = null
         warmingFor = null
+        // a helper player may only continue if it plays exactly this song, otherwise two songs play at once
+        if ((XFade.active && XFade.songId != sg.id) || (!XFade.active && XFade.preparedId != null)) XFade.stop()
         playCount++
         known[sg.id] = sg
         counts[sg.id] = (counts[sg.id] ?: 0) + 1
@@ -954,6 +979,7 @@ class AppState(private val ctx: Context) {
             return
         }
         if (repeat) {
+            XFade.stop()
             endedFor = null
             fading = false
             fadeJob?.cancel()
@@ -1054,13 +1080,24 @@ class AppState(private val ctx: Context) {
     }
 
     // the next song starts on a second player while the end of this one fades out, so they really overlap
+    // the id of the song the main player will really play next
+    private fun playerNextId(): String? {
+        val c = controller ?: return null
+        val i = c.currentMediaItemIndex
+        return if (i >= 0 && i + 1 < c.mediaItemCount) c.getMediaItemAt(i + 1).mediaId else null
+    }
+
     private fun startOverlap(leftSec: Float) {
-        val nid = queuedId ?: return
+        val nid = playerNextId() ?: return
         val nxt = queue.firstOrNull { it.id == nid } ?: known[nid] ?: return
         scope.launch {
             try {
                 val url = DownloadStore.localUri(nxt) ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
                 if (!fading || current == null) return@launch
+                if (playerNextId() != nid) {
+                    XFade.stop()
+                    return@launch
+                }
                 XFade.begin(ctx, nxt.id, url, (leftSec * 1000).toLong() - 150L)
             } catch (e: Exception) {
                 XFade.stop()
@@ -1070,14 +1107,14 @@ class AppState(private val ctx: Context) {
 
     // a few seconds before the crossfade: load the next song silently on the helper player
     private fun warmOverlap() {
-        val nid = queuedId ?: return
+        val nid = playerNextId() ?: return
         if (warmingFor == nid || XFade.preparedId == nid || XFade.active) return
         val nxt = queue.firstOrNull { it.id == nid } ?: known[nid] ?: return
         warmingFor = nid
         scope.launch {
             try {
                 val url = DownloadStore.localUri(nxt) ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
-                if (current == null || queuedId != nid) {
+                if (current == null || playerNextId() != nid) {
                     warmingFor = null
                     return@launch
                 }
@@ -1119,6 +1156,9 @@ class AppState(private val ctx: Context) {
 
     fun tick() {
         val c = controller
+        syncFromPlayer()
+        // never leave a helper player running when no fade is going on
+        if (XFade.active && !fading) XFade.stop()
         if (c != null && current != null && c.playbackState == Player.STATE_ENDED && c.currentMediaItem?.mediaId == current?.id) onEnded()
         if (c != null && playing && c.playbackState == Player.STATE_READY) {
             position = c.currentPosition / 1000f

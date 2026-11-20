@@ -37,6 +37,18 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -233,45 +245,98 @@ fun PlaylistScreen2(s: AppState, id: String) {
     val allDown = pl.songs.isNotEmpty() && pl.songs.all { DownloadStore.isDownloaded(it) }
     val busy = pl.songs.any { DownloadStore.progress.containsKey(it.id) }
     val statusPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val coverH = LocalConfiguration.current.screenWidthDp.dp * 1.12f + statusPad
+    val listState = rememberLazyListState()
+    val dragScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val songsNow by rememberUpdatedState(pl.songs)
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableStateOf(0f) }
+    var movedFrom by remember { mutableStateOf<List<Song>?>(null) }
+    // press and hold a song, then move your finger up or down: the song follows and the others make room
+    fun dragStep() {
+        val key = dragKey ?: return
+        if (movedFrom === songsNow) return
+        val info = listState.layoutInfo
+        val me = info.visibleItemsInfo.firstOrNull { it.key == key } ?: return
+        val center = me.offset + me.size / 2f + dragOffset
+        val other = info.visibleItemsInfo.firstOrNull { v ->
+            v.key != key && v.key is String && songsNow.any { sg -> sg.id == v.key } &&
+                center > v.offset && center < v.offset + v.size
+        }
+        if (other != null) {
+            val from = songsNow.indexOfFirst { it.id == key }
+            val to = songsNow.indexOfFirst { it.id == other.key }
+            if (from >= 0 && to >= 0 && from != to) {
+                movedFrom = songsNow
+                s.moveInPlaylist(pl.id, from, to - from)
+                dragOffset += if (to > from) -other.size.toFloat() else (me.offset - other.offset).toFloat()
+                return
+            }
+        }
+        val d = when {
+            center < info.viewportStartOffset + 170f -> -24f
+            center > info.viewportEndOffset - 330f -> 24f
+            else -> 0f
+        }
+        if (d != 0f) {
+            dragScope.launch { listState.scrollBy(d) }
+            dragOffset += d
+        }
+    }
     Box(Modifier.fillMaxSize().background(bg)) {
-        LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
-            // new look: blurred cover backdrop, big rounded cover card and the title, all sliding in
+        LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 220.dp)) {
+            // full screen cover, the lower part blurs smoothly into the page behind the title and buttons
             item {
-                Box(Modifier.fillMaxWidth()) {
+                Box(Modifier.fillMaxWidth().height(coverH)) {
                     if (first != null) {
-                        Box(Modifier.fillMaxWidth().height(430.dp).graphicsLayer { alpha = 0.55f }) {
-                            Cover(first, Modifier.fillMaxSize().blur(46.dp), 0.dp, 120.sp, quality = 600)
+                        Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1000)
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        Brush.verticalGradient(
+                                            0f to Color.Transparent,
+                                            0.40f to Color.Transparent,
+                                            0.72f to Color.Black,
+                                            1f to Color.Black
+                                        ),
+                                        blendMode = BlendMode.DstIn
+                                    )
+                                }
+                        ) {
+                            Cover(first, Modifier.fillMaxSize().blur(38.dp), 0.dp, 120.sp, quality = 600)
                         }
+                    } else {
+                        Box(Modifier.fillMaxSize().background(CardBg2))
                     }
+                    // dark top for the round buttons, soft fade into the page at the bottom
                     Box(
-                        Modifier.fillMaxWidth().height(430.dp).background(
-                            Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.30f), 0.6f to bg.copy(alpha = 0.55f), 1f to bg)
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                0f to Color.Black.copy(alpha = 0.45f),
+                                0.22f to Color.Transparent,
+                                0.50f to Color.Transparent,
+                                0.80f to bg.copy(alpha = 0.55f),
+                                1f to bg
+                            )
                         )
                     )
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = statusPad).padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PlainCircle(Icons.Rounded.ArrowBack) { s.openPlaylist = null }
+                        Spacer(Modifier.weight(1f))
+                        PlainCircle(Icons.Rounded.MoreVert) { menu = true }
+                    }
                     Column(
-                        Modifier.fillMaxWidth().padding(top = statusPad),
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            PlainCircle(Icons.Rounded.ArrowBack) { s.openPlaylist = null }
-                            Spacer(Modifier.weight(1f))
-                            PlainCircle(Icons.Rounded.MoreVert) { menu = true }
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        // the cover slides in from the left side (where the library tile was) and settles
-                        PlEnter(0, -90f, 0f, scaleFrom = 0.86f) {
-                            Box(Modifier.size(250.dp).clip(RoundedCornerShape(30.dp))) {
-                                if (first != null) {
-                                    Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1000)
-                                } else {
-                                    Box(Modifier.fillMaxSize().background(CardBg2))
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(22.dp))
                         PlEnter(90, -60f, 0f) {
                             Text(
                                 pl.name,
@@ -287,74 +352,72 @@ fun PlaylistScreen2(s: AppState, id: String) {
                         PlEnter(170, -40f, 0f) {
                             Text(
                                 pl.songs.size.toString() + " tracks  \u2022  " + fmt(pl.songs.sumOf { it.seconds }),
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = Color.White.copy(alpha = 0.75f),
                                 fontSize = 16.sp,
-                                modifier = Modifier.padding(top = 6.dp)
+                                modifier = Modifier.padding(top = 6.dp, bottom = 14.dp)
                             )
                         }
-                    }
-                }
-            }
-            // custom order, shuffle, big Play pill, download
-            item {
-              PlEnter(240, 0f, 40f) {
+                        // custom order lock, shuffle, big Play pill, download
+                        PlEnter(240, 0f, 40f) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RoundAction({ unlocked = !unlocked }) {
-                        Icon(
-                            if (unlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
-                            contentDescription = null,
-                            tint = if (unlocked) s.accent else Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    RoundAction({
-                        if (pl.songs.isNotEmpty()) {
-                            s.shuffle = true
-                            s.play(pl.songs.random(), pl.songs)
-                        }
-                    }) {
-                        Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Row(
-                        Modifier
-                            .bounceClick { if (pl.songs.isNotEmpty()) s.play(pl.songs[0], pl.songs) }
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.White)
-                            .padding(horizontal = 26.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Play", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    RoundAction({
-                        if (allDown) {
-                            Toast.makeText(ctx, "All songs are downloaded. Remove them from a song's menu.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            DownloadStore.startAll(ctx, pl.songs)
-                        }
-                    }) {
-                        when {
-                            busy -> CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
-                                strokeWidth = 2.5.dp
+                        RoundAction({ unlocked = !unlocked }) {
+                            Icon(
+                                if (unlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
+                                contentDescription = null,
+                                tint = if (unlocked) s.accent else Color.White,
+                                modifier = Modifier.size(24.dp)
                             )
-                            allDown -> Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = s.accent, modifier = Modifier.size(26.dp))
-                            else -> Icon(Icons.Rounded.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        RoundAction({
+                            if (pl.songs.isNotEmpty()) {
+                                s.shuffle = true
+                                s.play(pl.songs.random(), pl.songs)
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Row(
+                            Modifier
+                                .bounceClick { if (pl.songs.isNotEmpty()) s.play(pl.songs[0], pl.songs) }
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Color.White)
+                                .padding(horizontal = 26.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Play", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        RoundAction({
+                            if (allDown) {
+                                Toast.makeText(ctx, "All songs are downloaded. Remove them from a song's menu.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                DownloadStore.startAll(ctx, pl.songs)
+                            }
+                        }) {
+                            when {
+                                busy -> CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.5.dp
+                                )
+                                allDown -> Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = s.accent, modifier = Modifier.size(26.dp))
+                                else -> Icon(Icons.Rounded.Download, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
                         }
                     }
                 }
-              }
             }
             item { Spacer(Modifier.height(14.dp)) }
             if (pl.songs.isEmpty()) {
@@ -370,7 +433,19 @@ fun PlaylistScreen2(s: AppState, id: String) {
                 val cur = s.current?.id == song.id
                 val down = DownloadStore.isDownloaded(song)
                 var rowMenu by remember { mutableStateOf(false) }
-                Column(Modifier.animateItem().padding(horizontal = 14.dp, vertical = 3.dp)) {
+                val dragging = dragKey == song.id
+                Column(
+                    (if (dragging) {
+                        Modifier.zIndex(1f).graphicsLayer {
+                            translationY = dragOffset
+                            scaleX = 1.03f
+                            scaleY = 1.03f
+                            shadowElevation = 24f
+                        }
+                    } else {
+                        Modifier.animateItem()
+                    }).padding(horizontal = 14.dp, vertical = 3.dp)
+                ) {
                   PlEnter(300 + minOf(i, 8) * 45, -50f, 0f) {
                     Row(
                         Modifier
@@ -378,6 +453,25 @@ fun PlaylistScreen2(s: AppState, id: String) {
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (cur) s.accent.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.06f))
                             .clickable { s.play(song, pl.songs) }
+                            .pointerInput(unlocked, song.id) {
+                                if (unlocked) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            dragKey = song.id
+                                            dragOffset = 0f
+                                            movedFrom = null
+                                        },
+                                        onDragEnd = { dragKey = null; dragOffset = 0f; movedFrom = null },
+                                        onDragCancel = { dragKey = null; dragOffset = 0f; movedFrom = null },
+                                        onDrag = { change, amount ->
+                                            change.consume()
+                                            dragOffset += amount.y
+                                            dragStep()
+                                        }
+                                    )
+                                }
+                            }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -410,16 +504,10 @@ fun PlaylistScreen2(s: AppState, id: String) {
                         }
                         if (unlocked) {
                             Icon(
-                                Icons.Rounded.KeyboardArrowUp,
+                                Icons.Rounded.DragHandle,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(34.dp).clickable { s.moveInPlaylist(pl.id, i, -1) }
-                            )
-                            Icon(
-                                Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(34.dp).clickable { s.moveInPlaylist(pl.id, i, 1) }
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(30.dp)
                             )
                         } else {
                             Icon(

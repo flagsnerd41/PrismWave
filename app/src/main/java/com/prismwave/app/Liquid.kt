@@ -98,12 +98,8 @@ fun LiquidGlass(
     radius: Dp = 30.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val backdrop = LocalBackdrop.current
-    if (Build.VERSION.SDK_INT >= 33 && LiquidGlassOpt.on && backdrop != null && backdrop.enabled) {
-        LiquidGlassImpl(backdrop, modifier, radius, content)
-    } else {
-        Glass(alpha, modifier, RoundedCornerShape(radius), content)
-    }
+    // liquid glass was removed, the bars always use the normal blur
+    Glass(alpha, modifier, RoundedCornerShape(radius), content)
 }
 
 @RequiresApi(33)

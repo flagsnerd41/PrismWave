@@ -61,7 +61,15 @@ class PlaybackService : MediaSessionService() {
                 EqHolder.attach(audioSessionId)
             }
         })
-        session = MediaSession.Builder(this, PrismPlayer(player)).build()
+        val open = android.content.Intent(this, MainActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPi = android.app.PendingIntent.getActivity(
+            this, 0, open,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        session = MediaSession.Builder(this, PrismPlayer(player)).setSessionActivity(openPi).build()
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider(this).apply { setSmallIcon(R.drawable.ic_notif_p) }
         )

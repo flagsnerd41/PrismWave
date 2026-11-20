@@ -80,6 +80,8 @@ object DiscordRpc {
     private var lastSong: Song? = null
     private var lastPos = 0f
     private var lastPlaying = false
+    private var lastStart = 0L
+    @Volatile private var acked = true
     private val assetCache = HashMap<String, String>()
 
     fun hasToken(): Boolean = token.isNotEmpty()
@@ -107,6 +109,26 @@ object DiscordRpc {
                 } else {
                     connect()
                     push()
+                    // Discord limits how often the status may change, so quick skips are merged
+                    delay(700)
+                }
+            }
+        }
+        // every 15 seconds: reconnect if the connection died, and fix the time bar after a seek
+        scope.launch {
+            while (isActive) {
+                delay(15000)
+                if (!enabled || token.isEmpty()) continue
+                if (ws == null && !authFailed) {
+                    connect()
+                    continue
+                }
+                val sg = lastSong
+                if (ready && lastPlaying && sg != null) {
+                    val p = s.position
+                    lastPos = p
+                    val st = System.currentTimeMillis() - (p * 1000).toLong()
+                    if (kotlin.math.abs(st - lastStart) > 4000L) push()
                 }
             }
         }
@@ -154,6 +176,7 @@ object DiscordRpc {
         status = "Connecting..."
         ready = false
         seq = -1
+        acked = true
         val req = Request.Builder().url("wss://gateway.discord.gg/?v=10&encoding=json").build()
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -167,6 +190,8 @@ object DiscordRpc {
                             identify(webSocket)
                         }
                         1 -> webSocket.send(heartbeatJson())
+                        11 -> acked = true
+                        7 -> webSocket.close(4000, "reconnect")
                         9 -> {
                             status = "Discord refused the login. Sign in again"
                             webSocket.close(1000, null)
@@ -218,6 +243,12 @@ object DiscordRpc {
         beat = scope.launch {
             delay((interval * Math.random()).toLong())
             while (isActive) {
+                // no answer to the last heartbeat: the connection is dead (for example after a network change)
+                if (!acked) {
+                    webSocket.cancel()
+                    break
+                }
+                acked = false
                 webSocket.send(heartbeatJson())
                 delay(interval)
             }
@@ -261,6 +292,7 @@ object DiscordRpc {
 
     private fun buildActivity(sg: Song): JSONObject {
         val start = System.currentTimeMillis() - (lastPos * 1000).toLong()
+        lastStart = start
         val a = JSONObject()
             .put("name", "PrismWave").put("type", 2)
             .put("details", sg.title).put("state", sg.artist)

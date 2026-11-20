@@ -93,6 +93,13 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    private var appState: AppState? = null
+
+    override fun onResume() {
+        super.onResume()
+        appState?.syncFromPlayer()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -107,6 +114,7 @@ class MainActivity : ComponentActivity() {
             val appCtx = LocalContext.current.applicationContext
             remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
             val s = remember { AppState(appCtx) }
+            appState = s
             PrismTheme(s.accent) {
                 var splashDone by remember { mutableStateOf(true) }
                 val blur = remember { Animatable(0f) }
