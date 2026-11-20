@@ -145,7 +145,8 @@ fun CoverFlight(s: AppState) {
             tTo = pt
             tSize1 = PlayerTitle.sizeSp
             from = start
-            to = sr ?: Rect(0f, 0f, wPx, minOf(wPx * 1.10f, hPx * 0.60f))
+            // the Immersive cover fills the whole screen, so the flying cover lands on exactly that (same crop, nothing re-crops at the end)
+            to = sr ?: Rect(0f, 0f, wPx, hPx)
             wide = sr == null
             closing = false
             rad0 = if (tap != null) TapCover.radius else 12f
@@ -198,6 +199,8 @@ fun CoverFlight(s: AppState) {
                     }
                     .graphicsLayer {
                         val v = p.value
+                        // the last part fades out over the real player, so the header and artist are already there
+                        alpha = if (closing) 1f else (1f - (v - 0.6f) / 0.4f).coerceIn(0f, 1f)
                         shape = RoundedCornerShape((rad0 + (rad1 - rad0) * v).coerceAtLeast(0f).dp)
                         clip = true
                         compositingStrategy = if (wide) CompositingStrategy.Offscreen else CompositingStrategy.Auto

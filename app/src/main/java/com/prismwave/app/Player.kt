@@ -759,7 +759,7 @@ private fun TitleRow(
                 fontSize = artistSize,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.graphicsLayer { alpha = if (FlightState.running) 0f else 1f }.basicMarquee()
+                modifier = Modifier.basicMarquee()
             )
         }
         val liked = s.isLiked(song)
