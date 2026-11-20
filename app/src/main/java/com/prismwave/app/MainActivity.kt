@@ -268,7 +268,7 @@ fun Main(s: AppState) {
                     }
                     .drawBehind { drawRect(Brush.verticalGradient(listOf(tintTop, tintBot))) }
             ) {
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().nestedScroll(HeaderScroll.connection)) {
                     AnimatedContent(
                         targetState = s.screen,
                         transitionSpec = {

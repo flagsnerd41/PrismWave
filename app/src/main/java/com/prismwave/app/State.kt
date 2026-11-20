@@ -1093,22 +1093,23 @@ class AppState(private val ctx: Context) {
         scope.launch {
             try {
                 val c = controller ?: return@launch
-                c.seekTo(XFade.position() + 150L)
-                var w = 0
-                while (w < 20 && c.playbackState != Player.STATE_READY) {
+                // line the main player up with the helper player while it is still silent, retry until both are in sync
+                var tries = 0
+                while (tries < 4) {
+                    c.seekTo(XFade.position() + 120L)
+                    var w = 0
+                    while (w < 25 && c.playbackState != Player.STATE_READY) {
+                        delay(30)
+                        w++
+                    }
                     delay(40)
-                    w++
+                    val off = XFade.position() - c.currentPosition
+                    if (kotlin.math.abs(off) <= 45L) break
+                    tries++
                 }
-                // one more small correction, the helper player kept moving while the main one loaded
-                c.seekTo(XFade.position() + 90L)
-                w = 0
-                delay(60)
-                while (w < 10 && c.playbackState != Player.STATE_READY) {
-                    delay(40)
-                    w++
-                }
-                AudioShape.rampGain(0f, 1f, 240L)
-                XFade.fadeOutAndStop(240L)
+                // slow, equal handover so there is no jump when the helper disappears
+                AudioShape.rampGain(0f, 1f, 450L)
+                XFade.fadeOutAndStop(450L)
             } catch (e: Exception) {
                 AudioShape.rampGain(0f, 1f, 200L)
                 XFade.stop()

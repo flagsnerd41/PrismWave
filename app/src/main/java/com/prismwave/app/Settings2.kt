@@ -1307,7 +1307,7 @@ private fun PfPlayerPage(s: AppState) {
             Icons.Rounded.Sync, "Fade between songs",
             if (Opts.crossfade == 0) "Off" else Opts.crossfade.toString() + " s",
             Opts.crossfade.toFloat(), 0f..12f, a,
-            { Opts.crossfade = it.toInt() }, { Opts.save() }
+            { if (StudioPrefs.mixOn && it.toInt() > 0) CfNotice.show = true else Opts.crossfade = it.toInt() }, { Opts.save() }
         )
         PfSwitch(Icons.Rounded.Speed, "Muffle between songs", "The end gets muffled and quiet, the next song fades in clear", StudioPrefs.mixOn, a) {
             StudioPrefs.mixOn = it
@@ -1319,6 +1319,7 @@ private fun PfPlayerPage(s: AppState) {
             { StudioPrefs.mixSecs = it.toInt() }, { StudioPrefs.save() }
         )
     }
+    CrossfadeNotice()
     Aod.init(LocalContext.current.applicationContext)
     VolPrefs.init(LocalContext.current.applicationContext)
     PfLabel("Volume", a)
@@ -1968,7 +1969,7 @@ private fun PfTransitionsPage(s: AppState) {
             Icons.Rounded.Sync, "Crossfade",
             if (Opts.crossfade == 0) "Off" else Opts.crossfade.toString() + " s",
             Opts.crossfade.toFloat(), 0f..12f, a,
-            { Opts.crossfade = it.toInt() }, { Opts.save() }
+            { if (StudioPrefs.mixOn && it.toInt() > 0) CfNotice.show = true else Opts.crossfade = it.toInt() }, { Opts.save() }
         )
         PfSwitch(Icons.Rounded.Speed, "Audio blur-out", "The end gets muffled and quiet, the next song comes in clear", StudioPrefs.mixOn, a) {
             StudioPrefs.mixOn = it
@@ -1985,6 +1986,7 @@ private fun PfTransitionsPage(s: AppState) {
             { StudioPrefs.mixStrength = it }, { StudioPrefs.save() }
         )
     }
+    CrossfadeNotice()
     PfLabel("Album cover", a)
     PfGroup {
         PfSwitch(Icons.Rounded.AutoAwesome, "Cover blur-out", "The cover slowly blurs as the song ends, together with the audio", TransitionPrefs.blur, a) {
@@ -2080,4 +2082,30 @@ private fun PfProfileHeader(s: AppState, onOpen: () -> Unit) {
         )
         Text(if (s.signedIn) "Tap to manage your account" else "Tap to sign in", color = TextDim, fontSize = 14.sp)
     }
+}
+
+
+// crossfade and the muffled ending cannot run together
+object CfNotice {
+    var show by androidx.compose.runtime.mutableStateOf(false)
+}
+
+@Composable
+fun CrossfadeNotice() {
+    if (!CfNotice.show) return
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { CfNotice.show = false },
+        title = { Text("Crossfade is blocked") },
+        text = { Text("In order to turn on crossfade, you need to turn off muffle ending") },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { CfNotice.show = false }) { Text("OK") }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                StudioPrefs.mixOn = false
+                StudioPrefs.save()
+                CfNotice.show = false
+            }) { Text("Turn off muffle") }
+        }
+    )
 }

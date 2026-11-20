@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -86,11 +87,39 @@ fun headerShown(s: AppState): Boolean =
         s.screen == Screen.Search ||
         (s.screen == Screen.Library && s.openPlaylist == null && s.libraryOpen == null)
 
+// scrolling down hides the header, scrolling back up shows it again
+object HeaderScroll {
+    var hidden by androidx.compose.runtime.mutableStateOf(false)
+    val connection = object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+        override fun onPreScroll(
+            available: Offset,
+            source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
+        ): Offset {
+            if (available.y < -6f) hidden = true else if (available.y > 6f) hidden = false
+            return Offset.Zero
+        }
+    }
+}
+
 @Composable
 fun PinnedHeader(s: AppState) {
     val top = statusTop()
-    Box(Modifier.fillMaxWidth()) {
-        FadeBlurBar(top + PinnedHeaderHeight + 28.dp)
+    LaunchedEffect(s.screen) { HeaderScroll.hidden = false }
+    val p by androidx.compose.animation.core.animateFloatAsState(
+        if (HeaderScroll.hidden) 1f else 0f,
+        androidx.compose.animation.core.tween(280, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "hdrHide"
+    )
+    val total = top + PinnedHeaderHeight + 28.dp
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                translationY = -total.toPx() * p
+                alpha = 1f - p
+            }
+    ) {
+        FadeBlurBar(total)
         Column(Modifier.padding(top = top)) { Header(s) }
     }
 }
@@ -161,6 +190,33 @@ private fun RoundAction(onClick: () -> Unit, content: @Composable () -> Unit) {
     ) { content() }
 }
 
+// slides (and fades / scales) its content in once, with a delay, used by the playlist page
+@Composable
+private fun PlEnter(
+    delayMs: Int,
+    dx: Float,
+    dy: Float,
+    scaleFrom: Float = 1f,
+    content: @Composable () -> Unit
+) {
+    val p = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(delayMs.toLong())
+        p.animateTo(1f, androidx.compose.animation.core.tween(560, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    Box(
+        Modifier.graphicsLayer {
+            val k = 1f - p.value
+            translationX = dx * k * density
+            translationY = dy * k * density
+            alpha = p.value
+            val sc = scaleFrom + (1f - scaleFrom) * p.value
+            scaleX = sc
+            scaleY = sc
+        }
+    ) { content() }
+}
+
 @Composable
 fun PlaylistScreen2(s: AppState, id: String) {
     val pl = s.playlists.find { it.id == id }
@@ -179,63 +235,69 @@ fun PlaylistScreen2(s: AppState, id: String) {
     val statusPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(Modifier.fillMaxSize().background(bg)) {
         LazyColumn(contentPadding = PaddingValues(bottom = 220.dp)) {
-            // full-bleed cover that melts into the page, with the title at the bottom
+            // new look: blurred cover backdrop, big rounded cover card and the title, all sliding in
             item {
-                Box(Modifier.fillMaxWidth().height(540.dp)) {
+                Box(Modifier.fillMaxWidth()) {
                     if (first != null) {
-                        Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1200)
-                    } else {
-                        Box(Modifier.fillMaxSize().background(CardBg2))
+                        Box(Modifier.fillMaxWidth().height(430.dp).graphicsLayer { alpha = 0.55f }) {
+                            Cover(first, Modifier.fillMaxSize().blur(46.dp), 0.dp, 120.sp, quality = 600)
+                        }
                     }
                     Box(
-                        Modifier.fillMaxSize().background(
-                            Brush.verticalGradient(
-                                0f to Color.Black.copy(alpha = 0.45f),
-                                0.25f to Color.Transparent,
-                                0.55f to Color.Transparent,
-                                0.85f to bg.copy(alpha = 0.9f),
-                                1f to bg
-                            )
+                        Modifier.fillMaxWidth().height(430.dp).background(
+                            Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.30f), 0.6f to bg.copy(alpha = 0.55f), 1f to bg)
                         )
                     )
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = statusPad)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        PlainCircle(Icons.Rounded.ArrowBack) { s.openPlaylist = null }
-                        Spacer(Modifier.weight(1f))
-                        PlainCircle(Icons.Rounded.MoreVert) { menu = true }
-                    }
                     Column(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 28.dp, vertical = 10.dp),
+                        Modifier.fillMaxWidth().padding(top = statusPad),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            pl.name,
-                            color = Color.White,
-                            fontSize = 40.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            pl.songs.size.toString() + " tracks",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 17.sp,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            PlainCircle(Icons.Rounded.ArrowBack) { s.openPlaylist = null }
+                            Spacer(Modifier.weight(1f))
+                            PlainCircle(Icons.Rounded.MoreVert) { menu = true }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        // the cover slides in from the left side (where the library tile was) and settles
+                        PlEnter(0, -90f, 0f, scaleFrom = 0.86f) {
+                            Box(Modifier.size(250.dp).clip(RoundedCornerShape(30.dp))) {
+                                if (first != null) {
+                                    Cover(first, Modifier.fillMaxSize(), 0.dp, 120.sp, quality = 1000)
+                                } else {
+                                    Box(Modifier.fillMaxSize().background(CardBg2))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(22.dp))
+                        PlEnter(90, -60f, 0f) {
+                            Text(
+                                pl.name,
+                                color = Color.White,
+                                fontSize = 34.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 28.dp)
+                            )
+                        }
+                        PlEnter(170, -40f, 0f) {
+                            Text(
+                                pl.songs.size.toString() + " tracks  \u2022  " + fmt(pl.songs.sumOf { it.seconds }),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
+                        }
                     }
                 }
             }
             // custom order, shuffle, big Play pill, download
             item {
+              PlEnter(240, 0f, 40f) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.Center,
@@ -292,6 +354,7 @@ fun PlaylistScreen2(s: AppState, id: String) {
                         }
                     }
                 }
+              }
             }
             item { Spacer(Modifier.height(14.dp)) }
             if (pl.songs.isEmpty()) {
@@ -307,16 +370,18 @@ fun PlaylistScreen2(s: AppState, id: String) {
                 val cur = s.current?.id == song.id
                 val down = DownloadStore.isDownloaded(song)
                 var rowMenu by remember { mutableStateOf(false) }
-                Column(Modifier.animateItem()) {
+                Column(Modifier.animateItem().padding(horizontal = 14.dp, vertical = 3.dp)) {
+                  PlEnter(300 + minOf(i, 8) * 45, -50f, 0f) {
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .background(if (cur) s.accent.copy(alpha = 0.16f) else Color.Transparent)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (cur) s.accent.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.06f))
                             .clickable { s.play(song, pl.songs) }
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Cover(song, Modifier.size(58.dp), 8.dp, 18.sp)
+                        Cover(song, Modifier.size(58.dp), 14.dp, 18.sp)
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
@@ -365,6 +430,7 @@ fun PlaylistScreen2(s: AppState, id: String) {
                             )
                         }
                     }
+                  }
                 }
                 if (rowMenu) SongMenu(song, s, pl.id) { rowMenu = false }
             }
