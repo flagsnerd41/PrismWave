@@ -958,7 +958,7 @@ private fun LibraryMain(s: AppState) {
                         ) { s.libraryOpen = "Offline" }
                         BentoTile(
                             "Cached", "Instant playback", Icons.Rounded.Sync, teal,
-                            emptyList(), Modifier.weight(1f).fillMaxWidth()
+                            remember(s.current?.id) { s.cachedSongs().take(4) }, Modifier.weight(1f).fillMaxWidth()
                         ) { s.libraryOpen = "Cached" }
                     }
                 }
@@ -2319,7 +2319,7 @@ fun HomeScreen(s: AppState) {
     val bestQuick = heroList ?: ytList
     val community = (chill + workout).distinctBy { it.id }.take(20)
     val jump = history.distinctBy { it.id }.take(4).ifEmpty { (bestQuick ?: emptyList()).take(4) }
-    Box(Modifier.fillMaxSize()) {
+    PullRefreshHome(s) {
         HomeTopGlow(s, Modifier.align(Alignment.TopCenter))
         LazyColumn(
             contentPadding = PaddingValues(
@@ -2328,7 +2328,6 @@ fun HomeScreen(s: AppState) {
             )
         ) {
             item { Spacer(Modifier.height(PinnedHeaderHeight)) }
-            item { HomeHello(s) }
             if (heroList != null || ytList == null) {
                 item {
                     HomeSection(

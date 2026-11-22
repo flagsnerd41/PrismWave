@@ -1215,6 +1215,10 @@ private fun PfAppearancePage(s: AppState) {
             Icons.Rounded.Palette, "Gradient mini player",
             "Cover color gradient. Off uses the blur glass", MiniStyle.gradient, a
         ) { MiniStyle.set(lctx, it) }
+        PfSwitch(
+            Icons.Rounded.Palette, "Pill mini player",
+            "Round pill with a progress ring. Off keeps the classic style", MiniStyle.pill, a
+        ) { MiniStyle.setPill(lctx, it) }
     }
     PfLabel("Status bar", a)
     PfGroup {

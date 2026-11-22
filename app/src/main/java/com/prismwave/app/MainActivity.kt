@@ -345,17 +345,17 @@ fun Main(s: AppState) {
             LaunchedEffect(s.showPlayer) {
                 PlayerMorph.p.animateTo(
                     if (s.showPlayer) 1f else 0f,
-                    if (s.reduceMotion) tween(150) else tween(560, easing = FastOutSlowInEasing)
+                    if (s.reduceMotion) tween(150) else androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = 380f)
                 )
             }
-            val morph = PlayerMorph.p.value
+            val morphOpen by remember { androidx.compose.runtime.derivedStateOf { PlayerMorph.p.value > 0.001f } }
             val flight = TapCover.rect != null && !s.reduceMotion
-            if (s.showPlayer || morph > 0.001f) {
+            if (s.showPlayer || morphOpen) {
                 Box(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            val p = morph
+                            val p = PlayerMorph.p.value
                             if (flight && s.showPlayer) {
                                 alpha = ((p - 0.25f) / 0.5f).coerceIn(0f, 1f)
                             } else {
@@ -386,7 +386,7 @@ fun Main(s: AppState) {
                         Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                val p = morph
+                                val p = PlayerMorph.p.value
                                 if (!(flight && s.showPlayer)) {
                                     // the player keeps its real layout the whole time (no shrinking), the growing
                                     // rounded shape only reveals it, so nothing jumps when the animation ends

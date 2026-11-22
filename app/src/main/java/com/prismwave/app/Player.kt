@@ -322,7 +322,7 @@ fun MiniPlayer(s: AppState) {
         visible = shown,
         enter = slideInVertically(tween(520, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(350))
     ) {
-        MiniShell(
+        if (MiniStyle.pill) MiniPillBody(s, song, bounce.value) else MiniShell(
             s.glassAlpha(),
             art,
             Modifier
@@ -1822,11 +1822,17 @@ private fun PlayerMenuSheet(
 
 object MiniStyle {
     var gradient by mutableStateOf(true)
+    var pill by mutableStateOf(false)
     private var loaded = false
     fun init(ctx: android.content.Context) {
         if (loaded) return
         loaded = true
         gradient = ctx.getSharedPreferences("prismwave", 0).getBoolean("miniGradient", true)
+        pill = ctx.getSharedPreferences("prismwave", 0).getBoolean("miniPill", false)
+    }
+    fun setPill(ctx: android.content.Context, v: Boolean) {
+        pill = v
+        ctx.getSharedPreferences("prismwave", 0).edit().putBoolean("miniPill", v).apply()
     }
     fun set(ctx: android.content.Context, v: Boolean) {
         gradient = v

@@ -717,16 +717,17 @@ private fun HalfLyrics(lines: List<LyricLine>, idx: Int, still: Boolean) {
     ) {
         itemsIndexed(lines) { i, ln ->
             val k = i - a0
-            val al by animateFloatAsState(
+            val al = animateFloatAsState(
                 if (k < 0) 0f else if (k == 0) 1f else (0.58f - 0.16f * k).coerceAtLeast(0.14f),
                 tween(700, easing = FastOutSlowInEasing),
                 label = "ha"
             )
-            val bl by animateDpAsState(
-                if (k <= 0 || Opts.lite) 0.dp else (k * 1.6f).coerceAtMost(8f).dp,
+            val bl = animateFloatAsState(
+                if (k <= 0 || Opts.lite) 0f else (k * 1.6f).coerceAtMost(8f),
                 tween(500),
                 label = "hb"
             )
+            val canBlur = android.os.Build.VERSION.SDK_INT >= 31
             Text(
                 ln.text.ifEmpty { "..." },
                 color = Color.White,
@@ -737,13 +738,17 @@ private fun HalfLyrics(lines: List<LyricLine>, idx: Int, still: Boolean) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
-                        alpha = al
+                        alpha = al.value
                         val tms = lagProg.value * 1200f
                         val e = FastOutSlowInEasing.transform((tms / 850f).coerceIn(0f, 1f))
                         val ei = FastOutSlowInEasing.transform(((tms - (if (i > a0) minOf(i - a0, 5) * 70f else 0f)) / 850f).coerceIn(0f, 1f))
                         translationY = lagDelta * (e - ei)
+                        val b = bl.value
+                        renderEffect = if (canBlur && b > 0.05f) {
+                            val px = b * density
+                            androidx.compose.ui.graphics.BlurEffect(px, px, androidx.compose.ui.graphics.TileMode.Decal)
+                        } else null
                     }
-                    .then(if (bl > 0.05.dp) Modifier.blur(bl) else Modifier)
             )
         }
     }
