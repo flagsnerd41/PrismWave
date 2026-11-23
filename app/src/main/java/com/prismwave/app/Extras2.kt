@@ -92,7 +92,7 @@ object AccountPrefs {
 @Composable
 fun StyledSeekBar(s: AppState, total: Float, color: Color, modifier: Modifier = Modifier) {
     val song = s.current
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.fillMaxWidth().controlGlow(color), horizontalAlignment = Alignment.CenterHorizontally) {
         if (song != null && SeekPrefs.style != 5) StreamChip(song)
         val onSeek: (Float) -> Unit = { s.seekTo(it) }
         when (SeekPrefs.style) {

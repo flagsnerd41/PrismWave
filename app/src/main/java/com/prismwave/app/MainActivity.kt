@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); IconStyle.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
+            remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); IconStyle.init(appCtx); ControlGlow.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
             val s = remember { AppState(appCtx) }
             appState = s
             PrismTheme(s.accent) {

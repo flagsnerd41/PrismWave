@@ -1174,6 +1174,9 @@ private fun PfAppearancePage(s: AppState) {
         ) {
             IconStyle.set(navCtx, it == 1)
         }
+        PfSwitch(Icons.Rounded.AutoAwesome, "Glow behind controls", "Soft cover-colored blur behind the progress bar and icons", ControlGlow.on, a) {
+            ControlGlow.set(navCtx, it)
+        }
     }
     PfLabel("Navigation", a)
     PfGroup {

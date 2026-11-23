@@ -750,6 +750,7 @@ private fun TitleRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
+                    .songSwitch(song.id)
                     .graphicsLayer { alpha = if (FlightState.running) 0f else 1f }
                     .onGloballyPositioned {
                         PlayerTitle.rect = it.boundsInRoot()
@@ -763,7 +764,7 @@ private fun TitleRow(
                 fontSize = artistSize,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.basicMarquee()
+                modifier = Modifier.songSwitch(song.id, 70).basicMarquee()
             )
         }
         val liked = s.isLiked(song)
@@ -830,8 +831,9 @@ private fun TransportRow(s: AppState, side: Dp, big: Dp, skipIcons: Boolean = fa
         AppleTransportRow(s, side, big)
         return
     }
+    val glowArt = s.current?.let { rememberArtColor(it) } ?: Color.White
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().controlGlow(glowArt),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1881,8 +1883,9 @@ private fun PlayerBottomIcons(s: AppState, onAdd: () -> Unit, onSleep: () -> Uni
         AppleBottomIcons(s, onAdd, onSleep)
         return
     }
+    val glowArt = s.current?.let { rememberArtColor(it) } ?: Color.White
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().controlGlow(glowArt),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {

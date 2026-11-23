@@ -1,6 +1,8 @@
 package com.prismwave.app
 
 import android.content.Context
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -30,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -196,3 +202,59 @@ fun Modifier.appleRound(art: Color): Modifier =
     this.clip(CircleShape)
         .background(lerp(art, AppleOrange, 0.3f).copy(alpha = 0.38f))
         .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)), CircleShape)
+
+// ------------------------------------------------------------ soft color glow behind the controls
+
+/** Settings > Appearance > Player > Glow behind controls */
+object ControlGlow {
+    var on by mutableStateOf(true)
+    private var loaded = false
+
+    fun init(ctx: Context) {
+        if (loaded) return
+        loaded = true
+        on = ctx.getSharedPreferences("prismwave", 0).getBoolean("ctlGlow", true)
+    }
+
+    fun set(ctx: Context, v: Boolean) {
+        on = v
+        ctx.getSharedPreferences("prismwave", 0).edit().putBoolean("ctlGlow", v).apply()
+    }
+}
+
+/** two soft cover-colored blurs behind the progress bar and icons, drawn outside the bounds so the colors spread */
+fun Modifier.controlGlow(art: Color): Modifier {
+    if (!ControlGlow.on || Opts.lite) return this
+    return this.drawBehind {
+        val w = size.width
+        val h = size.height
+        val r = maxOf(w * 0.45f, h * 1.6f)
+        val warm = lerp(art, AppleOrange, 0.4f)
+        val c1 = Offset(w * 0.28f, h * 0.5f)
+        val c2 = Offset(w * 0.78f, h * 0.5f)
+        drawCircle(Brush.radialGradient(listOf(warm.copy(alpha = 0.38f), Color.Transparent), center = c1, radius = r), r, c1)
+        drawCircle(Brush.radialGradient(listOf(art.copy(alpha = 0.34f), Color.Transparent), center = c2, radius = r), r, c2)
+    }
+}
+
+// ------------------------------------------------------------ song switch: title and artist glide in
+
+@Composable
+fun Modifier.songSwitch(key: Any?, delayMs: Int = 0): Modifier {
+    val p = remember { Animatable(1f) }
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(key) {
+        if (first) {
+            first = false
+            return@LaunchedEffect
+        }
+        if (Opts.lite) return@LaunchedEffect
+        p.snapTo(0f)
+        delay(delayMs.toLong())
+        p.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 170f))
+    }
+    return this.graphicsLayer {
+        alpha = p.value.coerceIn(0f, 1f)
+        translationY = (1f - p.value) * 22.dp.toPx()
+    }
+}
