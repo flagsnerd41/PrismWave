@@ -1163,8 +1163,8 @@ private fun PfAppearancePage(s: AppState) {
             s.saveSettings()
         }
         PfChoice(
-            Icons.Rounded.Speed, "Progress bar style", listOf("Wave", "Material 3", "Line", "Pill", "Dotted", "Apple Music"), SeekPrefs.style, a,
-            "Wave moves while music plays. Material 3 is the standard slider. Line, Pill and Dotted are PrismWave's own. Apple Music: a thick pill with an orange to yellow glow and the stream badge under it"
+            Icons.Rounded.Speed, "Progress bar style", listOf("Wave", "Material 3", "Line", "Pill", "Dotted"), SeekPrefs.style, a,
+            "Wave moves while music plays. Material 3 is the standard slider. Line, Pill and Dotted are PrismWave's own."
         ) {
             SeekPrefs.set(navCtx, it)
         }

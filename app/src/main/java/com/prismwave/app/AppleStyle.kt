@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
@@ -258,3 +260,11 @@ fun Modifier.songSwitch(key: Any?, delayMs: Int = 0): Modifier {
         translationY = (1f - p.value) * 22.dp.toPx()
     }
 }
+
+// ------------------------------------------------------------ the real place of the mini player, so the full player grows out of it
+
+object MiniBounds {
+    var rect: androidx.compose.ui.geometry.Rect? = null
+}
+
+fun Modifier.trackMini(): Modifier = this.onGloballyPositioned { MiniBounds.rect = it.boundsInRoot() }

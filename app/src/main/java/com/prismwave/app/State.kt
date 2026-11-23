@@ -1109,7 +1109,8 @@ class AppState(private val ctx: Context) {
                     return@launch
                 }
                 XFade.begin(ctx, cur.id, url, { c.currentPosition }, speed, pit, fadeMs) {
-                    if (current?.id == cur.id) controller?.seekToNextMediaItem()
+                    // seekTo(index) on purpose: seekToNextMediaItem() is wired to the app's own Next button, which would reset everything
+                    if (current?.id == cur.id) controller?.let { it.seekTo(it.currentMediaItemIndex + 1, 0L) }
                 }
             } catch (e: Exception) {
                 XFade.stop()
@@ -1142,7 +1143,6 @@ class AppState(private val ctx: Context) {
         val c = controller
         syncFromPlayer()
         // never leave a helper player running when no fade is going on
-        if (XFade.active && XFade.songId == current?.id) XFade.stop()
         if (c != null && current != null && c.playbackState == Player.STATE_ENDED && c.currentMediaItem?.mediaId == current?.id) onEnded()
         if (c != null && playing && c.playbackState == Player.STATE_READY) {
             position = c.currentPosition / 1000f

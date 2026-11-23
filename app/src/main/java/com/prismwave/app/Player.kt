@@ -348,6 +348,7 @@ fun MiniPlayer(s: AppState) {
                         )
                     }
                 }
+                .trackMini()
                 .softClick { s.showPlayer = true }
                 .pointerInput(Unit) {
                     var dx = 0f
@@ -677,10 +678,15 @@ fun FullPlayer(s: AppState) {
     ) {
         AnimatedContent(
             modifier = Modifier.graphicsLayer {
-                val sc = 1f - 0.07f * halfP.value.coerceIn(0f, 1f)
+                // going to the half view: the player settles down, softens and fades while the lyrics come up
+                val hp = halfP.value.coerceIn(0f, 1f)
+                val sc = 1f - 0.07f * hp
                 scaleX = sc
                 scaleY = sc
+                translationY = hp * size.height * 0.05f
                 alpha = (1f - halfP.value * 2f).coerceAtLeast(0f)
+                val br = hp * 16f
+                renderEffect = if (Build.VERSION.SDK_INT >= 31 && !Opts.lite && br > 0.5f) androidx.compose.ui.graphics.BlurEffect(br, br, androidx.compose.ui.graphics.TileMode.Decal) else null
             },
             targetState = s.playerStyle,
             transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(200)) },

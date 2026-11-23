@@ -363,14 +363,19 @@ fun Main(s: AppState) {
                             if (flight && s.showPlayer) {
                                 alpha = ((p - 0.25f) / 0.5f).coerceIn(0f, 1f)
                             } else {
-                                val mx = 14.dp.toPx() * (1f - p)
-                                val mh = 72.dp.toPx()
-                                val mb = 112.dp.toPx()
-                                val top = (size.height - mb - mh) * (1f - p)
-                                val bottom = size.height - mb * (1f - p)
-                                val r = 34.dp.toPx() * (1f - p) + 34.dp.toPx() * p
+                                // grows out of the real mini player (its true place and pill shape) and shrinks back into it
+                                val mr = MiniBounds.rect
+                                val l0 = mr?.left ?: 14.dp.toPx()
+                                val t0 = mr?.top ?: (size.height - 112.dp.toPx() - 72.dp.toPx())
+                                val r0 = mr?.right ?: (size.width - 14.dp.toPx())
+                                val b0 = mr?.bottom ?: (size.height - 112.dp.toPx())
+                                val left = l0 * (1f - p)
+                                val top = t0 * (1f - p)
+                                val right = r0 + (size.width - r0) * p
+                                val bottom = b0 + (size.height - b0) * p
+                                val r = minOf((b0 - t0) / 2f, 34.dp.toPx()) * (1f - p) + 34.dp.toPx() * p
                                 val rect = androidx.compose.ui.geometry.RoundRect(
-                                    mx, top, size.width - mx, bottom,
+                                    left, top, right, bottom,
                                     androidx.compose.ui.geometry.CornerRadius(r, r)
                                 )
                                 clip = true

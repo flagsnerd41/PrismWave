@@ -61,6 +61,7 @@ fun MiniPillBody(s: AppState, song: Song, scale: Float) {
                 scaleX = scale
                 scaleY = scale
             }
+            .trackMini()
             .clip(RoundedCornerShape(50))
             .background(container)
             .softClick { s.showPlayer = true }

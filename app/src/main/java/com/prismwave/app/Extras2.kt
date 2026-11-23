@@ -62,7 +62,8 @@ object SeekPrefs {
         if (!sp.getBoolean("seekM3", false)) {
             sp.edit().putInt("seekStyle", 1).putBoolean("seekM3", true).apply()
         }
-        style = sp.getInt("seekStyle", 1)
+        // the Apple Music bar was removed: anyone who had it goes to Material 3
+        style = sp.getInt("seekStyle", 1).let { if (it == 5) 1 else it }
     }
 
     fun set(ctx: Context, v: Int) {
