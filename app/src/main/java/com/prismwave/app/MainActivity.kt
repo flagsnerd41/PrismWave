@@ -110,9 +110,13 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         CustomFont.load(applicationContext)
+        if (CustomFont.restoredNote) {
+            CustomFont.restoredNote = false
+            android.widget.Toast.makeText(applicationContext, "Safe mode: the custom font was broken, back to the original font", android.widget.Toast.LENGTH_LONG).show()
+        }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
+            remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); IconStyle.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
             val s = remember { AppState(appCtx) }
             appState = s
             PrismTheme(s.accent) {

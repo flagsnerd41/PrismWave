@@ -49,7 +49,7 @@ import kotlin.math.sin
 
 // ------------------------------------------------------------ progress bar styles
 
-// 0 = Wave, 1 = Material 3, 2 = Line, 3 = Pill, 4 = Dotted
+// 0 = Wave, 1 = Material 3, 2 = Line, 3 = Pill, 4 = Dotted, 5 = Apple Music
 object SeekPrefs {
     var style by mutableStateOf(0)
     private var loaded = false
@@ -93,7 +93,7 @@ object AccountPrefs {
 fun StyledSeekBar(s: AppState, total: Float, color: Color, modifier: Modifier = Modifier) {
     val song = s.current
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (song != null) StreamChip(song)
+        if (song != null && SeekPrefs.style != 5) StreamChip(song)
         val onSeek: (Float) -> Unit = { s.seekTo(it) }
         when (SeekPrefs.style) {
             1 -> M3Seek({ s.position }, total, onSeek, color)
@@ -123,6 +123,7 @@ fun StyledSeekBar(s: AppState, total: Float, color: Color, modifier: Modifier = 
                 }
                 drawCircle(color, if (drag) 9.dp.toPx() else 6.dp.toPx(), Offset(size.width * frac, cy))
             }
+            5 -> AppleSeek(s, total, if (song != null) rememberArtColor(song) else color)
             else -> WaveSeekBar({ s.position }, total, onSeek, color, Modifier.fillMaxWidth(), s.playing)
         }
     }

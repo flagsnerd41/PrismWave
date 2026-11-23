@@ -511,6 +511,10 @@ fun SeekBar(
 
 @Composable
 private fun TimeLabels(s: AppState, total: Float) {
+    if (SeekPrefs.style == 5) {
+        AppleTimeLabels(s, total, s.current?.let { rememberArtColor(it) } ?: Color.White)
+        return
+    }
     val pos = s.position.coerceIn(0f, total)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(fmt(pos.toInt()), color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
@@ -770,7 +774,8 @@ private fun TitleRow(
                 likePop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 300f))
             }
         }
-        val bgMod = if (circles) Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.18f)) else Modifier
+        val appleArt = if (IconStyle.apple && circles) rememberArtColor(song) else null
+        val bgMod = if (appleArt != null) Modifier.appleRound(appleArt) else if (circles) Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.18f)) else Modifier
         Box(
             Modifier.bounceClick { s.toggleLike(song) }.size(40.dp).graphicsLayer {
                 scaleX = likePop.value
@@ -821,6 +826,10 @@ private fun NudgeIcon(icon: ImageVector, dir: Float, size: Dp, box: Dp, onClick:
 
 @Composable
 private fun TransportRow(s: AppState, side: Dp, big: Dp, skipIcons: Boolean = false) {
+    if (IconStyle.apple) {
+        AppleTransportRow(s, side, big)
+        return
+    }
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -1868,6 +1877,10 @@ private fun MiniShell(
 
 @Composable
 private fun PlayerBottomIcons(s: AppState, onAdd: () -> Unit, onSleep: () -> Unit) {
+    if (IconStyle.apple) {
+        AppleBottomIcons(s, onAdd, onSleep)
+        return
+    }
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,

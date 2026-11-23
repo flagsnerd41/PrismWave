@@ -316,7 +316,7 @@ fun PagesHost(s: AppState) {
             "lyrics" -> LyricsScreen(s)
             "stack" -> CoverStackScreen(s)
             "eq" -> EqPage(s)
-            "car" -> CarPage(s)
+            "car" -> CarScreen(s)
             else -> Box(Modifier.fillMaxSize().background(Night))
         }
     }

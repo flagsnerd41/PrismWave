@@ -24,45 +24,122 @@ val DefaultFont = FontFamily(
 val AppFont: FontFamily get() = CustomFont.family ?: DefaultFont
 val PrismFont: FontFamily get() = AppFont
 
-/** a font the person uploaded (.ttf / .otf), kept in the app files */
+/**
+ * a font the person uploaded (.ttf / .otf), kept in the app files.
+ * SAFE MODE: a broken font can crash the app on every start. The font is checked before it is used, and if the app
+ * crashes in the first seconds while a custom font is active, the next start goes back to the original font by itself.
+ */
 object CustomFont {
     var family by androidx.compose.runtime.mutableStateOf<FontFamily?>(null)
     var name by androidx.compose.runtime.mutableStateOf<String?>(null)
 
-    private fun file(ctx: android.content.Context) = java.io.File(ctx.filesDir, "custom_font.ttf")
+    // set once when safe mode removed a font, so the app can tell the person
+    var restoredNote by androidx.compose.runtime.mutableStateOf(false)
+    private var launchedAt = 0L
+    private var watching = false
 
+    private fun file(ctx: android.content.Context) = java.io.File(ctx.filesDir, "custom_font.ttf")
+    private fun prefs(ctx: android.content.Context) = ctx.getSharedPreferences("prism_font", 0)
+
+    // a real font file starts with one of these four signatures
+    private fun looksLikeFont(f: java.io.File): Boolean {
+        return try {
+            if (!f.exists() || f.length() < 1024L) return false
+            val b = ByteArray(4)
+            f.inputStream().use { if (it.read(b) != 4) return false }
+            val s = String(b, Charsets.ISO_8859_1)
+            (b[0].toInt() == 0 && b[1].toInt() == 1 && b[2].toInt() == 0 && b[3].toInt() == 0) ||
+                s == "OTTO" || s == "true" || s == "ttcf"
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
+    // really loads the font once, so a bad file is caught here and not later while drawing text
+    private fun usable(f: java.io.File): Boolean {
+        return try {
+            looksLikeFont(f) && android.graphics.Typeface.createFromFile(f) != null
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
+    private fun dropFont(ctx: android.content.Context) {
+        try {
+            file(ctx).delete()
+        } catch (e: Throwable) {
+        }
+        family = null
+        name = null
+        prefs(ctx).edit().remove("name").putBoolean("crashed", false).commit()
+    }
+
+    /** call first thing in onCreate: sets the crash watcher and loads the font unless safe mode steps in */
     fun load(ctx: android.content.Context) {
+        launchedAt = android.os.SystemClock.elapsedRealtime()
+        if (!watching) {
+            watching = true
+            val prev = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { th, e ->
+                try {
+                    // a crash in the first 20 seconds with a custom font active is blamed on the font
+                    if (family != null && android.os.SystemClock.elapsedRealtime() - launchedAt < 20000L) {
+                        prefs(ctx).edit().putBoolean("crashed", true).commit()
+                    }
+                } catch (x: Throwable) {
+                }
+                if (prev != null) prev.uncaughtException(th, e)
+            }
+        }
         val f = file(ctx)
         if (!f.exists()) return
+        if (prefs(ctx).getBoolean("crashed", false)) {
+            dropFont(ctx)
+            restoredNote = true
+            return
+        }
         try {
-            android.graphics.Typeface.createFromFile(f)
+            if (!usable(f)) {
+                dropFont(ctx)
+                restoredNote = true
+                return
+            }
             family = FontFamily(Font(f, FontWeight.Normal), Font(f, FontWeight.Medium), Font(f, FontWeight.SemiBold), Font(f, FontWeight.Bold))
-            name = ctx.getSharedPreferences("prism_font", 0).getString("name", "Custom font")
-        } catch (e: Exception) {
-            family = null
-            f.delete()
+            name = prefs(ctx).getString("name", "Custom font")
+        } catch (e: Throwable) {
+            dropFont(ctx)
+            restoredNote = true
         }
     }
 
     fun import(ctx: android.content.Context, uri: android.net.Uri, label: String): Boolean {
+        val f = file(ctx)
+        val tmp = java.io.File(ctx.filesDir, "custom_font_new.tmp")
         return try {
-            val f = file(ctx)
-            ctx.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
-            android.graphics.Typeface.createFromFile(f)
-            ctx.getSharedPreferences("prism_font", 0).edit().putString("name", label).apply()
-            load(ctx)
-            family != null
-        } catch (e: Exception) {
-            file(ctx).delete()
-            family = null
+            ctx.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+            // the new file is checked BEFORE it replaces the old one, so a false font never gets in
+            if (!usable(tmp)) {
+                tmp.delete()
+                false
+            } else {
+                tmp.copyTo(f, overwrite = true)
+                tmp.delete()
+                prefs(ctx).edit().putString("name", label).putBoolean("crashed", false).commit()
+                family = FontFamily(Font(f, FontWeight.Normal), Font(f, FontWeight.Medium), Font(f, FontWeight.SemiBold), Font(f, FontWeight.Bold))
+                name = label
+                true
+            }
+        } catch (e: Throwable) {
+            try {
+                tmp.delete()
+            } catch (x: Throwable) {
+            }
             false
         }
     }
 
     fun reset(ctx: android.content.Context) {
-        file(ctx).delete()
-        family = null
-        name = null
+        dropFont(ctx)
     }
 }
 

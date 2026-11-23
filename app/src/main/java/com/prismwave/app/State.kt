@@ -90,6 +90,8 @@ class AppState(private val ctx: Context) {
     private var pausedByUnplug = false
     private var pausedAt = 0L
     private var fading = false
+    // the song the crossfade was already tried for, so a failed try does not repeat every second
+    private var overlapFor: String? = null
     private var queuedId: String? = null
     private var warmingFor: String? = null
     private var autoAdvance = false
@@ -604,6 +606,7 @@ class AppState(private val ctx: Context) {
         MuffleMix.clear()
         XFade.stop()
         fading = false
+        overlapFor = null
         queuedId = null
         warmingFor = null
         pausedByUnplug = false
@@ -930,8 +933,10 @@ class AppState(private val ctx: Context) {
         retriedId = null
         queuedId = null
         warmingFor = null
-        // a helper player may only continue if it plays exactly this song, otherwise two songs play at once
-        if ((XFade.active && XFade.songId != sg.id) || (!XFade.active && XFade.preparedId != null)) XFade.stop()
+        overlapFor = null
+        // the helper keeps fading out the OLD song, but it must never play the song that is current now,
+        // and a silent helper that was prepared for the old song is useless
+        if ((XFade.active && XFade.songId == sg.id) || (!XFade.active && XFade.preparedId != null)) XFade.stop()
         playCount++
         known[sg.id] = sg
         counts[sg.id] = (counts[sg.id] ?: 0) + 1
@@ -945,8 +950,6 @@ class AppState(private val ctx: Context) {
             val ms = ((prevLead ?: StudioPrefs.mixSecs.toFloat()) * 1000f).toLong()
             MuffleMix.ramp(StudioPrefs.mixStrength, 0f, ms)
             fade(0.3f, 1f, ms)
-        } else if (XFade.active && XFade.songId == sg.id) {
-            takeOverFromOverlap()
         } else if (Opts.crossfade > 0 || prevLead != null) {
             AudioShape.rampGain(0f, 1f, ((prevLead ?: Opts.crossfade.toFloat()) * 1000f).toLong())
         } else {
@@ -1079,7 +1082,8 @@ class AppState(private val ctx: Context) {
         CoverPreload.warm(ctx, listOfNotNull(next) + pool, q)
     }
 
-    // the next song starts on a second player while the end of this one fades out, so they really overlap
+    // Crossfade: the main player jumps to the next song right away and fades it in, while the helper player
+    // keeps playing the end of the old song from the same spot and fades it out.
     // the id of the song the main player will really play next
     private fun playerNextId(): String? {
         val c = controller ?: return null
@@ -1088,68 +1092,48 @@ class AppState(private val ctx: Context) {
     }
 
     private fun startOverlap(leftSec: Float) {
-        val nid = playerNextId() ?: return
-        val nxt = queue.firstOrNull { it.id == nid } ?: known[nid] ?: return
+        val cur = current ?: return
+        val c = controller ?: return
+        if (playerNextId() == null) return
+        overlapFor = cur.id
+        fading = true
+        val speed = (c.playbackParameters.speed).coerceIn(0.25f, 4f)
+        val pit = c.playbackParameters.pitch
+        // real time left of the old song at the current speed
+        val fadeMs = ((leftSec / speed) * 1000f).toLong().coerceAtLeast(600L)
         scope.launch {
             try {
-                val url = DownloadStore.localUri(nxt) ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
-                if (!fading || current == null) return@launch
-                if (playerNextId() != nid) {
-                    XFade.stop()
+                val url = DownloadStore.localUri(cur) ?: SongCache.uri(ctx, cur.id) ?: Engine.streamUrl(cur.url)
+                if (current?.id != cur.id) {
+                    fading = false
                     return@launch
                 }
-                XFade.begin(ctx, nxt.id, url, (leftSec * 1000).toLong() - 150L)
+                XFade.begin(ctx, cur.id, url, { c.currentPosition }, speed, pit, fadeMs) {
+                    if (current?.id == cur.id) controller?.seekToNextMediaItem()
+                }
             } catch (e: Exception) {
                 XFade.stop()
+                fading = false
             }
         }
     }
 
-    // a few seconds before the crossfade: load the next song silently on the helper player
-    private fun warmOverlap() {
-        val nid = playerNextId() ?: return
-        if (warmingFor == nid || XFade.preparedId == nid || XFade.active) return
-        val nxt = queue.firstOrNull { it.id == nid } ?: known[nid] ?: return
-        warmingFor = nid
+    // a few seconds before the crossfade: load the end of the current song silently on the helper player
+    private fun warmOverlap(posMs: Long) {
+        val cur = current ?: return
+        if (playerNextId() == null) return
+        if (warmingFor == cur.id || XFade.preparedId == cur.id || XFade.active) return
+        warmingFor = cur.id
         scope.launch {
             try {
-                val url = DownloadStore.localUri(nxt) ?: SongCache.uri(ctx, nxt.id) ?: Engine.streamUrl(nxt.url)
-                if (current == null || playerNextId() != nid) {
+                val url = DownloadStore.localUri(cur) ?: SongCache.uri(ctx, cur.id) ?: Engine.streamUrl(cur.url)
+                if (current?.id != cur.id) {
                     warmingFor = null
                     return@launch
                 }
-                XFade.prepare(ctx, nid, url)
+                XFade.prepare(ctx, cur.id, url, posMs)
             } catch (e: Exception) {
                 warmingFor = null
-            }
-        }
-    }
-
-    // the first song has ended: the main player continues the next song at the spot the helper player reached
-    private fun takeOverFromOverlap() {
-        scope.launch {
-            try {
-                val c = controller ?: return@launch
-                // line the main player up with the helper player while it is still silent, retry until both are in sync
-                var tries = 0
-                while (tries < 4) {
-                    c.seekTo(XFade.position() + 120L)
-                    var w = 0
-                    while (w < 25 && c.playbackState != Player.STATE_READY) {
-                        delay(30)
-                        w++
-                    }
-                    delay(40)
-                    val off = XFade.position() - c.currentPosition
-                    if (kotlin.math.abs(off) <= 45L) break
-                    tries++
-                }
-                // slow, equal handover so there is no jump when the helper disappears
-                AudioShape.rampGain(0f, 1f, 450L)
-                XFade.fadeOutAndStop(450L)
-            } catch (e: Exception) {
-                AudioShape.rampGain(0f, 1f, 200L)
-                XFade.stop()
             }
         }
     }
@@ -1158,7 +1142,7 @@ class AppState(private val ctx: Context) {
         val c = controller
         syncFromPlayer()
         // never leave a helper player running when no fade is going on
-        if (XFade.active && !fading) XFade.stop()
+        if (XFade.active && XFade.songId == current?.id) XFade.stop()
         if (c != null && current != null && c.playbackState == Player.STATE_ENDED && c.currentMediaItem?.mediaId == current?.id) onEnded()
         if (c != null && playing && c.playbackState == Player.STATE_READY) {
             position = c.currentPosition / 1000f
@@ -1180,18 +1164,19 @@ class AppState(private val ctx: Context) {
                     c.volume = 1f
                 }
             }
-            if ((Opts.crossfade > 0 || AutoMix.smart(current?.id)) && dur > 0 && !fading && !repeat) {
+            if ((Opts.crossfade > 0 || AutoMix.smart(current?.id)) && dur > 0 && !fading && !repeat && overlapFor != current?.id) {
                 val left = dur / 1000f - position
                 val cf = (if (AutoMix.on) AutoMix.leadFor(current?.id ?: "") else null) ?: Opts.crossfade.toFloat()
-                if (dur / 1000f > cf * 3 && left > cf && left <= cf + 8f) {
-                    warmOverlap()
-                } else if (left > cf + 10f && XFade.preparedId != null) {
+                // the window is in real seconds, so at 1.5x speed it covers 1.5x more of the song
+                val sp = c.playbackParameters.speed.coerceIn(0.25f, 4f)
+                val cfm = cf * sp
+                if (dur / 1000f > cfm * 3 && left > cfm && left <= cfm + 8f * sp) {
+                    warmOverlap(((dur / 1000f - cfm) * 1000f).toLong())
+                } else if (left > cfm + 10f * sp && XFade.preparedId != null) {
                     XFade.stop()
                     warmingFor = null
                 }
-                if (dur / 1000f > cf * 3 && left >= 0.5f && left <= cf) {
-                    fading = true
-                    AudioShape.rampGain(1f, 0f, (left * 1000).toLong() - 150)
+                if (dur / 1000f > cfm * 3 && left >= 0.5f && left <= cfm && playerNextId() != null) {
                     startOverlap(left)
                 }
             }

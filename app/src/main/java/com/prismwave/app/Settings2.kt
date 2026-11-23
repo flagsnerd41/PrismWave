@@ -1121,17 +1121,7 @@ private fun PfAppearancePage(s: AppState) {
             android.widget.Toast.makeText(fctx, if (ok) "Font added" else "That file is not a usable font", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    PfLabel("Font", a)
-    PfGroup {
-        PfAction(
-            Icons.Rounded.Palette, "Upload a font",
-            if (CustomFont.family != null) "Using: " + (CustomFont.name ?: "custom font") else "Pick a .ttf or .otf file",
-            a
-        ) { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream", "*/*")) }
-        if (CustomFont.family != null) {
-            PfAction(Icons.Rounded.Sync, "Back to the default font", null, a) { CustomFont.reset(fctx) }
-        }
-    }
+    val navCtx = androidx.compose.ui.platform.LocalContext.current.applicationContext
     PfLabel("Theme", a)
     PfGroup {
         PfSwitch(Icons.Rounded.Palette, "Material You", "Use a generated Material color scheme", Opts.materialYou, a) {
@@ -1163,25 +1153,6 @@ private fun PfAppearancePage(s: AppState) {
         }
         PfAccent(s)
     }
-    val navCtx = androidx.compose.ui.platform.LocalContext.current.applicationContext
-    PfLabel("Menu bar", a)
-    PfGroup {
-        PfChoice(
-            Icons.Rounded.Palette, "Menu bar style", listOf("Classic", "Pill", "Apple Music"), NavPrefs.style, a,
-            "Classic: the old bar with the round Search button. Pill: one bar with a typing box. Apple Music: icon over name, light capsule on the chosen tab"
-        ) {
-            NavPrefs.set(navCtx, it)
-        }
-    }
-    PfLabel("Progress bar", a)
-    PfGroup {
-        PfChoice(
-            Icons.Rounded.Speed, "Progress bar style", listOf("Wave", "Material 3", "Line", "Pill", "Dotted"), SeekPrefs.style, a,
-            "Wave moves while music plays. Material 3 is the standard slider. Line, Pill and Dotted are PrismWave's own"
-        ) {
-            SeekPrefs.set(navCtx, it)
-        }
-    }
     PfLabel("Player", a)
     PfGroup {
         PfChoice(
@@ -1190,6 +1161,38 @@ private fun PfAppearancePage(s: AppState) {
         ) {
             s.playerStyle = it
             s.saveSettings()
+        }
+        PfChoice(
+            Icons.Rounded.Speed, "Progress bar style", listOf("Wave", "Material 3", "Line", "Pill", "Dotted", "Apple Music"), SeekPrefs.style, a,
+            "Wave moves while music plays. Material 3 is the standard slider. Line, Pill and Dotted are PrismWave's own. Apple Music: a thick pill with an orange to yellow glow and the stream badge under it"
+        ) {
+            SeekPrefs.set(navCtx, it)
+        }
+        PfChoice(
+            Icons.Rounded.PlayArrow, "Icon style", listOf("PrismWave", "Apple Music"), if (IconStyle.apple) 1 else 0, a,
+            "Apple Music: chunky rounded controls, round bordered star and more buttons, soft outline icons, all tinted with the cover colors"
+        ) {
+            IconStyle.set(navCtx, it == 1)
+        }
+    }
+    PfLabel("Navigation", a)
+    PfGroup {
+        PfChoice(
+            Icons.Rounded.Palette, "Navigation style", listOf("Classic", "Pill", "Apple Music"), NavPrefs.style, a,
+            "Classic: the old bar with the round Search button. Pill: one bar with a typing box. Apple Music: icon over name, light capsule on the chosen tab"
+        ) {
+            NavPrefs.set(navCtx, it)
+        }
+    }
+    PfLabel("Font", a)
+    PfGroup {
+        PfAction(
+            Icons.Rounded.Palette, "Upload a font",
+            if (CustomFont.family != null) "Using: " + (CustomFont.name ?: "custom font") else "Pick a .ttf or .otf file",
+            a
+        ) { fontPicker.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream", "*/*")) }
+        if (CustomFont.family != null) {
+            PfAction(Icons.Rounded.Sync, "Back to the default font", null, a) { CustomFont.reset(fctx) }
         }
     }
     PfLabel("Blur", a)
@@ -1277,6 +1280,7 @@ private fun PfAppearancePage(s: AppState) {
         }
     }
 }
+
 
 @Composable
 private fun PfPlayerPage(s: AppState) {
