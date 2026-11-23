@@ -189,11 +189,11 @@ fun AppleBottomIcons(s: AppState, onAdd: () -> Unit, onSleep: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AppleIcon(OShuffle, if (s.shuffle) on else soft, 26.dp, 48.dp) { s.shuffle = !s.shuffle }
-        AppleIcon(OAdd, soft, 26.dp, 48.dp) { onAdd() }
-        AppleIcon(OLyrics, soft, 26.dp, 48.dp) { Pages.show("lyrics") }
-        AppleIcon(OBedtime, if (s.sleepLeft > 0) on else soft, 26.dp, 48.dp) { onSleep() }
-        AppleIcon(ORepeat, if (s.repeat) on else soft, 26.dp, 48.dp) { s.repeat = !s.repeat }
+        AppleIcon(Icons.Outlined.OShuffle, if (s.shuffle) on else soft, 26.dp, 48.dp) { s.shuffle = !s.shuffle }
+        AppleIcon(Icons.Outlined.OAdd, soft, 26.dp, 48.dp) { onAdd() }
+        AppleIcon(Icons.Outlined.OLyrics, soft, 26.dp, 48.dp) { Pages.show("lyrics") }
+        AppleIcon(Icons.Outlined.OBedtime, if (s.sleepLeft > 0) on else soft, 26.dp, 48.dp) { onSleep() }
+        AppleIcon(Icons.Outlined.ORepeat, if (s.repeat) on else soft, 26.dp, 48.dp) { s.repeat = !s.repeat }
     }
 }
 
