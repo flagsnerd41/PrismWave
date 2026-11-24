@@ -231,7 +231,7 @@ fun AppleNavBar(s: AppState) {
                 Modifier.fillMaxSize().background(sbg).softClick { goTo(s, Screen.Search) },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Search, contentDescription = null, tint = if (searchSel) s.accent else Color.White, modifier = Modifier.size(28.dp))
+                Icon(Icons.Rounded.Search, contentDescription = null, tint = if (searchSel) s.accent else Color.White, modifier = Modifier.size(28.dp).liquidGlyph())
             }
         }
     }

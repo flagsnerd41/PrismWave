@@ -1163,6 +1163,12 @@ private fun PfAppearancePage(s: AppState) {
             s.saveSettings()
         }
         PfChoice(
+            Icons.Rounded.PlayArrow, "Open animation", listOf("Expand from mini-player", "Cover flight"), OpenAnim.style, a,
+            "How the full player opens. Expand: it grows out of the mini player, like it shrinks back when you close it"
+        ) {
+            OpenAnim.set(navCtx, it)
+        }
+        PfChoice(
             Icons.Rounded.Speed, "Progress bar style", listOf("Wave", "Material 3", "Line", "Pill", "Dotted"), SeekPrefs.style, a,
             "Wave moves while music plays. Material 3 is the standard slider. Line, Pill and Dotted are PrismWave's own."
         ) {
@@ -1180,6 +1186,9 @@ private fun PfAppearancePage(s: AppState) {
     }
     PfLabel("Navigation", a)
     PfGroup {
+        PfSwitch(Icons.Rounded.AutoAwesome, "Liquid Glass icons", "Menu bar icons act like clear glass and refract the colors behind them (Android 12+)", GlassIcons.on, a) {
+            GlassIcons.set(navCtx, it)
+        }
         PfChoice(
             Icons.Rounded.Palette, "Navigation style", listOf("Classic", "Pill", "Apple Music"), NavPrefs.style, a,
             "Classic: the old bar with the round Search button. Pill: one bar with a typing box. Apple Music: icon over name, light capsule on the chosen tab"

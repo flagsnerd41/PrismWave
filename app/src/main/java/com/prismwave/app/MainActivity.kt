@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appCtx = LocalContext.current.applicationContext
-            remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); IconStyle.init(appCtx); ControlGlow.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
+            remember { NavPrefs.init(appCtx); SeekPrefs.init(appCtx); IconStyle.init(appCtx); ControlGlow.init(appCtx); AccountPrefs.init(appCtx); Opts.init(appCtx); LiquidGlassOpt.init(appCtx); MiniStyle.init(appCtx); OpenAnim.init(appCtx); GlassIcons.init(appCtx); VideoSync.init(appCtx); StudioPrefs.init(appCtx); AppColors.init(appCtx) }
             val s = remember { AppState(appCtx) }
             appState = s
             PrismTheme(s.accent) {
@@ -353,7 +353,7 @@ fun Main(s: AppState) {
                 )
             }
             val morphOpen by remember { androidx.compose.runtime.derivedStateOf { PlayerMorph.p.value > 0.001f } }
-            val flight = TapCover.rect != null && !s.reduceMotion
+            val flight = TapCover.rect != null && !s.reduceMotion && OpenAnim.style == 1
             if (s.showPlayer || morphOpen) {
                 Box(
                     Modifier

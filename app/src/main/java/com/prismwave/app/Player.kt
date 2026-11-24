@@ -981,16 +981,16 @@ private fun ImmersiveBody(
         val stageHeight = maxHeight * 0.60f
         // blurred backdrop that fills the whole screen
         if (VideoSync.showVideo(song) && VideoPrefs.liveBackdrop) {
-            VideoStage(s, song, Modifier.fillMaxSize().blur(50.dp), low = true)
+            VideoStage(s, song, Modifier.fillMaxSize().blur(16.dp), low = true)
         } else {
-            Cover(song, Modifier.fillMaxSize().blur(50.dp), 0.dp, 160.sp, quality = 600)
+            Cover(song, Modifier.fillMaxSize().blur(16.dp), 0.dp, 160.sp, quality = 600)
         }
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.20f),
-                    0.50f to Color.Black.copy(alpha = 0.30f),
-                    1f to bottom.copy(alpha = 0.90f)
+                    0f to Color.Black.copy(alpha = 0.10f),
+                    0.50f to Color.Black.copy(alpha = 0.16f),
+                    1f to bottom.copy(alpha = 0.88f)
                 )
             )
         )
@@ -1027,7 +1027,7 @@ private fun ImmersiveBody(
                                 )
                             }
                     ) {
-                        Cover(song, Modifier.fillMaxSize().blur(36.dp), 0.dp, 160.sp, quality = 400)
+                        Cover(song, Modifier.fillMaxSize().blur(14.dp), 0.dp, 160.sp, quality = 400)
                     }
                 }
                 Box(
@@ -1647,7 +1647,7 @@ private fun PlayerMenuSheet(
     )
     val cfg = LocalConfiguration.current
     val maxH = (cfg.screenHeightDp * 0.80f).dp
-    val popW = minOf(cfg.screenWidthDp - 24, 340).dp
+    val popW = minOf(cfg.screenWidthDp - 24, 290).dp
     val open = remember { Animatable(0f) }
     LaunchedEffect(visible) {
         if (visible) {
@@ -1762,68 +1762,42 @@ private fun PlayerMenuSheet(
                     .nestedScroll(swipeConn)
                     .verticalScroll(rememberScrollState())
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-            PopItem(0, o) {
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Cover(song, Modifier.size(56.dp), 14.dp, 20.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Now Playing", color = s.accent, fontSize = 13.sp)
-                        Text(
-                            song.title,
-                            color = Color.White,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(song.artist, color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val isDown = DownloadStore.isDownloaded(song)
+            val dlProg = DownloadStore.progress[song.id]
+            fun act(label: String) = actions.first { it.label == label }.run
+            IosMenuBody(
+                s, song, o, VolPrefs.showMenu, { VolumeCard(s.accent) }, liked, isDown, dlProg,
+                onDownload = {
+                    if (isDown) {
+                        DownloadStore.remove(ctx, song)
+                        toast("Download removed")
+                    } else if (dlProg == null) {
+                        DownloadStore.start(ctx, song)
+                        toast("Downloading")
                     }
-                }
-            }
-            if (VolPrefs.showMenu) PopItem(1, o) { VolumeCard(s.accent) }
-            PopItem(2, o) {
-                Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg).padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    actions.chunked(3).forEach { rowItems ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowItems.forEach { a -> MenuTile(a, s.accent, Modifier.weight(1f)) }
-                            repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
-                        }
-                    }
-                }
-            }
-            PopItem(3, o) {
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(CardBg)) {
-                    PopRow(Icons.Rounded.Person, "View artist", song.artist) { Pages.openCollection(song.artist, "", 3) }
-                    val isDown = DownloadStore.isDownloaded(song)
-                    val dlProg = DownloadStore.progress[song.id]
-                    PopRow(
-                        Icons.Rounded.Download,
-                        if (isDown) "Remove download" else if (dlProg != null) "Downloading " + (dlProg * 100).toInt() + "%" else "Download"
-                    ) {
-                        if (isDown) {
-                            DownloadStore.remove(ctx, song)
-                            toast("Download removed")
-                        } else if (dlProg == null) {
-                            DownloadStore.start(ctx, song)
-                            toast("Downloading")
-                        }
-                    }
-                    PopRow(Icons.Rounded.Info, "Details") { details = true }
-                    PopRow(Icons.Rounded.Equalizer, "Equalizer") { Pages.show("eq") }
-                    PopRow(
-                        Icons.Rounded.Speed,
-                        "Tempo and Pitch",
-                        "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)
-                    ) { tempoOpen = true }
-                }
+                },
+                onLike = actions.first { it.label == "Like" || it.label == "Unlike" }.run,
+                onShare = act("Share"),
+                library = listOf(
+                    IosItem(Icons.Rounded.PlaylistAdd, "Add to playlist", null, act("Add to playlist")),
+                    IosItem(Icons.Rounded.QueueMusic, "Queue", null, act("Queue")),
+                    IosItem(Icons.Rounded.Radio, "Start radio", null, act("Start radio")),
+                    IosItem(Icons.Rounded.Bedtime, "Sleep timer", null, act("Sleep timer"))
+                ),
+                more = listOf(
+                    IosItem(Icons.Rounded.Subtitles, "Lyrics", null, act("Lyrics")),
+                    IosItem(Icons.Rounded.DirectionsCar, "Car mode", null, act("Car mode")),
+                    IosItem(Icons.Rounded.Person, "View artist", song.artist) { Pages.openCollection(song.artist, "", 3) },
+                    IosItem(Icons.Rounded.ContentCopy, "Copy link", null, act("Copy link"))
+                ),
+                tools = listOf(
+                    IosItem(Icons.Rounded.Info, "Details", null) { details = true },
+                    IosItem(Icons.Rounded.Equalizer, "Equalizer", null) { Pages.show("eq") },
+                    IosItem(Icons.Rounded.Speed, "Tempo and Pitch", "x" + "%.2f".format(s.tempo) + "  •  x" + "%.2f".format(s.pitch)) { tempoOpen = true }
+                )
+            )
             }
             }
         }

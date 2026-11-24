@@ -169,7 +169,7 @@ fun LyricsStage(s: AppState, song: Song, st: () -> Float) {
                 lastPos = s.position
                 lastAt = now
             }
-            smoothMs = (lastPos * 1000f).toLong() + (if (s.playing) now - lastAt else 0L)
+            smoothMs = (lastPos * 1000f).toLong() + (if (s.playing) ((now - lastAt) * s.tempo).toLong().coerceAtMost((1300L * s.tempo).toLong()) else 0L)
         }
     }
     val playing by remember(lines, synced, off) {
