@@ -1799,7 +1799,6 @@ private fun PlayerMenuSheet(
                 )
             )
             }
-            }
         }
     }
     if (tempoOpen) TempoPitchDialog(s) { tempoOpen = false }
