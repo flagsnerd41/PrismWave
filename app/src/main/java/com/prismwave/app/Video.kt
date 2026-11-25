@@ -87,6 +87,7 @@ object VideoSync {
 
     suspend fun check(song: Song) {
         if (has.containsKey(song.id) || Opts.offline) return
+        if (song.url.startsWith("content://")) { has[song.id] = false; return }
         try {
             val p = Engine.videoPair(song.url, heights[quality.coerceIn(0, heights.lastIndex)])
             if (p != null) {

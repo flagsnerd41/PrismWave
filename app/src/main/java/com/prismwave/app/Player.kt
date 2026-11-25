@@ -517,8 +517,22 @@ private fun TimeLabels(s: AppState, total: Float) {
         return
     }
     val pos = s.position.coerceIn(0f, total)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    val badge = s.current?.let { StreamMeta.byUrl[it.url] }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(fmt(pos.toInt()), color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        if (badge != null) {
+            Text(
+                badge,
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White.copy(alpha = 0.14f))
+                    .padding(horizontal = 12.dp, vertical = 3.dp)
+            )
+        }
         Text("-" + fmt((total - pos).toInt()), color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
     }
 }
@@ -965,8 +979,13 @@ private fun ImmersiveBody(
     onSleep: () -> Unit,
     onQueue: () -> Unit
 ) {
-    val art = rememberArtColor(song)
-    val bottom by animateColorAsState(lerp(art, Color.Black, 0.55f), tween(700), label = "ibot")
+    ImmersivePrefs.init(androidx.compose.ui.platform.LocalContext.current.applicationContext)
+    val artRaw = rememberArtColor(song)
+    val soft = !Opts.lite && !s.reduceMotion
+    // the colors drift slowly from one song to the next
+    val art by animateColorAsState(artRaw, tween(if (soft) 1600 else 0), label = "iart")
+    val bottom by animateColorAsState(lerp(artRaw, Color.Black, 0.55f), tween(if (soft) 1600 else 0), label = "ibot")
+    val backBlur = ImmersivePrefs.blur.dp
     val total = song.seconds.coerceAtLeast(1).toFloat()
     val stageFade = remember {
         Brush.verticalGradient(
@@ -981,9 +1000,11 @@ private fun ImmersiveBody(
         val stageHeight = maxHeight * 0.60f
         // blurred backdrop that fills the whole screen
         if (VideoSync.showVideo(song) && VideoPrefs.liveBackdrop) {
-            VideoStage(s, song, Modifier.fillMaxSize().blur(16.dp), low = true)
+            VideoStage(s, song, Modifier.fillMaxSize().blur(backBlur), low = true)
         } else {
-            Cover(song, Modifier.fillMaxSize().blur(16.dp), 0.dp, 160.sp, quality = 600)
+            androidx.compose.animation.Crossfade(song, animationSpec = tween(if (soft) 1100 else 0), label = "iback") { sg ->
+                Cover(sg, Modifier.fillMaxSize().blur(backBlur), 0.dp, 160.sp, quality = 600)
+            }
         }
         Box(
             Modifier.fillMaxSize().background(

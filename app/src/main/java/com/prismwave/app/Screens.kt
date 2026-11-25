@@ -968,9 +968,10 @@ private fun LibraryMain(s: AppState) {
                     Modifier.appear(1).fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).height(120.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    LocalFilesAuto()
                     BentoTile(
-                        "Local files", "On device", Icons.Rounded.Folder, blue,
-                        emptyList(), Modifier.weight(1f).fillMaxHeight()
+                        "Local files", if (LocalFiles.songs.isEmpty()) "On device" else LocalFiles.songs.size.toString() + " songs", Icons.Rounded.Folder, blue,
+                        LocalFiles.songs.take(4), Modifier.weight(1f).fillMaxHeight()
                     ) { s.libraryOpen = "Local Files" }
                     BentoTile(
                         "My top 50", "All time", Icons.Rounded.TrendingUp, violet,
@@ -1015,6 +1016,7 @@ fun SongListScreen(s: AppState, title: String) {
         "My top 50" -> s.topPlayed()
         "Offline" -> DownloadStore.songs.toList()
         "Cached" -> s.cachedSongs()
+        "Local Files" -> LocalFiles.songs.toList()
         else -> emptyList()
     }
     LazyColumn(contentPadding = PaddingValues(top = statusTop(), bottom = 220.dp)) {
@@ -1025,10 +1027,14 @@ fun SongListScreen(s: AppState, title: String) {
                 Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
         }
+        if (title == "Local Files") {
+            item { LocalFilesBar() }
+        }
         if (songs.isEmpty()) {
             item {
                 Text(
                     when (title) {
+                        "Local Files" -> "No music found yet. Tap Scan to look for songs on this phone. Anything under 1 minute is ignored."
                         "Liked songs" -> "No liked songs yet. Open a song's menu and tap Like."
                         "Offline" -> "No downloads yet. Open a song's menu and tap Download."
                         "History", "My top 50" -> "Play something first"

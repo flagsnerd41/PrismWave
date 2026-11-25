@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -30,7 +31,6 @@ object TransitionPrefs {
     private var p: SharedPreferences? = null
     var blur by mutableStateOf(true)
     var blurSecs by mutableStateOf(6)
-    var shuffle by mutableStateOf(true)
 
     fun init(ctx: Context) {
         if (p != null) return
@@ -38,22 +38,19 @@ object TransitionPrefs {
         p = sp
         blur = sp.getBoolean("blur", true)
         blurSecs = sp.getInt("blurSecs", 6).coerceIn(3, 12)
-        shuffle = sp.getBoolean("shuffle", true)
     }
 
     fun save() {
         p?.edit()
             ?.putBoolean("blur", blur)
             ?.putInt("blurSecs", blurSecs)
-            ?.putBoolean("shuffle", shuffle)
             ?.apply()
     }
 }
 
 // The big cover in the player.
 // 1. The last seconds of a song blur the cover slowly (same length as the audio blur-out).
-// 2. When it is super blurry the cover flicks through random covers from your music.
-// 3. It lands on the next song's cover and slowly clears, like the muffled audio clears.
+// 2. The next song's cover is swapped in while it is blurry and slowly clears, like the muffled audio clears.
 @Composable
 fun TransitionCover(
     s: AppState,
@@ -88,31 +85,20 @@ fun TransitionCover(
     val b = if (busy) post.value else pre
 
     LaunchedEffect(song.id) {
-        if (shown.id == song.id || !TransitionPrefs.shuffle || Opts.lite || s.reduceMotion) {
+        if (shown.id == song.id || Opts.lite || s.reduceMotion) {
             shown = song
             busy = false
             return@LaunchedEffect
         }
+        // the new cover is swapped in while it is blurred, then it clears softly
         val natural = lastBlur[0] > 0.45f
-        post.snapTo(if (natural) lastBlur[0] else 0f)
+        post.snapTo(if (natural) lastBlur[0] else 0.55f)
         busy = true
-        post.animateTo(1f, tween(if (natural) 300 else 260))
-        val src = if (s.coverPool.isNotEmpty()) s.coverPool else (s.queue + s.history.toList() + s.liked.toList())
-        val pool = src
-            .filter { it.id != song.id && it.id != shown.id && it.thumb != null }
-            .distinctBy { it.id }
-            .shuffled()
-            .take(12)
-        val steps = if (natural) pool.size.coerceAtMost(10) else pool.size.coerceAtMost(5)
-        for (i in 0 until steps) {
-            shown = pool[i]
-            delay(65L + i * 28L)
-        }
         shown = song
         val clearMs = if (natural) {
             if (StudioPrefs.mixOn) (StudioPrefs.mixSecs * 1000L).coerceIn(2500L, 8000L) else 3500L
         } else {
-            1200L
+            950L
         }
         post.animateTo(0f, tween(clearMs.toInt(), easing = LinearOutSlowInEasing))
         busy = false
@@ -124,7 +110,13 @@ fun TransitionCover(
     Box(modifier.clip(RoundedCornerShape(corner))) {
         Cover(
             shown,
-            if (b > 0.01f) Modifier.fillMaxSize().blur((b * 30f).dp) else Modifier.fillMaxSize(),
+            if (b > 0.01f) {
+                Modifier.fillMaxSize()
+                    .graphicsLayer { scaleX = 1f + 0.06f * b; scaleY = 1f + 0.06f * b }
+                    .blur((b * 30f).dp)
+            } else {
+                Modifier.fillMaxSize()
+            },
             0.dp,
             textSize,
             quality = quality

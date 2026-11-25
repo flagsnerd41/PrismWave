@@ -301,7 +301,7 @@ object DiscordRpc {
         if (sg.seconds > 1) ts.put("end", start + sg.seconds * 1000L)
         a.put("timestamps", ts)
         val assets = JSONObject()
-        val cover = sg.thumb?.let { resolveImage(artUrl(it, 512)) }
+        val cover = sg.thumb?.takeIf { it.startsWith("http") }?.let { resolveImage(artUrl(it, 512)) }
         val logo = resolveImage(LOGO_URL)
         if (cover != null) {
             assets.put("large_image", cover).put("large_text", sg.title)

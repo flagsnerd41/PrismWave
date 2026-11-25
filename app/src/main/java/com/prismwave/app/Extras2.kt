@@ -94,7 +94,6 @@ object AccountPrefs {
 fun StyledSeekBar(s: AppState, total: Float, color: Color, modifier: Modifier = Modifier) {
     val song = s.current
     Column(modifier.fillMaxWidth().controlGlow(color), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (song != null && SeekPrefs.style != 5) StreamChip(song)
         val onSeek: (Float) -> Unit = { s.seekTo(it) }
         when (SeekPrefs.style) {
             1 -> M3Seek({ s.position }, total, onSeek, color)

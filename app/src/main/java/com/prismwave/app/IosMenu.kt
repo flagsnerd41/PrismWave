@@ -104,8 +104,8 @@ object GlassIcons {
 }
 
 /**
- * Draws an icon as clear glass: the shape of the icon shows a magnified, saturated copy of what is
- * behind it, with a dark tint so it stays readable. It moves with the content, so the colors change live.
+ * Draws an icon as frosted glass: the shape of the icon shows a blurred copy of what is
+ * behind it under a white tint, so it reads as a white icon with blur inside. It moves with the content, so the colors change live.
  */
 fun Modifier.liquidGlyph(): Modifier = composed {
     val backdrop = LocalBackdrop.current
@@ -124,16 +124,16 @@ fun Modifier.liquidGlyph(): Modifier = composed {
                 val w = size.width.toInt().coerceAtLeast(1)
                 val h = size.height.toInt().coerceAtLeast(1)
                 layer.blendMode = BlendMode.SrcIn
-                layer.renderEffect = BlurEffect(2.5f, 2.5f, TileMode.Clamp)
-                layer.colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(2.2f) })
+                layer.renderEffect = BlurEffect(14f, 14f, TileMode.Clamp)
+                layer.colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.5f) })
                 layer.record(this, layoutDirection, IntSize(w, h)) {
                     val cx = pos.x + w / 2f
                     val cy = pos.y + h / 2f
                     // the lens: the background seen 2.6x bigger around the icon, so the colors bend inside it
-                    scale(2.6f, pivot = Offset(cx, cy)) {
+                    scale(1.3f, pivot = Offset(cx, cy)) {
                         translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
                     }
-                    drawRect(Color.Black.copy(alpha = 0.50f))
+                    drawRect(Color.White.copy(alpha = 0.66f))
                 }
                 drawLayer(layer)
             }

@@ -1183,10 +1183,16 @@ private fun PfAppearancePage(s: AppState) {
         PfSwitch(Icons.Rounded.AutoAwesome, "Glow behind controls", "Soft cover-colored blur behind the progress bar and icons", ControlGlow.on, a) {
             ControlGlow.set(navCtx, it)
         }
+        PfSlider(
+            Icons.Rounded.AutoAwesome, "Immersive blur",
+            if (ImmersivePrefs.blur < 1f) "Off: the backdrop is sharp" else ImmersivePrefs.blur.toInt().toString() + " dp",
+            ImmersivePrefs.blur, 0f..60f, a,
+            { ImmersivePrefs.blur = it }, { ImmersivePrefs.save(navCtx) }
+        )
     }
     PfLabel("Navigation", a)
     PfGroup {
-        PfSwitch(Icons.Rounded.AutoAwesome, "Liquid Glass icons", "Menu bar icons act like clear glass and refract the colors behind them (Android 12+)", GlassIcons.on, a) {
+        PfSwitch(Icons.Rounded.AutoAwesome, "Blurred glass icons", "Menu bar icons are white with a frosted blur inside them (Android 12+)", GlassIcons.on, a) {
             GlassIcons.set(navCtx, it)
         }
         PfChoice(
@@ -1767,6 +1773,13 @@ private fun PfAboutPage(s: AppState) {
 @Composable
 private fun PfChangelogPage(s: AppState) {
     val a = s.accent
+    PfChange("Added local files, immersive blur setting and soft song switch", a, listOf(
+        "Local files: scans this phone for songs longer than 1 minute. Library, Local files",
+        "Settings, Player: Immersive blur slider for the blurred backdrop",
+        "The bitrate badge now sits between the time labels, under the progress bar",
+        "Song switch: the backdrop, colors and cover now change softly. The random covers option is gone",
+        "Menu bar icons are white again with a frosted blur inside them"
+    ))
     PfChange("Added letter by letter lyrics glow, new defaults, auto refresh and more behavior", a, listOf(
         "Lyrics: every letter fills when it is sung, with a soft moving glow",
         "Material 3 progress bar and the Vibrant theme are the new defaults",
@@ -2013,14 +2026,6 @@ private fun PfTransitionsPage(s: AppState) {
             TransitionPrefs.blurSecs.toFloat(), 3f..12f, a,
             { TransitionPrefs.blurSecs = it.toInt() }, { TransitionPrefs.save() }
         )
-        PfSwitch(
-            Icons.Rounded.Palette, "Random covers",
-            "At the blurriest moment the cover shuffles through your songs, then settles on the next one and slowly clears",
-            TransitionPrefs.shuffle, a
-        ) {
-            TransitionPrefs.shuffle = it
-            TransitionPrefs.save()
-        }
         PfNote("The cover blur uses the same length as the audio blur-out or AutoMix when those are on. Lite mode and Reduce motion turn cover effects off.")
     }
     PfLabel("8D audio", a)

@@ -131,6 +131,7 @@ object Engine {
     // Music-only related: the YouTube Mix (radio) for the song, with a YouTube Music search as the fallback.
     // The plain watch-page suggestions are ordinary YouTube videos (gaming, pranks...), so they are not used any more.
     suspend fun related(url: String): List<Song> = withContext(Dispatchers.IO) {
+        if (url.startsWith("content://") || url.startsWith("file://")) return@withContext emptyList<Song>()
         init()
         val id = url.substringAfter("v=", "").substringBefore("&")
         val songs = ArrayList<Song>()
@@ -221,6 +222,7 @@ object Engine {
     }
 
     suspend fun streamUrl(videoUrl: String): String = withContext(Dispatchers.IO) {
+        if (videoUrl.startsWith("content://") || videoUrl.startsWith("file://")) return@withContext videoUrl
         val nowMs = System.currentTimeMillis()
         val hit = synchronized(urlCache) { urlCache[videoUrl] }
         if (hit != null && nowMs - hit.second < 4L * 3600 * 1000) return@withContext hit.first

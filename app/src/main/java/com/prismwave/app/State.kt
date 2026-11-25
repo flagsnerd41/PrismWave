@@ -958,7 +958,7 @@ class AppState(private val ctx: Context) {
         }
         preload()
         queueNextItem()
-        if (!SongCache.has(ctx, sg.id) && !Opts.offline) {
+        if (!SongCache.has(ctx, sg.id) && !Opts.offline && !sg.url.startsWith("content://")) {
             scope.launch {
                 try {
                     SongCache.fetch(ctx, sg.id, Engine.streamUrl(sg.url))
