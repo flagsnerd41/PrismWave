@@ -124,16 +124,16 @@ fun Modifier.liquidGlyph(): Modifier = composed {
                 val w = size.width.toInt().coerceAtLeast(1)
                 val h = size.height.toInt().coerceAtLeast(1)
                 layer.blendMode = BlendMode.SrcIn
-                layer.renderEffect = BlurEffect(14f, 14f, TileMode.Clamp)
-                layer.colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.5f) })
+                layer.renderEffect = BlurEffect(26f, 26f, TileMode.Clamp)
+                layer.colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(2.0f) })
                 layer.record(this, layoutDirection, IntSize(w, h)) {
                     val cx = pos.x + w / 2f
                     val cy = pos.y + h / 2f
                     // the lens: the background seen 2.6x bigger around the icon, so the colors bend inside it
-                    scale(1.3f, pivot = Offset(cx, cy)) {
+                    scale(1.8f, pivot = Offset(cx, cy)) {
                         translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
                     }
-                    drawRect(Color.White.copy(alpha = 0.66f))
+                    drawRect(Color.White.copy(alpha = 0.30f))
                 }
                 drawLayer(layer)
             }
