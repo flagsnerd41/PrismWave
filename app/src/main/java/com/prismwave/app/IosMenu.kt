@@ -133,7 +133,7 @@ fun Modifier.liquidGlyph(): Modifier = composed {
                     scale(1.8f, pivot = Offset(cx, cy)) {
                         translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
                     }
-                    drawRect(Color.White.copy(alpha = 0.30f))
+                    drawRect(Color.White.copy(alpha = 0.96f))
                 }
                 drawLayer(layer)
             }
