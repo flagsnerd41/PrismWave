@@ -61,7 +61,10 @@ fun LiveNavIcon(kind: Int, selected: Boolean, color: Color, size: Dp = 27.dp) {
         Modifier.size(size).graphicsLayer {
             scaleX = pop.value
             scaleY = pop.value
-        }.liquidGlyph()
+        }.liquidGlyph(
+            if (selected) 0.3.dp else 1.dp,
+            if (selected) Color(0xFFFA243C) else null
+        )
     ) {
         val w = this.size.width
         val m = fill

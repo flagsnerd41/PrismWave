@@ -61,6 +61,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -107,17 +108,39 @@ object GlassIcons {
  * Draws an icon as frosted glass: the shape of the icon shows a blurred copy of what is
  * behind it under a white tint, so it reads as a white icon with blur inside. It moves with the content, so the colors change live.
  */
-fun Modifier.liquidGlyph(): Modifier = composed {
+fun Modifier.liquidGlyph(blur: Dp = 0.dp, glow: Color? = null): Modifier = composed {
     val backdrop = LocalBackdrop.current
-    if (!GlassIcons.on || backdrop == null || !backdrop.enabled || Build.VERSION.SDK_INT < 31 || Opts.lite) {
-        return@composed this
-    }
+    val canBlur = Build.VERSION.SDK_INT >= 31
+    val lens = GlassIcons.on && backdrop != null && backdrop.enabled && canBlur && !Opts.lite
+    if (!lens && !(canBlur && (blur > 0.dp || glow != null))) return@composed this
     val layer = rememberGraphicsLayer()
+    val glowLayer = rememberGraphicsLayer()
     var pos by remember { mutableStateOf(Offset.Zero) }
-    this
-        .onGloballyPositioned { pos = it.positionInRoot() }
-        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
+    var m: Modifier = this.onGloballyPositioned { pos = it.positionInRoot() }
+    // soft bloom behind the icon (only for the chosen tab): a blurred, tinted copy of the icon, drawn outside the glass layer
+    if (glow != null && canBlur) {
+        m = m.drawWithContent {
+            val gw = size.width.toInt().coerceAtLeast(1)
+            val gh = size.height.toInt().coerceAtLeast(1)
+            val g = 4.dp.toPx()
+            glowLayer.colorFilter = ColorFilter.tint(glow, BlendMode.SrcIn)
+            glowLayer.renderEffect = BlurEffect(g, g, TileMode.Decal)
+            glowLayer.alpha = 0.8f
+            glowLayer.record(this, layoutDirection, IntSize(gw, gh)) { this@drawWithContent.drawContent() }
+            drawLayer(glowLayer)
+            drawContent()
+        }
+    }
+    // real blur on the icon pixels themselves (not the backdrop, not opacity)
+    m = m.graphicsLayer {
+        if (lens) compositingStrategy = CompositingStrategy.Offscreen
+        if (canBlur && blur > 0.dp) {
+            val px = blur.toPx()
+            renderEffect = BlurEffect(px, px, TileMode.Decal)
+        }
+    }
+    if (lens && backdrop != null) {
+        m = m.drawWithContent {
             // the icon itself is only the shape
             drawContent()
             if (backdrop.size.width > 0) {
@@ -129,7 +152,6 @@ fun Modifier.liquidGlyph(): Modifier = composed {
                 layer.record(this, layoutDirection, IntSize(w, h)) {
                     val cx = pos.x + w / 2f
                     val cy = pos.y + h / 2f
-                    // the lens: the background seen 2.6x bigger around the icon, so the colors bend inside it
                     scale(1.8f, pivot = Offset(cx, cy)) {
                         translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
                     }
@@ -138,6 +160,8 @@ fun Modifier.liquidGlyph(): Modifier = composed {
                 drawLayer(layer)
             }
         }
+    }
+    m
 }
 
 // ------------------------------------------------------------ compact iOS style Now Playing menu
