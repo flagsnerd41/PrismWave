@@ -1192,8 +1192,22 @@ private fun PfAppearancePage(s: AppState) {
     }
     PfLabel("Navigation", a)
     PfGroup {
-        PfSwitch(Icons.Rounded.AutoAwesome, "Blurred glass icons", "Menu bar icons are white with a frosted blur inside them (Android 12+)", GlassIcons.on, a) {
-            GlassIcons.set(navCtx, it)
+        PfChoice(
+            Icons.Rounded.AutoAwesome, "Bar glass", listOf("Blur", "Liquid glass"), if (LiquidGlassOpt.on) 1 else 0, a,
+            "Blur: the normal frosted bar. Liquid glass: the bar bends what is behind it at the edges (Android 13+)"
+        ) {
+            LiquidGlassOpt.set(navCtx, it == 1)
+        }
+        PfSwitch(
+            Icons.Rounded.AutoAwesome, "Icon overlap",
+            if (LiquidGlassOpt.on) "Menu bar icons take the colors of what is behind them, shaped like the icons" else "Only works with Liquid glass",
+            GlassIcons.on && LiquidGlassOpt.on, a
+        ) {
+            if (!LiquidGlassOpt.on) {
+                android.widget.Toast.makeText(navCtx, "Turn on Liquid glass first", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                GlassIcons.set(navCtx, it)
+            }
         }
         PfChoice(
             Icons.Rounded.Palette, "Navigation style", listOf("Classic", "Pill", "Apple Music"), NavPrefs.style, a,

@@ -1672,7 +1672,7 @@ private fun PlayerMenuSheet(
     val open = remember { Animatable(0f) }
     LaunchedEffect(visible) {
         if (visible) {
-            open.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 420f))
+            open.animateTo(1f, spring(dampingRatio = 0.80f, stiffness = 330f))
         } else {
             open.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
         }
@@ -1743,20 +1743,34 @@ private fun PlayerMenuSheet(
                 .heightIn(max = roomDp)
                 .onSizeChanged { cardH = it.height }
                 .graphicsLayer {
-                    val sc = 0.30f + 0.70f * o
-                    scaleX = sc
-                    scaleY = sc
-                    alpha = (o * 1.6f).coerceIn(0f, 1f)
+                    scaleX = 0.12f + 0.88f * o
+                    scaleY = 0.06f + 0.94f * (o * 1.04f)
+                    alpha = (o * 2.4f).coerceIn(0f, 1f)
                     transformOrigin = TransformOrigin(originX, originY)
-                    shadowElevation = 28.dp.toPx() * o.coerceIn(0f, 1f)
-                    shape = RoundedCornerShape(30.dp)
+                    shadowElevation = 30.dp.toPx() * o.coerceIn(0f, 1f)
+                    shape = RoundedCornerShape(32.dp)
                     clip = true
                 }
-                .background(if (Opts.lite) Night else Night.copy(alpha = 0.62f))
+                // liquid glass card: a see-through tint, a light sheen from the top and a bright rim
+                .background(if (Opts.lite) Night else Night.copy(alpha = 0.34f))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.03f), Color.White.copy(alpha = 0.08f))
+                    )
+                )
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.14f), Color.Transparent),
+                        center = Offset(0f, 0f),
+                        radius = 700f
+                    )
+                )
                 .border(
-                    1.dp,
-                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.32f), Color.White.copy(alpha = 0.06f))),
-                    RoundedCornerShape(30.dp)
+                    1.2.dp,
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = 0.70f), Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.32f))
+                    ),
+                    RoundedCornerShape(32.dp)
                 )
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
         ) {
@@ -1870,7 +1884,7 @@ private fun MiniShell(
             content = content
         )
     } else {
-        LiquidGlass(alpha, modifier, radius, content)
+        Glass(alpha, modifier, RoundedCornerShape(radius), content)
     }
 }
 

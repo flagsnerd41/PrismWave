@@ -152,7 +152,7 @@ fun NavBar2(s: AppState) {
             kb?.hide()
         }
     }
-    LiquidGlass(s.glassAlpha(), Modifier.fillMaxWidth().height(68.dp), 34.dp) {
+    Glass(s.glassAlpha(), Modifier.fillMaxWidth().height(68.dp), RoundedCornerShape(34.dp)) {
         Row(
             Modifier.fillMaxSize().padding(6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)

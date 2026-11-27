@@ -34,17 +34,19 @@ import androidx.compose.ui.unit.dp
 
 /** Own on/off switch for the experimental liquid glass bar (Android 13+). */
 object LiquidGlassOpt {
-    var on by mutableStateOf(true)
+    var on by mutableStateOf(false)
     private var loaded = false
     fun init(ctx: Context) {
         if (loaded) return
         loaded = true
-        on = ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).getBoolean("liquidGlass", true)
+        on = ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).getBoolean("liquidGlassNav", false)
     }
     fun set(ctx: Context, v: Boolean) {
         on = v
-        ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).edit().putBoolean("liquidGlass", v).apply()
+        ctx.getSharedPreferences("prismwave", Context.MODE_PRIVATE).edit().putBoolean("liquidGlassNav", v).apply()
     }
+    /** true when the liquid look can really draw (Android 13+, blur backdrop alive) */
+    fun active(b: Backdrop?): Boolean = on && Build.VERSION.SDK_INT >= 33 && b != null && b.enabled && !Opts.lite
 }
 
 private const val LIQUID_AGSL = """
@@ -74,7 +76,9 @@ half4 main(float2 p) {
     half4 cg = content.eval(clamp(p - n * bend * depth * 0.95, lo, hi));
     half4 cb = content.eval(clamp(p - n * bend * depth * 1.10, lo, hi));
     half3 col = half3(cr.r, cg.g, cb.b);
-    col = mix(col, half3(1.0), 0.07);
+    half lum = dot(col, half3(0.299, 0.587, 0.114));
+    col = mix(half3(lum), col, 1.35);
+    col = mix(col, half3(1.0), 0.06);
     float light = 0.5 + 0.5 * dot(n, normalize(float2(-0.5, -0.85)));
     float edge = pow(rim, 3.0);
     col += half3(edge * (0.10 + 0.40 * light));
@@ -98,8 +102,12 @@ fun LiquidGlass(
     radius: Dp = 30.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
-    // liquid glass was removed, the bars always use the normal blur
-    Glass(alpha, modifier, RoundedCornerShape(radius), content)
+    val backdrop = LocalBackdrop.current
+    if (LiquidGlassOpt.active(backdrop) && backdrop != null) {
+        if (Build.VERSION.SDK_INT >= 33) LiquidGlassImpl(backdrop, modifier, radius, content)
+    } else {
+        Glass(alpha, modifier, RoundedCornerShape(radius), content)
+    }
 }
 
 @RequiresApi(33)

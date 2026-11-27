@@ -181,18 +181,22 @@ fun Cover(
     fixedSize: Boolean = false
 ) {
     val ctx = LocalContext.current
+    var loaded by remember(song.thumb, quality) { mutableStateOf(false) }
+    var showPh by remember(song.thumb, quality) { mutableStateOf(true) }
+    // keep the glow a moment after the picture arrives, so the fade-in never flashes dark
+    LaunchedEffect(loaded) {
+        if (loaded) {
+            kotlinx.coroutines.delay(420)
+            showPh = false
+        }
+    }
     Box(
         modifier
             .clip(RoundedCornerShape(radius))
             .background(Brush.linearGradient(listOf(song.color, Night))),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            song.title.take(1),
-            color = Color.White.copy(alpha = 0.8f),
-            fontSize = letterSize,
-            fontWeight = FontWeight.Bold
-        )
+        if (showPh) CoverPlaceholder(song.color, Modifier.fillMaxSize())
         val thumb = song.thumb
         if (thumb != null) {
             var failed by remember(thumb, quality) { mutableStateOf(false) }
@@ -205,6 +209,7 @@ fun Cover(
             AsyncImage(
                 model = req,
                 onError = { failed = true },
+                onSuccess = { loaded = true },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

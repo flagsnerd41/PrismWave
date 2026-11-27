@@ -111,7 +111,8 @@ object GlassIcons {
 fun Modifier.liquidGlyph(blur: Dp = 0.dp, glow: Color? = null): Modifier = composed {
     val backdrop = LocalBackdrop.current
     val canBlur = Build.VERSION.SDK_INT >= 31
-    val lens = GlassIcons.on && backdrop != null && backdrop.enabled && canBlur && !Opts.lite
+    // the overlap look only works on the liquid glass bar
+    val lens = GlassIcons.on && LiquidGlassOpt.active(backdrop) && backdrop != null && canBlur
     if (!lens && !(canBlur && (blur > 0.dp || glow != null))) return@composed this
     val layer = rememberGraphicsLayer()
     val glowLayer = rememberGraphicsLayer()
@@ -155,7 +156,7 @@ fun Modifier.liquidGlyph(blur: Dp = 0.dp, glow: Color? = null): Modifier = compo
                     scale(1.8f, pivot = Offset(cx, cy)) {
                         translate(-pos.x, -pos.y) { drawLayer(backdrop.layer) }
                     }
-                    drawRect(Color.White.copy(alpha = 0.96f))
+                    drawRect(Color.White.copy(alpha = 0.40f))
                 }
                 drawLayer(layer)
             }
@@ -173,8 +174,8 @@ private fun IosGroup(content: @Composable () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.07f))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.10f))
     ) { content() }
 }
 
